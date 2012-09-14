@@ -2,7 +2,7 @@
 
 SCRIPT_PATH=$(cd `dirname $0` && pwd)
 
-USE_BUILDROOT=1
+USE_BUILDROOT=0
 
 if [ "$USE_BUILDROOT" = "1" ]; then
   BUILDROOT=/opt/xbmc-bcm/buildroot
@@ -15,14 +15,15 @@ if [ "$USE_BUILDROOT" = "1" ]; then
 else
   TARBALLS=/opt/xbmc-tarballs
   SDKSTAGE=/opt/bcm-rootfs
-  XBMCPREFIX=/opt/xbmc-bcm/xbmc-bin
+  XBMCPREFIX=/opt/xbmc-bcm/xbmc-dbg
   TARGETFS=/opt/bcm-rootfs
-  TOOLCHAIN=/usr/local/bcm-gcc
+#  TOOLCHAIN=/home/pi/tools/arm-bcm2708/arm-bcm2708hardfp-linux-gnueabi
+  TOOLCHAIN=/home/pi/gcc-linaro-arm-linux-gnueabihf-raspbian-2012.08-20120724_linux
   BUILDROOT=/opt/bcm-rootfs
 fi
 
-sudo mkdir -p $XBMCPREFIX
-sudo chmod 777 $XBMCPREFIX
+mkdir -p $XBMCPREFIX
+chmod 777 $XBMCPREFIX
 mkdir -p $XBMCPREFIX/lib
 mkdir -p $XBMCPREFIX/include
 
