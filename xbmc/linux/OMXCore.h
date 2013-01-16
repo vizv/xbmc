@@ -106,8 +106,8 @@ public:
   OMX_ERRORTYPE SetConfig(OMX_INDEXTYPE configIndex, OMX_PTR configStruct);
   OMX_ERRORTYPE GetConfig(OMX_INDEXTYPE configIndex, OMX_PTR configStruct);
   OMX_ERRORTYPE SendCommand(OMX_COMMANDTYPE cmd, OMX_U32 cmdParam, OMX_PTR cmdParamData);
-  OMX_ERRORTYPE EnablePort(unsigned int port, bool wait = true);
-  OMX_ERRORTYPE DisablePort(unsigned int port, bool wait = true);
+  OMX_ERRORTYPE EnablePort(unsigned int port, bool wait = true, bool lock = true);
+  OMX_ERRORTYPE DisablePort(unsigned int port, bool wait = true, bool lock = true);
   OMX_ERRORTYPE UseEGLImage(OMX_BUFFERHEADERTYPE** ppBufferHdr, OMX_U32 nPortIndex, OMX_PTR pAppPrivate, void* eglImage);
 
   bool          Initialize( const std::string &component_name, OMX_INDEXTYPE index);
@@ -202,6 +202,10 @@ private:
   bool          m_flush_input;
   bool          m_flush_output;
   bool          m_resource_error;
+  OMX_STATETYPE m_state;
+#define MAX_PORT 512
+  bool                m_port_enabled[MAX_PORT];
+  OMX_PORT_PARAM_TYPE m_ports[4];
 };
 
 class COMXCore

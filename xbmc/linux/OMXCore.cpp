@@ -40,6 +40,7 @@
 
 //#define OMX_DEBUG_EVENTS
 //#define OMX_DEBUG_EVENTHANDLER
+//#define TEST_OMX_STATE_CACHE
 
 ////////////////////////////////////////////////////////////////////////////////////////////
 #define CLASSNAME "COMXCoreComponent"
@@ -337,6 +338,10 @@ COMXCoreComponent::COMXCoreComponent()
 
   m_omx_events.clear();
   m_ignore_error = OMX_ErrorNone;
+
+  m_state = OMX_StateLoaded;
+  for (int i=0; i<MAX_PORT; i++)
+    m_port_enabled[i] = true;
 
   pthread_mutex_init(&m_omx_input_mutex, NULL);
   pthread_mutex_init(&m_omx_output_mutex, NULL);
@@ -897,46 +902,35 @@ OMX_ERRORTYPE COMXCoreComponent::DisableAllPorts()
     return OMX_ErrorUndefined;
 
   OMX_ERRORTYPE omx_err = OMX_ErrorNone;
-
-  OMX_INDEXTYPE idxTypes[] = {
-    OMX_IndexParamAudioInit,
-    OMX_IndexParamImageInit,
-    OMX_IndexParamVideoInit, 
-    OMX_IndexParamOtherInit
-  };
-
-  OMX_PORT_PARAM_TYPE ports;
-  OMX_INIT_STRUCTURE(ports);
-
-  int i;
-  for(i=0; i < 4; i++)
+  uint32_t wait_bits = 0;
+  // quicker to send all the disables, then wait for all the responses
+  for(int i=0; i < 4; i++)
   {
-    omx_err = OMX_GetParameter(m_handle, idxTypes[i], &ports);
-    if(omx_err == OMX_ErrorNone) {
-
-      uint32_t j;
-      for(j=0; j<ports.nPorts; j++)
+    for(int j=0; j<(int)m_ports[i].nPorts; j++)
+    {
+      OMX_U32 port = m_ports[i].nStartPortNumber+j;
+      omx_err = DisablePort(port, false, false);
+      if(omx_err != OMX_ErrorNone && omx_err != OMX_ErrorSameState)
       {
-        OMX_PARAM_PORTDEFINITIONTYPE portFormat;
-        OMX_INIT_STRUCTURE(portFormat);
-        portFormat.nPortIndex = ports.nStartPortNumber+j;
-
-        omx_err = OMX_GetParameter(m_handle, OMX_IndexParamPortDefinition, &portFormat);
-        if(omx_err != OMX_ErrorNone)
+        CLog::Log(LOGERROR, "COMXCoreComponent::DisableAllPorts DisablePort error on component %s port %d omx_err(0x%08x)\n", m_componentName.c_str(), port, omx_err);
+        return omx_err;
+      }
+      if (omx_err != OMX_ErrorSameState)
+        wait_bits |= 1<<(j*4+i);
+    }
+  }
+  for(int i=0; i < 4; i++)
+  {
+    for(int j=0; j<(int)m_ports[i].nPorts; j++)
+    {
+      if (wait_bits & (1<<(j*4+i))) {
+        OMX_U32 port = m_ports[i].nStartPortNumber+j;
+        omx_err = WaitForCommand(OMX_CommandPortDisable, port);
+        if (omx_err != OMX_ErrorNone)
         {
-          if(portFormat.bEnabled == OMX_FALSE)
-            continue;
-        }
-
-        omx_err = OMX_SendCommand(m_handle, OMX_CommandPortDisable, ports.nStartPortNumber+j, NULL);
-        if(omx_err != OMX_ErrorNone)
-        {
-          CLog::Log(LOGERROR, "COMXCoreComponent::DisableAllPorts - Error disable port %d on component %s omx_err(0x%08x)", 
-            (int)(ports.nStartPortNumber) + j, m_componentName.c_str(), (int)omx_err);
-        }
-        omx_err = WaitForCommand(OMX_CommandPortDisable, ports.nStartPortNumber+j);
-        if(omx_err != OMX_ErrorNone && omx_err != OMX_ErrorSameState)
+          CLog::Log(LOGERROR, "COMXCoreComponent::DisableAllPorts WaitForCommand error on component %s port %d omx_err(0x%08x)\n", m_componentName.c_str(), port, omx_err);
           return omx_err;
+        }
       }
     }
   }
@@ -1124,11 +1118,16 @@ OMX_ERRORTYPE COMXCoreComponent::SetStateForComponent(OMX_STATETYPE state)
   if(!m_handle)
     return OMX_ErrorUndefined;
 
-  OMX_ERRORTYPE omx_err = OMX_ErrorNone;
-  OMX_STATETYPE state_actual = OMX_StateMax;
-
+  OMX_STATETYPE state_actual = GetState();
   if(state == state_actual)
-    return OMX_ErrorNone;
+  {
+    printf("COMXCoreComponent::SetStateForComponent - Already in state %d status on component %s\n", (int)state, m_componentName.c_str());
+#if !defined(TEST_OMX_STATE_CACHE)
+    return OMX_ErrorSameState;
+#endif
+  }
+
+  OMX_ERRORTYPE omx_err = OMX_ErrorNone;
 
   omx_err = OMX_SendCommand(m_handle, OMX_CommandStateSet, state, 0);
   if (omx_err != OMX_ErrorNone)
@@ -1164,7 +1163,13 @@ OMX_STATETYPE COMXCoreComponent::GetState()
 
   OMX_STATETYPE state;
 
+#if !defined(TEST_OMX_STATE_CACHE)
+  state = m_state;
+#else
   OMX_GetState(m_handle, &state);
+  assert(m_state == state);
+#endif
+
   return state;
 }
 
@@ -1248,13 +1253,23 @@ OMX_ERRORTYPE COMXCoreComponent::SendCommand(OMX_COMMANDTYPE cmd, OMX_U32 cmdPar
   return omx_err;
 }
 
-OMX_ERRORTYPE COMXCoreComponent::EnablePort(unsigned int port,  bool wait)
+OMX_ERRORTYPE COMXCoreComponent::EnablePort(unsigned int port, bool wait, bool lock)
 {
   if(!m_handle)
     return OMX_ErrorUndefined;
 
+#if !defined(TEST_OMX_STATE_CACHE)
+  if (m_port_enabled[port]) {
+    printf("COMXCoreComponent::EnablePort - Already enabled port %d status on component %s\n", port, m_componentName.c_str());
+    return OMX_ErrorSameState;
+  }
+#endif
+  if (m_port_enabled[port])
+    printf("COMXCoreComponent::EnablePort - Already enabled port %d status on component %s\n", port, m_componentName.c_str());
+
   OMX_ERRORTYPE omx_err = OMX_ErrorNone;
 
+#if defined(TEST_OMX_STATE_CACHE)
   OMX_PARAM_PORTDEFINITIONTYPE portFormat;
   OMX_INIT_STRUCTURE(portFormat);
   portFormat.nPortIndex = port;
@@ -1266,7 +1281,10 @@ OMX_ERRORTYPE COMXCoreComponent::EnablePort(unsigned int port,  bool wait)
         port, m_componentName.c_str(), (int)omx_err);
   }
 
+  assert(m_port_enabled[port] == portFormat.bEnabled);
+
   if(portFormat.bEnabled == OMX_FALSE)
+#endif
   {
     omx_err = OMX_SendCommand(m_handle, OMX_CommandPortEnable, port, NULL);
     if(omx_err != OMX_ErrorNone)
@@ -1284,13 +1302,23 @@ OMX_ERRORTYPE COMXCoreComponent::EnablePort(unsigned int port,  bool wait)
   return omx_err;
 }
 
-OMX_ERRORTYPE COMXCoreComponent::DisablePort(unsigned int port, bool wait)
+OMX_ERRORTYPE COMXCoreComponent::DisablePort(unsigned int port, bool wait, bool lock)
 {
   if(!m_handle)
     return OMX_ErrorUndefined;
 
+#if !defined(TEST_OMX_STATE_CACHE)
+  if (!m_port_enabled[port]) {
+     //printf("COMXCoreComponent::DisablePort - Already disabled port %d status on component %s\n", port, m_componentName.c_str());
+     return OMX_ErrorSameState;
+  }
+#endif
+  if (!m_port_enabled[port])
+    printf("COMXCoreComponent::DisablePort - Already disabled port %d status on component %s\n", port, m_componentName.c_str());
+
   OMX_ERRORTYPE omx_err = OMX_ErrorNone;
 
+#if defined(TEST_OMX_STATE_CACHE)
   OMX_PARAM_PORTDEFINITIONTYPE portFormat;
   OMX_INIT_STRUCTURE(portFormat);
   portFormat.nPortIndex = port;
@@ -1302,7 +1330,10 @@ OMX_ERRORTYPE COMXCoreComponent::DisablePort(unsigned int port, bool wait)
         port, m_componentName.c_str(), (int)omx_err);
   }
 
+  assert(m_port_enabled[port] == portFormat.bEnabled);
+
   if(portFormat.bEnabled == OMX_TRUE)
+#endif
   {
     omx_err = OMX_SendCommand(m_handle, OMX_CommandPortDisable, port, NULL);
     if(omx_err != OMX_ErrorNone)
@@ -1428,6 +1459,10 @@ bool COMXCoreComponent::Initialize( const std::string &component_name, OMX_INDEX
   m_omx_events.clear();
   m_ignore_error = OMX_ErrorNone;
 
+  m_state = OMX_StateLoaded;
+  for (int i=0; i<MAX_PORT; i++)
+    m_port_enabled[i] = true;
+
   m_componentName = component_name;
   
   m_callbacks.EventHandler    = &COMXCoreComponent::DecoderEventHandlerCallback;
@@ -1447,14 +1482,26 @@ bool COMXCoreComponent::Initialize( const std::string &component_name, OMX_INDEX
     }
   }
 
+  OMX_INDEXTYPE idxTypes[] = {
+    OMX_IndexParamAudioInit,
+    OMX_IndexParamImageInit,
+    OMX_IndexParamVideoInit,
+    OMX_IndexParamOtherInit
+  };
+
   OMX_PORT_PARAM_TYPE port_param;
   OMX_INIT_STRUCTURE(port_param);
 
-  omx_err = OMX_GetParameter(m_handle, index, &port_param);
-  if (omx_err != OMX_ErrorNone)
+  for(int i=0; i < 4; i++)
   {
-    CLog::Log(LOGERROR, "COMXCoreComponent::Initialize - could not get port_param for component %s omx_err(0x%08x)\n", 
-        component_name.c_str(), (int)omx_err);
+    OMX_INIT_STRUCTURE(m_ports[i]);
+
+    omx_err = OMX_GetParameter(m_handle, idxTypes[i], &m_ports[i]);
+    if(omx_err != OMX_ErrorNone)
+      CLog::Log(LOGERROR, "COMXCoreComponent::Initialize - could not get port_param for component %s port %d omx_err(0x%08x)\n",
+            m_componentName.c_str(), idxTypes[i], omx_err);
+    if (index == idxTypes[i])
+      port_param = m_ports[i];
   }
 
   if(m_componentName != "OMX.broadcom.clock")
@@ -1656,6 +1703,7 @@ OMX_ERRORTYPE COMXCoreComponent::DecoderEventHandler(
       switch(nData1)
       {
         case OMX_CommandStateSet:
+          m_state = (OMX_STATETYPE)nData2;
           switch ((int)nData2)
           {
             case OMX_StateInvalid:
@@ -1702,11 +1750,17 @@ OMX_ERRORTYPE COMXCoreComponent::DecoderEventHandler(
           #endif
         break;
         case OMX_CommandPortDisable:
+          if (nData2 < MAX_PORT)
+            m_port_enabled[nData2] = false;
+          else assert(0);
           #if defined(OMX_DEBUG_EVENTHANDLER)
           CLog::Log(LOGDEBUG, "%s::%s %s - OMX_CommandPortDisable, nData1(0x%x), port %d\n", CLASSNAME, __func__, GetName().c_str(), nData1, (int)nData2);
           #endif
         break;
         case OMX_CommandPortEnable:
+          if (nData2 < MAX_PORT)
+            m_port_enabled[nData2] = true;
+          else assert(0);
           #if defined(OMX_DEBUG_EVENTHANDLER)
           CLog::Log(LOGDEBUG, "%s::%s %s - OMX_CommandPortEnable, nData1(0x%x), port %d\n", CLASSNAME, __func__, GetName().c_str(), nData1, (int)nData2);
           #endif
@@ -1751,9 +1805,9 @@ OMX_ERRORTYPE COMXCoreComponent::DecoderEventHandler(
       switch((OMX_S32)nData1)
       {
         case OMX_ErrorSameState:
-          //#if defined(OMX_DEBUG_EVENTHANDLER)
-          //CLog::Log(LOGERROR, "%s::%s %s - OMX_ErrorSameState, same state\n", CLASSNAME, __func__, GetName().c_str());
-          //#endif
+          #if defined(OMX_DEBUG_EVENTHANDLER)
+          CLog::Log(LOGERROR, "%s::%s %s - OMX_ErrorSameState, same state\n", CLASSNAME, __func__, GetName().c_str());
+          #endif
         break;
         case OMX_ErrorInsufficientResources:
           CLog::Log(LOGERROR, "%s::%s %s - OMX_ErrorInsufficientResources, insufficient resources\n", CLASSNAME, __func__, GetName().c_str());
