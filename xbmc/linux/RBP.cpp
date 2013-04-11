@@ -22,6 +22,11 @@
 #if defined(TARGET_RASPBERRY_PI)
 
 #include "utils/log.h"
+#include "windowing/WindowingFactory.h"
+#include "guilib/GUIWindowManager.h"
+#include "guilib/GraphicContext.h"
+#include "xbmc/settings/DisplaySettings.h"
+#include "Application.h"
 
 #include "cores/omxplayer/OMXImage.h"
 
@@ -159,4 +164,19 @@ void CRBP::Deinitialize()
   m_initialized     = false;
   m_omx_initialized = false;
 }
+
+void CRBP::SuspendVideoOutput()
+{
+  CLog::Log(LOGDEBUG, "Raspberry PI suspending video output\n");
+  g_Windowing.DestroyWindow();
+}
+
+void CRBP::ResumeVideoOutput()
+{
+  CLog::Log(LOGDEBUG, "Raspberry PI resuming video output\n");
+  RESOLUTION_INFO res = CDisplaySettings::Get().GetCurrentResolutionInfo();
+  g_Windowing.CreateNewWindow("XBMC", true, res, CApplication::OnEvent);
+  g_windowManager.MarkDirty();
+}
+
 #endif
