@@ -57,6 +57,13 @@
 # define DLOG(fmt, args...)
 #endif
 
+#if defined(TARGET_RASPBERRY_PI)
+static float get_display_aspect_ratio(HDMI_ASPECT_T aspect);
+static float get_display_aspect_ratio(SDTV_ASPECT_T aspect);
+static bool ClampToGUIDisplayLimits(int &width, int &height);
+static void SetResolutionString(RESOLUTION_INFO &res);
+#endif
+
 
 CEGLNativeTypeRaspberryPI::CEGLNativeTypeRaspberryPI()
 {
@@ -324,79 +331,6 @@ bool CEGLNativeTypeRaspberryPI::SetNativeResolution(const RESOLUTION_INFO &res)
 #endif
 }
 
-#if defined(TARGET_RASPBERRY_PI)
-static float get_display_aspect_ratio(HDMI_ASPECT_T aspect)
-{
-  float display_aspect;
-  switch (aspect) {
-    case HDMI_ASPECT_4_3:   display_aspect = 4.0/3.0;   break;
-    case HDMI_ASPECT_14_9:  display_aspect = 14.0/9.0;  break;
-    case HDMI_ASPECT_16_9:  display_aspect = 16.0/9.0;  break;
-    case HDMI_ASPECT_5_4:   display_aspect = 5.0/4.0;   break;
-    case HDMI_ASPECT_16_10: display_aspect = 16.0/10.0; break;
-    case HDMI_ASPECT_15_9:  display_aspect = 15.0/9.0;  break;
-    case HDMI_ASPECT_64_27: display_aspect = 64.0/27.0; break;
-    default:                display_aspect = 16.0/9.0;  break;
-  }
-  return display_aspect;
-}
-
-static float get_display_aspect_ratio(SDTV_ASPECT_T aspect)
-{
-  float display_aspect;
-  switch (aspect) {
-    case SDTV_ASPECT_4_3:  display_aspect = 4.0/3.0;  break;
-    case SDTV_ASPECT_14_9: display_aspect = 14.0/9.0; break;
-    case SDTV_ASPECT_16_9: display_aspect = 16.0/9.0; break;
-    default:               display_aspect = 4.0/3.0;  break;
-  }
-  return display_aspect;
-}
-
-static bool ClampToGUIDisplayLimits(int &width, int &height)
-{
-  float max_height = (float)CSettings::Get().GetInt("videoscreen.limitgui");
-  float default_ar = 16.0f/9.0f;
-  if (max_height < 540.0f || max_height > 1080.0f)
-    max_height = 1080.0f;
-
-  float ar = (float)width/(float)height;
-  float max_width = max_height * default_ar;
-  // bigger than maximum, so need to clamp
-  if (width > max_width || height > max_height) {
-    // wider than max, so clamp width first
-    if (ar > default_ar)
-    {
-      width = max_width;
-      height = max_width / ar + 0.5f;
-    // taller than max, so clamp height first
-    } else {
-      height = max_height;
-      width = max_height * ar + 0.5f;
-    }
-    return true;
-  }
-
-  return false;
-}
-
-static void SetResolutionString(RESOLUTION_INFO &res)
-{
-  int gui_width  = res.iScreenWidth;
-  int gui_height = res.iScreenHeight;
-
-  ClampToGUIDisplayLimits(gui_width, gui_height);
-
-  res.iWidth = gui_width;
-  res.iHeight = gui_height;
-
-  res.strMode = StringUtils::Format("%dx%d (%dx%d) @ %.2f%s%s%s - Full Screen", res.iScreenWidth, res.iScreenHeight, res.iWidth, res.iHeight, res.fRefreshRate,
-    res.dwFlags & D3DPRESENTFLAG_INTERLACED ? "i" : "",
-    res.dwFlags & D3DPRESENTFLAG_MODE3DTB   ? " 3DTB" : "",
-    res.dwFlags & D3DPRESENTFLAG_MODE3DSBS  ? " 3DSBS" : "");
-}
-#endif
-
 bool CEGLNativeTypeRaspberryPI::ProbeResolutions(std::vector<RESOLUTION_INFO> &resolutions)
 {
 #if defined(TARGET_RASPBERRY_PI)
@@ -639,3 +573,78 @@ void CEGLNativeTypeRaspberryPI::CallbackTvServiceCallback(void *userdata, uint32
 
 #endif
 
+
+// private utility functions
+
+#if defined(TARGET_RASPBERRY_PI)
+static float get_display_aspect_ratio(HDMI_ASPECT_T aspect)
+{
+  float display_aspect;
+  switch (aspect) {
+    case HDMI_ASPECT_4_3:   display_aspect = 4.0/3.0;   break;
+    case HDMI_ASPECT_14_9:  display_aspect = 14.0/9.0;  break;
+    case HDMI_ASPECT_16_9:  display_aspect = 16.0/9.0;  break;
+    case HDMI_ASPECT_5_4:   display_aspect = 5.0/4.0;   break;
+    case HDMI_ASPECT_16_10: display_aspect = 16.0/10.0; break;
+    case HDMI_ASPECT_15_9:  display_aspect = 15.0/9.0;  break;
+    case HDMI_ASPECT_64_27: display_aspect = 64.0/27.0; break;
+    default:                display_aspect = 16.0/9.0;  break;
+  }
+  return display_aspect;
+}
+
+static float get_display_aspect_ratio(SDTV_ASPECT_T aspect)
+{
+  float display_aspect;
+  switch (aspect) {
+    case SDTV_ASPECT_4_3:  display_aspect = 4.0/3.0;  break;
+    case SDTV_ASPECT_14_9: display_aspect = 14.0/9.0; break;
+    case SDTV_ASPECT_16_9: display_aspect = 16.0/9.0; break;
+    default:               display_aspect = 4.0/3.0;  break;
+  }
+  return display_aspect;
+}
+
+static bool ClampToGUIDisplayLimits(int &width, int &height)
+{
+  float max_height = (float)CSettings::Get().GetInt("videoscreen.limitgui");
+  float default_ar = 16.0f/9.0f;
+  if (max_height < 540.0f || max_height > 1080.0f)
+    max_height = 1080.0f;
+
+  float ar = (float)width/(float)height;
+  float max_width = max_height * default_ar;
+  // bigger than maximum, so need to clamp
+  if (width > max_width || height > max_height) {
+    // wider than max, so clamp width first
+    if (ar > default_ar)
+    {
+      width = max_width;
+      height = max_width / ar + 0.5f;
+    // taller than max, so clamp height first
+    } else {
+      height = max_height;
+      width = max_height * ar + 0.5f;
+    }
+    return true;
+  }
+
+  return false;
+}
+
+static void SetResolutionString(RESOLUTION_INFO &res)
+{
+  int gui_width  = res.iScreenWidth;
+  int gui_height = res.iScreenHeight;
+
+  ClampToGUIDisplayLimits(gui_width, gui_height);
+
+  res.iWidth = gui_width;
+  res.iHeight = gui_height;
+
+  res.strMode = StringUtils::Format("%dx%d (%dx%d) @ %.2f%s%s%s - Full Screen", res.iScreenWidth, res.iScreenHeight, res.iWidth, res.iHeight, res.fRefreshRate,
+    res.dwFlags & D3DPRESENTFLAG_INTERLACED ? "i" : "",
+    res.dwFlags & D3DPRESENTFLAG_MODE3DTB   ? " 3DTB" : "",
+    res.dwFlags & D3DPRESENTFLAG_MODE3DSBS  ? " 3DSBS" : "");
+}
+#endif
