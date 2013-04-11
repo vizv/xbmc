@@ -60,6 +60,9 @@ public:
   void WaitVsync();
   double AdjustHDMIClock(double adjust);
 
+  void SuspendVideoOutput();
+  void ResumeVideoOutput();
+
 private:
   DllBcmHost *m_DllBcmHost;
   bool       m_initialized;
