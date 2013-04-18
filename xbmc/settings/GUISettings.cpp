@@ -540,13 +540,13 @@ void CGUISettings::Initialize()
 #endif
 #endif
 
-#if !defined(TARGET_RASPBERRY_PI)
+//#if !defined(TARGET_RASPBERRY_PI)
   map<int,int> guimode;
   guimode.insert(make_pair(34121, AE_SOUND_IDLE  ));
   guimode.insert(make_pair(34122, AE_SOUND_ALWAYS));
   guimode.insert(make_pair(34123, AE_SOUND_OFF   ));
   AddInt(ao, "audiooutput.guisoundmode", 34120, AE_SOUND_IDLE, guimode, SPIN_CONTROL_TEXT);
-#endif
+//#endif
 
   CSettingsCategory* in = AddCategory(SETTINGS_SYSTEM, "input", 14094);
   AddString(in, "input.peripherals", 35000, "", BUTTON_CONTROL_STANDARD);
