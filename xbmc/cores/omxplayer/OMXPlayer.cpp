@@ -485,7 +485,7 @@ bool COMXPlayer::OpenFile(const CFileItem &file, const CPlayerOptions &options)
     if(IsRunning())
       CloseFile();
 
-    if(!m_av_clock.OMXInitialize(false, false))
+    if(!m_av_clock.OMXInitialize(&m_clock, false, false))
     {
       return false;
     }
@@ -684,7 +684,7 @@ bool COMXPlayer::OpenInputStream()
 
   SetAVDelay(g_settings.m_currentVideoSettings.m_AudioDelay);
   SetSubTitleDelay(g_settings.m_currentVideoSettings.m_SubtitleDelay);
-  m_av_clock.Reset();
+  m_clock.Reset();
   m_dvd.Clear();
   m_errorCount = 0;
   m_iChannelEntryTimeOut = 0;
@@ -1682,13 +1682,13 @@ void COMXPlayer::HandlePlaySpeed()
       // when seeking, give the player a headstart to make sure
       // the time it takes to seek doesn't make a difference.
       double error;
-      error  = m_av_clock.GetClock() - m_SpeedState.lastpts;
+      error  = m_clock.GetClock() - m_SpeedState.lastpts;
       error *= m_playSpeed / abs(m_playSpeed);
 
       if(error > DVD_MSEC_TO_TIME(1000))
       {
         CLog::Log(LOGDEBUG, "COMXPlayer::Process - Seeking to catch up");
-        int64_t iTime = (int64_t)DVD_TIME_TO_MSEC(m_av_clock.GetClock() + m_State.time_offset + 500000.0 * m_playSpeed / DVD_PLAYSPEED_NORMAL);
+        int64_t iTime = (int64_t)DVD_TIME_TO_MSEC(m_clock.GetClock() + m_State.time_offset + 500000.0 * m_playSpeed / DVD_PLAYSPEED_NORMAL);
         m_messenger.Put(new CDVDMsgPlayerSeek(iTime, (GetPlaySpeed() < 0), true, false, false, true));
       }
     }
@@ -2292,12 +2292,12 @@ void COMXPlayer::HandleMessages()
         if(m_State.timestamp > 0)
         {
           double offset;
-          offset  = m_av_clock.GetAbsoluteClock() - m_State.timestamp;
+          offset  = m_clock.GetAbsoluteClock() - m_State.timestamp;
           offset *= m_playSpeed / DVD_PLAYSPEED_NORMAL;
           if(offset >  1000) offset =  1000;
           if(offset < -1000) offset = -1000;
           m_State.time     += DVD_TIME_TO_MSEC(offset);
-          m_State.timestamp =  m_av_clock.GetAbsoluteClock();
+          m_State.timestamp =  m_clock.GetAbsoluteClock();
         }
 
         if (speed != DVD_PLAYSPEED_PAUSE && m_playSpeed != DVD_PLAYSPEED_PAUSE && speed != m_playSpeed)
@@ -2317,7 +2317,7 @@ void COMXPlayer::HandleMessages()
         // 2. skip frames and adjust their pts or the clock
         m_playSpeed = speed;
         m_caching = CACHESTATE_DONE;
-        m_av_clock.SetSpeed(speed);
+        m_clock.SetSpeed(speed);
         m_av_clock.OMXSetSpeed(speed);
         m_omxPlayerAudio.SetSpeed(speed);
         m_omxPlayerVideo.SetSpeed(speed);
@@ -2437,7 +2437,7 @@ void COMXPlayer::SetCaching(ECacheState state)
   || state == CACHESTATE_INIT
   || state == CACHESTATE_PVR)
   {
-    m_av_clock.SetSpeed(DVD_PLAYSPEED_PAUSE);
+    m_clock.SetSpeed(DVD_PLAYSPEED_PAUSE);
     m_av_clock.OMXSetSpeed(DVD_PLAYSPEED_PAUSE);
     m_omxPlayerAudio.SetSpeed(DVD_PLAYSPEED_PAUSE);
     m_omxPlayerAudio.SendMessage(new CDVDMsg(CDVDMsg::PLAYER_STARTED), 1);
@@ -2451,7 +2451,7 @@ void COMXPlayer::SetCaching(ECacheState state)
   if(state == CACHESTATE_PLAY
   ||(state == CACHESTATE_DONE && m_caching != CACHESTATE_PLAY))
   {
-    m_av_clock.SetSpeed(m_playSpeed);
+    m_clock.SetSpeed(m_playSpeed);
     m_av_clock.OMXSetSpeed(m_playSpeed);
     m_omxPlayerAudio.SetSpeed(m_playSpeed);
     m_omxPlayerVideo.SetSpeed(m_playSpeed);
@@ -2585,7 +2585,7 @@ void COMXPlayer::Seek(bool bPlus, bool bLargeStep)
      * Alter the standard seek position based on whether any commercial breaks have been
      * automatically skipped.
      */
-    const int clock = DVD_TIME_TO_MSEC(m_av_clock.GetClock());
+    const int clock = DVD_TIME_TO_MSEC(m_clock.GetClock());
     /*
      * If a large backwards seek occurs within 10 seconds of the end of the last automated
      * commercial skip, then seek back to the start of the commercial break under the assumption
@@ -2892,7 +2892,7 @@ int64_t COMXPlayer::GetTime()
   const double limit  = DVD_MSEC_TO_TIME(200);
   if(m_State.timestamp > 0)
   {
-    offset  = m_av_clock.GetAbsoluteClock() - m_State.timestamp;
+    offset  = m_clock.GetAbsoluteClock() - m_State.timestamp;
     offset *= m_playSpeed / DVD_PLAYSPEED_NORMAL;
     if(offset >  limit) offset =  limit;
     if(offset < -limit) offset = -limit;
@@ -2981,6 +2981,7 @@ bool COMXPlayer::OpenAudioStream(int iStream, int source, bool reset)
   m_CurrentAudio.hint = hint;
   m_CurrentAudio.stream = (void*)pStream;
   m_CurrentAudio.started = false;
+  m_clock.SetMasterClock(false);
   m_HasAudio = true;
 
   /* we are potentially going to be waiting on this */
@@ -3355,7 +3356,7 @@ void COMXPlayer::FlushBuffers(bool queued, double pts, bool accurate)
     }
 
     if(pts != DVD_NOPTS_VALUE)
-      m_av_clock.Discontinuity(pts);
+      m_clock.Discontinuity(pts);
     UpdatePlayState(0);
   }
   // let clock know the new time so progress bar updates immediately
@@ -3953,7 +3954,7 @@ int COMXPlayer::AddSubtitleFile(const std::string& filename, const std::string& 
 void COMXPlayer::UpdatePlayState(double timeout)
 {
   if(m_State.timestamp != 0
-  && m_State.timestamp + DVD_MSEC_TO_TIME(timeout) > m_av_clock.GetAbsoluteClock())
+  && m_State.timestamp + DVD_MSEC_TO_TIME(timeout) > m_clock.GetAbsoluteClock())
     return;
 
   SPlayerState state(m_State);
@@ -4078,7 +4079,7 @@ void COMXPlayer::UpdatePlayState(double timeout)
   else
     state.cache_bytes = 0;
 
-  state.timestamp = m_av_clock.GetAbsoluteClock();
+  state.timestamp = m_clock.GetAbsoluteClock();
   //{CLog::Log(LOGINFO, "%s: time:%.2f stamp:%.2f dts:%d m:%d (p:%d,c:%d) =%llu", __func__, (double)state.time, (double)state.timestamp, (int)DVD_TIME_TO_MSEC(state.dts + m_offset_pts), (int)DVD_TIME_TO_MSEC(m_av_clock.OMXMediaTime()), (int)m_playSpeed, (int)m_caching, llrint(state.time + DVD_TIME_TO_MSEC(offset)));}
 
   CSingleLock lock(m_StateSection);
@@ -4088,7 +4089,7 @@ void COMXPlayer::UpdatePlayState(double timeout)
 void COMXPlayer::UpdateApplication(double timeout)
 {
   if(m_UpdateApplication != 0
-  && m_UpdateApplication + DVD_MSEC_TO_TIME(timeout) > m_av_clock.GetAbsoluteClock())
+  && m_UpdateApplication + DVD_MSEC_TO_TIME(timeout) > m_clock.GetAbsoluteClock())
     return;
 
   CDVDInputStream::IChannel* pStream = dynamic_cast<CDVDInputStream::IChannel*>(m_pInputStream);
@@ -4101,7 +4102,7 @@ void COMXPlayer::UpdateApplication(double timeout)
       CApplicationMessenger::Get().SetCurrentItem(item);
     }
   }
-  m_UpdateApplication = m_av_clock.GetAbsoluteClock();
+  m_UpdateApplication = m_clock.GetAbsoluteClock();
 }
 
 bool COMXPlayer::CanRecord()
