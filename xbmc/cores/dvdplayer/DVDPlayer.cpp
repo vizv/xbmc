@@ -1992,6 +1992,7 @@ static void UpdateLimits(double& minimum, double& maximum, double dts)
 
 void CDVDPlayer::CheckContinuity(CCurrentStream& current, DemuxPacket* pPacket)
 {
+return;
   if (m_playSpeed < DVD_PLAYSPEED_PAUSE)
     return;
 
