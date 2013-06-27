@@ -2082,6 +2082,7 @@ static void UpdateLimits(double& minimum, double& maximum, double dts)
 
 void COMXPlayer::CheckContinuity(COMXCurrentStream& current, DemuxPacket* pPacket)
 {
+return;
   if (m_playSpeed < DVD_PLAYSPEED_PAUSE)
     return;
 
