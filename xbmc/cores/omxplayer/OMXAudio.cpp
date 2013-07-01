@@ -104,6 +104,7 @@ COMXAudio::COMXAudio() :
   m_omx_clock       (NULL   ),
   m_av_clock        (NULL   ),
   m_settings_changed(false  ),
+  m_setStartTime    (false  ),
   m_LostSync        (true   ),
   m_SampleRate      (0      ),
   m_eEncoding       (OMX_AUDIO_CodingPCM),
@@ -566,6 +567,7 @@ bool COMXAudio::Initialize(AEAudioFormat format, std::string& device, OMXClock *
 
   m_Initialized   = true;
   m_settings_changed = false;
+  m_setStartTime = true;
   m_last_pts      = DVD_NOPTS_VALUE;
 
   CLog::Log(LOGDEBUG, "COMXAudio::Initialize Input bps %d samplerate %d channels %d buffer size %d bytes per second %d", 
@@ -633,6 +635,7 @@ void COMXAudio::Flush()
   
   m_last_pts      = DVD_NOPTS_VALUE;
   m_LostSync      = true;
+  m_setStartTime  = true;
 }
 
 //***********************************************************************************************
@@ -853,7 +856,7 @@ unsigned int COMXAudio::AddPackets(const void* data, unsigned int len, double dt
 
     uint64_t val  = (uint64_t)(pts == DVD_NOPTS_VALUE) ? 0 : pts;
 
-    if(m_av_clock->AudioStart())
+    if(m_setStartTime)
     {
       omx_buffer->nFlags = OMX_BUFFERFLAG_STARTTIME;
       if(pts == DVD_NOPTS_VALUE)
@@ -862,7 +865,7 @@ unsigned int COMXAudio::AddPackets(const void* data, unsigned int len, double dt
       m_last_pts = pts;
 
       CLog::Log(LOGDEBUG, "COMXAudio::Decode ADec : setStartTime %f\n", (float)val / DVD_TIME_BASE);
-      m_av_clock->AudioStart(false);
+      m_setStartTime = false;
     }
     else
     {
