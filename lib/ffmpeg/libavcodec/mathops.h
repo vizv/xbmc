@@ -178,5 +178,14 @@ if ((y) < (x)) {\
 #   define PACK_2S16(a,b)    PACK_2U16((a)&0xffff, (b)&0xffff)
 #endif
 
+#ifndef MOD_UNLIKELY
+#   define MOD_UNLIKELY(modulus, dividend, divisor, prev_dividend) \
+    do { \
+        if ((prev_dividend) == 0 || (dividend) - (prev_dividend) != (divisor)) \
+            (modulus) = (dividend) % (divisor); \
+        (prev_dividend) = (dividend); \
+    } while (0)
+#endif
+
 #endif /* AVCODEC_MATHOPS_H */
 
