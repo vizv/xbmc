@@ -1107,6 +1107,8 @@ void COMXPlayer::Process()
   if (!CachePVRStream())
     SetCaching(CACHESTATE_FLUSH);
 
+  EDEINTERLACEMODE current_deinterlace = g_settings.m_currentVideoSettings.m_DeinterlaceMode;
+
   while (!m_bAbortRequest)
   {
     const bool m_Pause = m_playSpeed == DVD_PLAYSPEED_PAUSE;
@@ -1121,6 +1123,17 @@ void COMXPlayer::Process()
     float video_fifo = video_pts / DVD_TIME_BASE - stamp * 1e-6;
     float threshold = 0.1f;
     bool audio_fifo_low = false, video_fifo_low = false, audio_fifo_high = false, video_fifo_high = false;
+
+    // if deinterlace setting has changed, we should close and open video
+    if (current_deinterlace != g_settings.m_currentVideoSettings.m_DeinterlaceMode)
+    {
+      int iStream = m_CurrentVideo.id, source = m_CurrentVideo.source;
+      CloseVideoStream(false);
+      OpenVideoStream(iStream, source);
+      if (m_State.canseek)
+        m_messenger.Put(new CDVDMsgPlayerSeek(GetTime(), true, true, true, true, true));
+      current_deinterlace = g_settings.m_currentVideoSettings.m_DeinterlaceMode;
+    }
 
     #ifdef _DEBUG
     static unsigned count;
