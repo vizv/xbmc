@@ -59,6 +59,8 @@ public:
 
 
   bool PumpPowerEvents(IPowerEventsCallback *callback) override { return false; }
+
+  bool ProcessAction(const CAction& action) override { return false; }
 };
 
 // This class will wrap and handle PowerSyscalls.
@@ -88,6 +90,7 @@ public:
 
   static void SettingOptionsShutdownStatesFiller(std::shared_ptr<const CSetting> setting, std::vector< std::pair<std::string, int> > &list, int &current, void *data);
 
+  bool ProcessAction(const CAction& action);
 private:
   void OnSleep() override;
   void OnWake() override;
