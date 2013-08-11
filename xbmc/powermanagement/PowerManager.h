@@ -59,6 +59,8 @@ public:
 
 
   virtual bool PumpPowerEvents(IPowerEventsCallback *callback) { return false; }
+
+  virtual bool ProcessAction(const CAction& action) { return false; }
 };
 
 // This class will wrap and handle PowerSyscalls.
@@ -88,6 +90,7 @@ public:
 
   static void SettingOptionsShutdownStatesFiller(const CSetting *setting, std::vector< std::pair<std::string, int> > &list, int &current, void *data);
 
+  bool ProcessAction(const CAction& action);
 private:
   void OnSleep();
   void OnWake();
