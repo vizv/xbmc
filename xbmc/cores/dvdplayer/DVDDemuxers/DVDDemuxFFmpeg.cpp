@@ -751,8 +751,15 @@ DemuxPacket* CDVDDemuxFFmpeg::Read()
               picture.key_frame= 1;
 //              picture.sample_aspect_ratio = (AVRational){0, 1};
               picture.format = -1;
-              m_dllAvCodec.avcodec_decode_video2(st->codec, &picture,
-                                               &got_picture, &m_pkt.pkt);
+              if (m_dllAvCodec.avcodec_decode_video2(st->codec, &picture,
+                                               &got_picture, &m_pkt.pkt) < 0)
+              {
+                m_dllAvUtil.av_free(st->codec->extradata);
+                st->codec->extradata = NULL;
+printf("decode %d fail\n", i);
+              }
+printf("decode %d\n", i);
+
               m_dllAvCodec.avcodec_close(st->codec);
               st->parser->flags = 0;
             }
@@ -1093,6 +1100,17 @@ void CDVDDemuxFFmpeg::CreateStreams(unsigned int program)
 
 void CDVDDemuxFFmpeg::DisposeStreams()
 {
+#if 0
+  for(unsigned int i = 0; i < m_pFormatContext->nb_streams; i++)
+  {
+    AVStream *st = m_pFormatContext->streams[i];
+    if (st && st->codec->extradata)
+    {
+      m_dllAvUtil.av_free(st->codec->extradata);
+      st->codec->extradata = NULL;
+    }
+  }
+#endif
   std::map<int, CDemuxStream*>::iterator it;
   for(it = m_streams.begin(); it != m_streams.end(); ++it)
     delete it->second;

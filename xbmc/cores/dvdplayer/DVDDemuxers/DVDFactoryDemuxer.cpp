@@ -99,12 +99,11 @@ CDVDDemux* CDVDFactoryDemuxer::CreateDemuxer(CDVDInputStream* pInputStream)
   }
 #endif
 
-  bool streaminfo = true;
+  bool streaminfo = false;
   if (pInputStream->IsStreamType(DVDSTREAM_TYPE_PVRMANAGER))
   {
     CDVDInputStreamPVRManager* pInputStreamPVR = (CDVDInputStreamPVRManager*)pInputStream;
     CDVDInputStream* pOtherStream = pInputStreamPVR->GetOtherStream();
-    streaminfo = !pInputStreamPVR->IsStreamType(DVDSTREAM_TYPE_PVRMANAGER);
     if(pOtherStream)
     {
       /* Used for MediaPortal PVR addon (uses PVR otherstream for playback of rtsp streams) */
