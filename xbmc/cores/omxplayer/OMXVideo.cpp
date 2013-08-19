@@ -68,8 +68,6 @@ COMXVideo::COMXVideo()
   m_is_open           = false;
   m_extradata         = NULL;
   m_extrasize         = 0;
-  m_video_convert     = false;
-  m_video_codec_name  = "";
   m_deinterlace       = false;
   m_deinterlace_request = VS_DEINTERLACEMODE_OFF;
   m_hdmi_clock_sync   = false;
@@ -696,7 +694,6 @@ void COMXVideo::Close()
   m_extradata = NULL;
   m_extrasize = 0;
 
-  m_video_convert     = false;
   m_video_codec_name  = "";
   m_deinterlace       = false;
   m_av_clock          = NULL;
