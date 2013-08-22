@@ -377,6 +377,7 @@ static int init(AVCodecParserContext *s)
     H264Context *h = s->priv_data;
     h->thread_context[0] = h;
     h->s.slice_context_count = 1;
+    ff_h264dsp_init(&h->h264dsp, 8, 1);
     return 0;
 }
 
