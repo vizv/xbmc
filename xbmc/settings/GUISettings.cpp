@@ -476,6 +476,7 @@ void CGUISettings::Initialize()
 
 #if defined(TARGET_RASPBERRY_PI)
   AddBool(ao, "audiooutput.dualaudio", 36042, false);
+  AddBool(ao, "audiooutput.boostcentre", 36043, false);
 #endif
 #if defined(TARGET_DARWIN_IOS)
   CSettingsCategory* aocat = g_sysinfo.IsAppleTV2() ? ao : NULL;
