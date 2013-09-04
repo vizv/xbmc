@@ -11420,3 +11420,8 @@ msgstr ""
 msgctxt "#36041"
 msgid "* Item folder"
 msgstr ""
+
+#: system/settings/rbp.xml
+msgctxt "#36042"
+msgid "Dual audio output"
+msgstr ""
