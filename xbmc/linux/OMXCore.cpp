@@ -612,6 +612,28 @@ OMX_BUFFERHEADERTYPE *COMXCoreComponent::GetOutputBuffer()
   return omx_output_buffer;
 }
 
+
+OMX_ERRORTYPE COMXCoreComponent::WaitForOutputDone(long timeout /*=1000*/)
+{
+  OMX_ERRORTYPE omx_err = OMX_ErrorNone;
+
+  pthread_mutex_lock(&m_omx_output_mutex);
+  struct timespec endtime;
+  clock_gettime(CLOCK_REALTIME, &endtime);
+  add_timespecs(endtime, timeout);
+  while (m_output_buffer_count != m_omx_output_available.size())
+  {
+    int retcode = pthread_cond_timedwait(&m_output_buffer_cond, &m_omx_output_mutex, &endtime);
+    if (retcode != 0) {
+      CLog::Log(LOGERROR, "COMXCoreComponent::WaitForOutputDone %s wait event timeout\n", m_componentName.c_str());
+      break;
+    }
+  }
+  pthread_mutex_unlock(&m_omx_output_mutex);
+  return omx_err;
+}
+
+
 OMX_ERRORTYPE COMXCoreComponent::AllocInputBuffers(bool use_buffers /* = false **/)
 {
   OMX_ERRORTYPE omx_err = OMX_ErrorNone;

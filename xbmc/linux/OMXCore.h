@@ -161,6 +161,8 @@ public:
   OMX_ERRORTYPE FreeInputBuffers();
   OMX_ERRORTYPE FreeOutputBuffers();
 
+  OMX_ERRORTYPE WaitForOutputDone(long timeout=200);
+
   bool IsEOS() { return m_eos; };
   bool BadState() { return m_resource_error; };
   void ResetEos();
