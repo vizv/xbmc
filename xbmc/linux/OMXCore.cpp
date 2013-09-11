@@ -869,9 +869,12 @@ OMX_ERRORTYPE COMXCoreComponent::FreeInputBuffers()
       CLog::Log(LOGERROR, "COMXCoreComponent::FreeInputBuffers error deallocate omx input buffer on component %s omx_err(0x%08x)\n", m_componentName.c_str(), omx_err);
     }
   }
+  pthread_mutex_unlock(&m_omx_input_mutex);
 
-  WaitForCommand(OMX_CommandPortDisable, m_input_port);
+  WaitForInputDone(1000);
   assert(m_omx_input_buffers.size() == m_omx_input_avaliable.size());
+
+  pthread_mutex_lock(&m_omx_input_mutex);
 
   m_omx_input_buffers.clear();
 
@@ -919,8 +922,12 @@ OMX_ERRORTYPE COMXCoreComponent::FreeOutputBuffers()
     }
   }
 
-  WaitForCommand(OMX_CommandPortDisable, m_output_port);
+  pthread_mutex_unlock(&m_omx_output_mutex);
+
+  WaitForOutputDone(1000);
   assert(m_omx_output_buffers.size() == m_omx_output_available.size());
+
+  pthread_mutex_lock(&m_omx_output_mutex);
 
   m_omx_output_buffers.clear();
 
