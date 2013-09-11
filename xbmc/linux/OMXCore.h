@@ -120,21 +120,13 @@ public:
   bool          IsInitialized();
   bool          Deinitialize(bool free_component = false);
 
-  // OMXCore Decoder delegate callback routines.
-  static OMX_ERRORTYPE DecoderEventHandlerCallback(OMX_HANDLETYPE hComponent, OMX_PTR pAppData,
-    OMX_EVENTTYPE eEvent, OMX_U32 nData1, OMX_U32 nData2, OMX_PTR pEventData);
-  static OMX_ERRORTYPE DecoderEmptyBufferDoneCallback(
-    OMX_HANDLETYPE hComponent, OMX_PTR pAppData, OMX_BUFFERHEADERTYPE* pBuffer);
-  static OMX_ERRORTYPE DecoderFillBufferDoneCallback(
-    OMX_HANDLETYPE hComponent, OMX_PTR pAppData, OMX_BUFFERHEADERTYPE* pBufferHeader);
-
   // OMXCore decoder callback routines.
-  OMX_ERRORTYPE DecoderEventHandler(OMX_HANDLETYPE hComponent, OMX_PTR pAppData,
+  OMX_ERRORTYPE DecoderEventHandler(OMX_HANDLETYPE hComponent,
     OMX_EVENTTYPE eEvent, OMX_U32 nData1, OMX_U32 nData2, OMX_PTR pEventData);
   OMX_ERRORTYPE DecoderEmptyBufferDone(
-    OMX_HANDLETYPE hComponent, OMX_PTR pAppData, OMX_BUFFERHEADERTYPE* pBuffer);
+    OMX_HANDLETYPE hComponent, OMX_BUFFERHEADERTYPE* pBuffer);
   OMX_ERRORTYPE DecoderFillBufferDone(
-    OMX_HANDLETYPE hComponent, OMX_PTR pAppData, OMX_BUFFERHEADERTYPE* pBuffer);
+    OMX_HANDLETYPE hComponent, OMX_BUFFERHEADERTYPE* pBuffer);
 
   void TransitionToStateLoaded();
 
