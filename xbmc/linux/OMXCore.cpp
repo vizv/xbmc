@@ -582,6 +582,8 @@ OMX_BUFFERHEADERTYPE *COMXCoreComponent::GetInputBuffer(long timeout)
   add_timespecs(endtime, timeout);
   while (1 && !m_flush_input)
   {
+    if (m_resource_error)
+      break;
     if(!m_omx_input_avaliable.empty())
     {
       omx_input_buffer = m_omx_input_avaliable.front();
@@ -613,6 +615,8 @@ OMX_BUFFERHEADERTYPE *COMXCoreComponent::GetOutputBuffer(long timeout /*=200*/)
   add_timespecs(endtime, timeout);
   while (1 && !m_flush_output)
   {
+    if (m_resource_error)
+      break;
     if(!m_omx_output_available.empty())
     {
       omx_output_buffer = m_omx_output_available.front();
@@ -642,6 +646,8 @@ OMX_ERRORTYPE COMXCoreComponent::WaitForInputDone(long timeout /*=200*/)
   add_timespecs(endtime, timeout);
   while (m_input_buffer_count != m_omx_input_avaliable.size())
   {
+    if (m_resource_error)
+      break;
     int retcode = pthread_cond_timedwait(&m_input_buffer_cond, &m_omx_input_mutex, &endtime);
     if (retcode != 0) {
       if (timeout != 0)
@@ -665,6 +671,8 @@ OMX_ERRORTYPE COMXCoreComponent::WaitForOutputDone(long timeout /*=200*/)
   add_timespecs(endtime, timeout);
   while (m_output_buffer_count != m_omx_output_available.size())
   {
+    if (m_resource_error)
+      break;
     int retcode = pthread_cond_timedwait(&m_output_buffer_cond, &m_omx_output_mutex, &endtime);
     if (retcode != 0) {
       if (timeout != 0)
@@ -1066,6 +1074,8 @@ OMX_ERRORTYPE COMXCoreComponent::WaitForEvent(OMX_EVENTTYPE eventType, long time
       }
     }
 
+    if (m_resource_error)
+      break;
     int retcode = pthread_cond_timedwait(&m_omx_event_cond, &m_omx_event_mutex, &endtime);
     if (retcode != 0) 
     {
@@ -1133,6 +1143,8 @@ OMX_ERRORTYPE COMXCoreComponent::WaitForCommand(OMX_U32 command, OMX_U32 nData2,
       }
     }
 
+    if (m_resource_error)
+      break;
     int retcode = pthread_cond_timedwait(&m_omx_event_cond, &m_omx_event_mutex, &endtime);
     if (retcode != 0) {
       CLog::Log(LOGERROR, "COMXCoreComponent::WaitForCommand %s wait timeout event.eEvent 0x%08x event.command 0x%08x event.nData2 %d\n", 
@@ -1817,6 +1829,7 @@ OMX_ERRORTYPE COMXCoreComponent::DecoderEventHandler(
         break;
         case OMX_ErrorStreamCorrupt:
           CLog::Log(LOGERROR, "%s::%s %s - OMX_ErrorStreamCorrupt, Bitstream corrupt\n", CLASSNAME, __func__, GetName().c_str());
+          m_resource_error = true;
         break;
         case OMX_ErrorUnsupportedSetting:
           CLog::Log(LOGERROR, "%s::%s %s - OMX_ErrorUnsupportedSetting, unsupported setting\n", CLASSNAME, __func__, GetName().c_str());
@@ -1824,6 +1837,13 @@ OMX_ERRORTYPE COMXCoreComponent::DecoderEventHandler(
         default:
           CLog::Log(LOGERROR, "%s::%s %s - OMX_EventError detected, nData1(0x%x), port %d\n",  CLASSNAME, __func__, GetName().c_str(), nData1, (int)nData2);
         break;
+      }
+      // wake things up
+      if (m_resource_error)
+      {
+        pthread_cond_broadcast(&m_output_buffer_cond);
+        pthread_cond_broadcast(&m_input_buffer_cond);
+        pthread_cond_broadcast(&m_omx_event_cond);
       }
     break;
     default:
