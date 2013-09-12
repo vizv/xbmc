@@ -75,15 +75,12 @@ public:
   OMX_ERRORTYPE Deestablish(bool noWait = false);
   OMX_ERRORTYPE Establish(bool portSettingsChanged, bool enable_ports = true);
 private:
-  pthread_mutex_t   m_lock;
   bool              m_portSettingsChanged;
   COMXCoreComponent *m_src_component;
   COMXCoreComponent *m_dst_component;
   unsigned int      m_src_port;
   unsigned int      m_dst_port;
   DllOMX            *m_DllOMX;
-  void              Lock();
-  void              UnLock();
   bool              m_tunnel_set;
 };
 
@@ -165,7 +162,6 @@ private:
   std::string    m_componentName;
   pthread_mutex_t   m_omx_event_mutex;
   pthread_mutex_t   m_omx_eos_mutex;
-  pthread_mutex_t   m_lock;
   std::vector<omx_event> m_omx_events;
 
   OMX_CALLBACKTYPE  m_callbacks;
@@ -201,8 +197,6 @@ private:
 #define MAX_PORT 512
   bool                m_port_enabled[MAX_PORT];
   OMX_PORT_PARAM_TYPE m_ports[4];
-  void              Lock();
-  void              UnLock();
 };
 
 class COMXCore
