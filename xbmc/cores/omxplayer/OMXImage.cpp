@@ -585,7 +585,7 @@ bool COMXImage::HandlePortSettingChange(unsigned int resize_width, unsigned int 
     }
     assert(m_decoded_format.nBufferCountActual == 1);
 
-    omx_err = m_omx_resize.AllocOutputBuffers();//false, true);
+    omx_err = m_omx_resize.AllocOutputBuffers();
     if(omx_err != OMX_ErrorNone)
     {
       CLog::Log(LOGERROR, "%s::%s m_omx_resize.AllocOutputBuffers result(0x%x)\n", CLASSNAME, __func__, omx_err);
@@ -741,14 +741,12 @@ bool COMXImage::Decode(const uint8_t *demuxer_content, unsigned demuxer_bytes, u
     }
   }
 
-  omx_err = m_omx_decoder.WaitForEvent(OMX_EventBufferFlag, 1000);
+  omx_err = m_omx_resize.WaitForOutputDone(1000);
   if(omx_err != OMX_ErrorNone)
   {
-    CLog::Log(LOGERROR, "%s::%s m_omx_decoder.WaitForEvent result(0x%x)\n", CLASSNAME, __func__, omx_err);
+    CLog::Log(LOGERROR, "%s::%s m_omx_resize.WaitForOutputDone result(0x%x)\n", CLASSNAME, __func__, omx_err);
     return false;
   }
-
-  m_omx_tunnel_decode.Deestablish();
 
   if(m_omx_decoder.BadState())
     return false;
@@ -936,10 +934,10 @@ bool COMXImageEnc::Encode(unsigned char *buffer, int size, unsigned width, unsig
   if(omx_err != OMX_ErrorNone)
     return false;
 
-  omx_err = m_omx_encoder.WaitForEvent(OMX_EventBufferFlag, 1000);
+  omx_err = m_omx_encoder.WaitForOutputDone(1000);
   if(omx_err != OMX_ErrorNone)
   {
-    CLog::Log(LOGERROR, "%s::%s m_omx_encoder WaitForEvent result(0x%x)\n", CLASSNAME, __func__, omx_err);
+    CLog::Log(LOGERROR, "%s::%s m_omx_resize.WaitForOutputDone result(0x%x)\n", CLASSNAME, __func__, omx_err);
     return false;
   }
 
