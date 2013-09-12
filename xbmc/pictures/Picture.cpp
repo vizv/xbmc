@@ -33,8 +33,8 @@
 #include "DllSwScale.h"
 #include "guilib/Texture.h"
 #include "guilib/imagefactory.h"
-#if defined(HAS_OMXPLAYER)
-#include "cores/omxplayer/OMXImage.h"
+#if defined(TARGET_RASPBERRY_PI)
+#include "linux/RBP.h"
 #endif
 
 using namespace XFILE;
@@ -45,13 +45,8 @@ bool CPicture::CreateThumbnailFromSurface(const unsigned char *buffer, int width
   if (URIUtils::HasExtension(thumbFile, ".jpg"))
   {
 #if defined(HAS_OMXPLAYER)
-    COMXImage *omxImage = new COMXImage();
-    if (omxImage && omxImage->CreateThumbnailFromSurface((BYTE *)buffer, width, height, XB_FMT_A8R8G8B8, stride, thumbFile.c_str()))
-    {
-      delete omxImage;
+    if (g_RBP.CreateThumbnailFromSurface((BYTE *)buffer, width, height, XB_FMT_A8R8G8B8, stride, thumbFile.c_str()))
       return true;
-    }
-    delete omxImage;
 #endif
   }
 

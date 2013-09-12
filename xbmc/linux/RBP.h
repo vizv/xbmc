@@ -37,6 +37,7 @@
 #if defined(TARGET_RASPBERRY_PI)
 #include "DllBCM.h"
 #include "OMXCore.h"
+#include "cores/omxplayer/OMXImage.h"
 
 class CRBP
 {
@@ -53,6 +54,13 @@ public:
   // stride can be null for packed output
   unsigned char *CaptureDisplay(int width, int height, int *stride, bool swap_red_blue, bool video_only = true);
   DllOMX *GetDllOMX() { return m_OMX ? m_OMX->GetDll() : NULL; }
+  COMXImageFile *LoadJpeg(const CStdString& texturePath);
+  void CloseJpeg(COMXImageFile *file);
+
+  bool DecodeJpeg(COMXImageFile *file, unsigned int maxWidth, unsigned int maxHeight, unsigned int stride, void *pixels);
+  bool ClampLimits(unsigned int &width, unsigned int &height, unsigned int m_width, unsigned int m_height, bool transposed = false);
+  bool CreateThumbnailFromSurface(unsigned char* buffer, unsigned int width, unsigned int height,
+      unsigned int format, unsigned int pitch, const CStdString& destFile);
 
 private:
   DllBcmHost *m_DllBcmHost;
@@ -61,8 +69,6 @@ private:
   int        m_arm_mem;
   int        m_gpu_mem;
   COMXCore   *m_OMX;
-class DllLibOMXCore;
-
 };
 
 extern CRBP g_RBP;

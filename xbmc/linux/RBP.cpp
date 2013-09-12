@@ -22,6 +22,9 @@
 #if defined(TARGET_RASPBERRY_PI)
 
 #include "utils/log.h"
+#include "guilib/GraphicContext.h"
+#include "settings/DisplaySettings.h"
+#include "settings/AdvancedSettings.h"
 
 CRBP::CRBP()
 {
@@ -138,5 +141,100 @@ void CRBP::Deinitialize()
 
   m_initialized     = false;
   m_omx_initialized = false;
+}
+
+bool CRBP::ClampLimits(unsigned int &width, unsigned int &height, unsigned int m_width, unsigned int m_height, bool transposed)
+{
+  RESOLUTION_INFO& res_info = CDisplaySettings::Get().GetResolutionInfo(g_graphicsContext.GetVideoResolution());
+  unsigned int max_width = width;
+  unsigned int max_height = height;
+  const unsigned int gui_width = transposed ? res_info.iHeight:res_info.iWidth;
+  const unsigned int gui_height = transposed ? res_info.iWidth:res_info.iHeight;
+  const float aspect = (float)m_width / m_height;
+  bool clamped = false;
+
+  if (max_width == 0 || max_height == 0)
+  {
+    max_height = g_advancedSettings.m_imageRes;
+
+    if (g_advancedSettings.m_fanartRes > g_advancedSettings.m_imageRes)
+    { // 16x9 images larger than the fanart res use that rather than the image res
+      if (fabsf(aspect / (16.0f/9.0f) - 1.0f) <= 0.01f && m_height >= g_advancedSettings.m_fanartRes)
+      {
+        max_height = g_advancedSettings.m_fanartRes;
+      }
+    }
+    max_width = max_height * 16/9;
+  }
+
+  if (gui_width)
+    max_width = min(max_width, gui_width);
+  if (gui_height)
+    max_height = min(max_height, gui_height);
+
+  max_width  = min(max_width, 2048U);
+  max_height = min(max_height, 2048U);
+
+  width = m_width;
+  height = m_height;
+  if (width > max_width || height > max_height)
+  {
+    if ((unsigned int)(max_width / aspect + 0.5f) > max_height)
+      max_width = (unsigned int)(max_height * aspect + 0.5f);
+    else
+      max_height = (unsigned int)(max_width / aspect + 0.5f);
+    width = max_width;
+    height = max_height;
+    clamped = true;
+  }
+  // Texture.cpp wants even width/height
+  width  = (width  + 15) & ~15;
+  height = (height + 15) & ~15;
+
+  return clamped;
+}
+
+bool CRBP::CreateThumbnailFromSurface(unsigned char* buffer, unsigned int width, unsigned int height,
+      unsigned int format, unsigned int pitch, const CStdString& destFile)
+{
+  COMXImageEnc omxImageEnc;
+  bool ret = omxImageEnc.CreateThumbnailFromSurface(buffer, width, height, format, pitch, destFile);
+  if (!ret)
+    CLog::Log(LOGNOTICE, "%s: unable to create thumbnail %s %dx%d", __func__, destFile.c_str(), width, height);
+  return ret;
+}
+
+COMXImageFile *CRBP::LoadJpeg(const CStdString& texturePath)
+{
+  COMXImageFile *file = new COMXImageFile();
+  if (!file->ReadFile(texturePath))
+  {
+    CLog::Log(LOGNOTICE, "%s: unable to load %s", __func__, texturePath.c_str());
+    delete file;
+    file = NULL;
+  }
+  return file;
+}
+
+void CRBP::CloseJpeg(COMXImageFile *file)
+{
+  delete file;
+}
+
+bool CRBP::DecodeJpeg(COMXImageFile *file, unsigned int width, unsigned int height, unsigned int stride, void *pixels)
+{
+  bool ret = false;
+  COMXImage omx_image;
+  if (omx_image.Decode(file->GetImageBuffer(), file->GetImageSize(), width, height, stride, pixels))
+  {
+    assert(width  == omx_image.GetDecodedWidth());
+    assert(height == omx_image.GetDecodedHeight());
+    assert(stride == omx_image.GetDecodedStride());
+    ret = true;
+  }
+  else
+    CLog::Log(LOGNOTICE, "%s: unable to decode %s %dx%d", __func__, file->GetFilename(), width, height);
+  omx_image.Close();
+  return ret;
 }
 #endif
