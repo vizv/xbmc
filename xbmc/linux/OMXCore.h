@@ -58,7 +58,6 @@ typedef struct omx_event {
   OMX_U32 nData2;
 } omx_event;
 
-class DllLibOMXCore;
 class COMXCore;
 class COMXCoreComponent;
 class COMXCoreTunel;
@@ -83,7 +82,6 @@ private:
   unsigned int      m_src_port;
   unsigned int      m_dst_port;
   DllOMX            *m_DllOMX;
-  bool              m_DllOMXOpen;
   void              Lock();
   void              UnLock();
   bool              m_tunnel_set;
@@ -192,7 +190,6 @@ private:
 
   bool          m_exit;
   DllOMX        *m_DllOMX;
-  bool          m_DllOMXOpen;
   pthread_cond_t    m_input_buffer_cond;
   pthread_cond_t    m_output_buffer_cond;
   pthread_cond_t    m_omx_event_cond;
@@ -217,10 +214,10 @@ public:
   // initialize OMXCore and get decoder component
   bool Initialize();
   void Deinitialize();
+  DllOMX *GetDll() { return m_DllOMX; }
 
 protected:
   bool              m_is_open;
-  bool              m_Initialized;
   DllOMX            *m_DllOMX;
 };
 
