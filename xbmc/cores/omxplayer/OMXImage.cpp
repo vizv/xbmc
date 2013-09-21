@@ -188,15 +188,6 @@ OMX_IMAGE_CODINGTYPE COMXImageFile::GetCodingType(unsigned int &width, unsigned 
     {
       switch(marker)
       {
-        case M_TEM:
-        case M_DRI:
-          CBitstreamConverter::skip_bits(&br, 16);
-          continue;
-        case M_SOI:
-        case M_EOI:
-          continue;
-        
-        case M_SOS:
         case M_DQT:
         case M_DNL:
         case M_DHP:
@@ -259,6 +250,7 @@ OMX_IMAGE_CODINGTYPE COMXImageFile::GetCodingType(unsigned int &width, unsigned 
           nMarker = true;
           break;
 
+        case M_SOS:
         default:
           nMarker = false;
           break;
@@ -275,10 +267,14 @@ OMX_IMAGE_CODINGTYPE COMXImageFile::GetCodingType(unsigned int &width, unsigned 
         {
           progressive = true;
         }
+        int readBits = 2;
         SKIPN(p, 1);
+        readBits ++;
         height = READ16(p);
+        readBits += 2;
         width = READ16(p);
-        SKIPN(p, 1 * (block_size - 9));
+        readBits += 2;
+        SKIPN(p, 1 * (block_size - readBits));
       }
       else if(marker == M_APP1)
       {
