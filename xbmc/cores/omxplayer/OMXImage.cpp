@@ -29,8 +29,6 @@
 #include "utils/log.h"
 #include "linux/XMemUtils.h"
 
-#include "utils/BitstreamConverter.h"
-
 #include <sys/time.h>
 #include <inttypes.h>
 #include "guilib/GraphicContext.h"
@@ -137,6 +135,33 @@ typedef enum {      /* JPEG marker codes */
   M_TEM   = 0x01,
 } JPEG_MARKER;
 
+static uint8_t inline READ8(uint8_t * &p)
+{
+  uint8_t r = p[0];
+  p += 1;
+  return r;
+}
+
+static uint16_t inline READ16(uint8_t * &p)
+{
+  uint16_t r = (p[0] << 8) | p[1];
+  p += 2;
+  return r;
+}
+
+static uint32_t inline READ32(uint8_t * &p)
+{
+  uint32_t r = (p[0] << 24) | (p[1] << 16) | (p[2] << 8) | p[3];
+  p += 4;
+  return r;
+}
+
+static void inline SKIPN(uint8_t * &p, unsigned int n)
+{
+  p += n;
+}
+
+
 OMX_IMAGE_CODINGTYPE COMXImageFile::GetCodingType(unsigned int &width, unsigned int &height)
 {
   OMX_IMAGE_CODINGTYPE eCompressionFormat = OMX_IMAGE_CodingMax;
@@ -146,20 +171,20 @@ OMX_IMAGE_CODINGTYPE COMXImageFile::GetCodingType(unsigned int &width, unsigned 
   if(!m_image_size)
     return OMX_IMAGE_CodingMax;
 
-  bits_reader_t br;
-  CBitstreamConverter::bits_reader_set( &br, m_image_buffer, m_image_size );
+  uint8_t *p = m_image_buffer;
+  uint8_t *q = m_image_buffer + m_image_size;
 
   /* JPEG Header */
-  if(CBitstreamConverter::read_bits(&br, 16) == 0xFFD8)
+  if(READ16(p) == 0xFFD8)
   {
     eCompressionFormat = OMX_IMAGE_CodingJPEG;
 
-    CBitstreamConverter::read_bits(&br, 8);
-    unsigned char marker = CBitstreamConverter::read_bits(&br, 8);
+    READ8(p);
+    unsigned char marker = READ8(p);
     unsigned short block_size = 0;
     bool nMarker = false;
 
-    while(!br.oflow)
+    while(p < q)
     {
       switch(marker)
       {
@@ -230,7 +255,7 @@ OMX_IMAGE_CODINGTYPE COMXImageFile::GetCodingType(unsigned int &width, unsigned 
         case M_JPG13:
         case M_JPG14:
         case M_COM:
-          block_size = CBitstreamConverter::read_bits(&br, 16);
+          block_size = READ16(p);
           nMarker = true;
           break;
 
@@ -250,25 +275,25 @@ OMX_IMAGE_CODINGTYPE COMXImageFile::GetCodingType(unsigned int &width, unsigned 
         {
           progressive = true;
         }
-        CBitstreamConverter::skip_bits(&br, 8);
-        height = CBitstreamConverter::read_bits(&br, 16);
-        width = CBitstreamConverter::read_bits(&br, 16);
-        CBitstreamConverter::skip_bits(&br, 8 * (block_size - 9));
+        SKIPN(p, 1);
+        height = READ16(p);
+        width = READ16(p);
+        SKIPN(p, 1 * (block_size - 9));
       }
       else if(marker == M_APP1)
       {
         int readBits = 2;
 
         // Exif header
-        if(CBitstreamConverter::read_bits(&br, 32) == 0x45786966)
+        if(READ32(p) == 0x45786966)
         {
           bool bMotorolla = false;
           bool bError = false;
-          CBitstreamConverter::skip_bits(&br, 8 * 2);
+          SKIPN(p, 1 * 2);
           readBits += 2;
         
-          char o1 = CBitstreamConverter::read_bits(&br, 8);
-          char o2 = CBitstreamConverter::read_bits(&br, 8);
+          char o1 = READ8(p);
+          char o2 = READ8(p);
           readBits += 2;
 
           /* Discover byte order */
@@ -279,7 +304,7 @@ OMX_IMAGE_CODINGTYPE COMXImageFile::GetCodingType(unsigned int &width, unsigned 
           else
             bError = true;
         
-          CBitstreamConverter::skip_bits(&br, 8 * 2);
+          SKIPN(p, 1 * 2);
           readBits += 2;
 
           if(!bError)
@@ -289,61 +314,61 @@ OMX_IMAGE_CODINGTYPE COMXImageFile::GetCodingType(unsigned int &width, unsigned 
             // Get first IFD offset (offset to IFD0)
             if(bMotorolla)
             {
-              CBitstreamConverter::skip_bits(&br, 8 * 2);
+              SKIPN(p, 1 * 2);
               readBits += 2;
 
-              a = CBitstreamConverter::read_bits(&br, 8);
-              b = CBitstreamConverter::read_bits(&br, 8);
+              a = READ8(p);
+              b = READ8(p);
               readBits += 2;
               offset = (a << 8) + b;
             }
             else
             {
-              a = CBitstreamConverter::read_bits(&br, 8);
-              b = CBitstreamConverter::read_bits(&br, 8);
+              a = READ8(p);
+              b = READ8(p);
               readBits += 2;
               offset = (b << 8) + a;
 
-              CBitstreamConverter::skip_bits(&br, 8 * 2);
+              SKIPN(p, 1 * 2);
               readBits += 2;
             }
 
             offset -= 8;
             if(offset > 0)
             {
-              CBitstreamConverter::skip_bits(&br, 8 * offset);
+              SKIPN(p, 1 * offset);
               readBits += offset;
             } 
 
             // Get the number of directory entries contained in this IFD
             if(bMotorolla)
             {
-              a = CBitstreamConverter::read_bits(&br, 8);
-              b = CBitstreamConverter::read_bits(&br, 8);
+              a = READ8(p);
+              b = READ8(p);
               numberOfTags = (a << 8) + b;
             }
             else
             {
-              a = CBitstreamConverter::read_bits(&br, 8);
-              b = CBitstreamConverter::read_bits(&br, 8);
+              a = READ8(p);
+              b = READ8(p);
               numberOfTags = (b << 8) + a;
             }
             readBits += 2;
 
-            while(numberOfTags && !br.oflow)
+            while(numberOfTags && p < q)
             {
               // Get Tag number
               if(bMotorolla)
               {
-                a = CBitstreamConverter::read_bits(&br, 8);
-                b = CBitstreamConverter::read_bits(&br, 8);
+                a = READ8(p);
+                b = READ8(p);
                 tagNumber = (a << 8) + b;
                 readBits += 2;
               }
               else
               {
-                a = CBitstreamConverter::read_bits(&br, 8);
-                b = CBitstreamConverter::read_bits(&br, 8);
+                a = READ8(p);
+                b = READ8(p);
                 tagNumber = (b << 8) + a;
                 readBits += 2;
               }
@@ -353,27 +378,27 @@ OMX_IMAGE_CODINGTYPE COMXImageFile::GetCodingType(unsigned int &width, unsigned 
               {
                 if(bMotorolla)
                 {
-                  CBitstreamConverter::skip_bits(&br, 8 * 7);
+                  SKIPN(p, 1 * 7);
                   readBits += 7;
-                  m_orientation = CBitstreamConverter::read_bits(&br, 8);
+                  m_orientation = READ8(p);
                   readBits += 1;
-                  CBitstreamConverter::skip_bits(&br, 8 * 2);
+                  SKIPN(p, 1 * 2);
                   readBits += 2;
                 }
                 else
                 {
-                  CBitstreamConverter::skip_bits(&br, 8 * 6);
+                  SKIPN(p, 1 * 6);
                   readBits += 6;
-                  m_orientation = CBitstreamConverter::read_bits(&br, 8);
+                  m_orientation = READ8(p);
                   readBits += 1;
-                  CBitstreamConverter::skip_bits(&br, 8 * 3);
+                  SKIPN(p, 1 * 3);
                   readBits += 3;
                 }
                 break;
               }
               else
               {
-                CBitstreamConverter::skip_bits(&br, 8 * 10);
+                SKIPN(p, 1 * 10);
                 readBits += 10;
               }
               numberOfTags--;
@@ -381,15 +406,15 @@ OMX_IMAGE_CODINGTYPE COMXImageFile::GetCodingType(unsigned int &width, unsigned 
           }
         }
         readBits += 4;
-        CBitstreamConverter::skip_bits(&br, 8 * (block_size - readBits));
+        SKIPN(p, 1 * (block_size - readBits));
       }
       else
       {
-        CBitstreamConverter::skip_bits(&br, 8 * (block_size - 2));
+        SKIPN(p, 1 * (block_size - 2));
       }
 
-      CBitstreamConverter::read_bits(&br, 8);
-      marker = CBitstreamConverter::read_bits(&br, 8);
+      READ8(p);
+      marker = READ8(p);
 
     }
   }
