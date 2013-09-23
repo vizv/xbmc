@@ -25,6 +25,7 @@
 #include "guilib/GraphicContext.h"
 #include "settings/DisplaySettings.h"
 #include "settings/AdvancedSettings.h"
+#include "utils/URIUtils.h"
 
 CRBP::CRBP()
 {
@@ -237,4 +238,29 @@ bool CRBP::DecodeJpeg(COMXImageFile *file, unsigned int width, unsigned int heig
   omx_image.Close();
   return ret;
 }
+
+bool CRBP::CreateThumb(const CStdString& srcFile, unsigned int maxHeight, unsigned int maxWidth, std::string &additional_info, const CStdString& destFile)
+{
+  bool okay = false;
+  COMXImageFile file;
+  COMXImageReEnc reenc;
+  void *pDestBuffer;
+  unsigned int nDestSize;
+  if (URIUtils::HasExtension(srcFile, ".jpg|.tbn") && file.ReadFile(srcFile) && reenc.ReEncode(file, maxWidth, maxHeight, pDestBuffer, nDestSize))
+  {
+    XFILE::CFile outfile;
+    if (outfile.OpenForWrite(destFile, true))
+    {
+      outfile.Write(pDestBuffer, nDestSize);
+      outfile.Close();
+      okay = true;
+    }
+    else
+      CLog::Log(LOGERROR, "%s: can't open output file: %s\n", __func__, destFile.c_str());
+  }
+  if (!okay)
+     CLog::Log(LOGERROR, "%s: %dx%d %s->%s (%s) = %d", __func__, maxWidth, maxHeight, srcFile.c_str(), destFile.c_str(), additional_info.c_str(), okay);
+  return okay;
+}
+
 #endif

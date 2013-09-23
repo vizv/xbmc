@@ -100,4 +100,27 @@ protected:
   CCriticalSection              m_OMXSection;
 };
 
+class COMXImageReEnc
+{
+public:
+  COMXImageReEnc();
+  virtual ~COMXImageReEnc();
+
+  // Required overrides
+  void Close();
+  bool ReEncode(COMXImageFile &srcFile, unsigned int width, unsigned int height, void * &pDestBuffer, unsigned int &nDestSize);
+protected:
+  bool HandlePortSettingChange(unsigned int resize_width, unsigned int resize_height, bool port_settings_changed);
+  // Components
+  COMXCoreComponent             m_omx_decoder;
+  COMXCoreComponent             m_omx_resize;
+  COMXCoreComponent             m_omx_encoder;
+  COMXCoreTunel                 m_omx_tunnel_decode;
+  COMXCoreTunel                 m_omx_tunnel_resize;
+  OMX_BUFFERHEADERTYPE          *m_encoded_buffer;
+  CCriticalSection              m_OMXSection;
+  void                          *m_pDestBuffer;
+  unsigned int                  m_nDestAllocSize;
+};
+
 #endif
