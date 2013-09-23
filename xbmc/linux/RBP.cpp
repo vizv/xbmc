@@ -26,18 +26,27 @@
 #include "settings/DisplaySettings.h"
 #include "settings/AdvancedSettings.h"
 #include "utils/URIUtils.h"
+#include "windowing/WindowingFactory.h"
+#include "Application.h"
+
+#define CheckError() m_result = eglGetError(); if(m_result != EGL_SUCCESS) CLog::Log(LOGERROR, "EGL error in %s: %x",__FUNCTION__, m_result);
 
 CRBP::CRBP()
+: CThread("CRBPWorker")
 {
   m_initialized     = false;
   m_omx_initialized = false;
   m_DllBcmHost      = new DllBcmHost();
   m_OMX             = new COMXCore();
+  pthread_mutex_init(&m_texqueue_mutex, NULL);
+  pthread_cond_init(&m_texqueue_cond, NULL);
 }
 
 CRBP::~CRBP()
 {
   Deinitialize();
+  pthread_mutex_destroy(&m_texqueue_mutex);
+  pthread_cond_destroy(&m_texqueue_cond);
   delete m_OMX;
   delete m_DllBcmHost;
 }
@@ -61,6 +70,8 @@ bool CRBP::Initialize()
     vc_gencmd_number_property(response, "arm", &m_arm_mem);
   if (vc_gencmd(response, sizeof response, "get_mem gpu") == 0)
     vc_gencmd_number_property(response, "gpu", &m_gpu_mem);
+
+  Create();
 
   return true;
 }
@@ -261,6 +272,250 @@ bool CRBP::CreateThumb(const CStdString& srcFile, unsigned int maxHeight, unsign
   if (!okay)
      CLog::Log(LOGERROR, "%s: %dx%d %s->%s (%s) = %d", __func__, maxWidth, maxHeight, srcFile.c_str(), destFile.c_str(), additional_info.c_str(), okay);
   return okay;
+}
+
+void CRBP::AllocTextureInternal(struct textureinfo *tex)
+{
+//printf("%s %s\n", __func__, tex->filename);
+  glGenTextures(1, (GLuint*) &tex->texture);
+//printf("Texture alloc: %d (%s) %p\n", tex->texture, tex->filename, tex);
+  assert(tex->texture);
+  glBindTexture(GL_TEXTURE_2D, tex->texture);
+  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+  glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, tex->width, tex->height, 0, GL_RGB, GL_UNSIGNED_SHORT_5_6_5, 0);
+  tex->egl_image = eglCreateImageKHR(m_egl_display, m_egl_context, EGL_GL_TEXTURE_2D_KHR, (EGLClientBuffer)tex->texture, NULL);
+  sem_post(&tex->sync);
+  GLint m_result;
+  CheckError();
+}
+
+void CRBP::GetTexture(void *userdata, GLuint *texture)
+{
+  struct textureinfo *tex = static_cast<struct textureinfo *>(userdata);
+//printf("%s: %p %d\n", __func__, tex, tex ? tex->texture:0);
+  assert(texture && tex);
+  *texture = tex->texture;
+}
+
+void CRBP::DestroyTextureInternal(struct textureinfo *tex)
+{
+  // we can only call gl functions from the application thread
+
+  bool s = true;
+  //printf("%s: %p %d %p\n", __func__, tex, tex->texture, tex->egl_image);
+  assert (tex->egl_image);
+  assert(tex->texture);
+  s = eglDestroyImageKHR(m_egl_display, tex->egl_image);
+  assert(s);
+  glDeleteTextures(1, (GLuint*) &tex->texture);
+  sem_post(&tex->sync);
+}
+
+void CRBP::DestroyTexture(void *userdata)
+{
+  struct textureinfo *tex = static_cast<struct textureinfo *>(userdata);
+  // we can only call gl functions from the application thread
+
+  tex->action = TEXTURE_DELETE;
+  sem_init(&tex->sync, 0, 0);
+  if ( g_application.IsCurrentThread() )
+  {
+     DestroyTextureInternal(tex);
+  }
+  else
+  {
+    pthread_mutex_lock(&m_texqueue_mutex);
+    m_texqueue.push(tex);
+    pthread_cond_broadcast(&m_texqueue_cond);
+    pthread_mutex_unlock(&m_texqueue_mutex);
+  }
+  // wait for function to have finished (in texture thread)
+  sem_wait(&tex->sync);
+  memset(tex, 0, sizeof *tex);
+  delete tex;
+}
+
+bool CRBP::DecodeJpegToTexture(COMXImageFile *file, unsigned int width, unsigned int height, void **userdata)
+{
+  bool ret = false;
+  COMXTexture omx_image;
+
+  struct textureinfo *tex = new struct textureinfo;
+  assert(tex);
+  if (!tex)
+    return NULL;
+
+  memset(tex, 0, sizeof *tex);
+  tex->parent = (void *)this;
+  tex->width = width;
+  tex->height = height;
+  tex->egl_image = NULL;
+  tex->filename = file->GetFilename();
+  tex->action = TEXTURE_ALLOC;
+  sem_init(&tex->sync, 0, 0);
+
+  pthread_mutex_lock(&m_texqueue_mutex);
+  m_texqueue.push(tex);
+  pthread_cond_broadcast(&m_texqueue_cond);
+  pthread_mutex_unlock(&m_texqueue_mutex);
+
+  // wait for function to have finished (in texture thread)
+  sem_wait(&tex->sync);
+  assert(tex->egl_image);
+  assert(tex->texture);
+
+  if (tex && tex->egl_image && tex->texture && omx_image.Decode(file->GetImageBuffer(), file->GetImageSize(), width, height, tex->egl_image, m_egl_display))
+  {
+    ret = true;
+    *userdata = tex;
+  }
+  else
+  {
+    CLog::Log(LOGNOTICE, "%s: unable to decode to texture %s %dx%d", __func__, file->GetFilename(), width, height);
+    DestroyTexture(tex);
+  }
+  return ret;
+}
+
+static bool ChooseConfig(EGLDisplay display, const EGLint *configAttrs, EGLConfig *config)
+{
+  EGLBoolean eglStatus = true;
+  EGLint     configCount = 0;
+  EGLConfig* configList = NULL;
+  GLint m_result;
+  // Find out how many configurations suit our needs
+  eglStatus = eglChooseConfig(display, configAttrs, NULL, 0, &configCount);
+  CheckError();
+
+  if (!eglStatus || !configCount)
+  {
+    CLog::Log(LOGERROR, "EGL failed to return any matching configurations: %i", configCount);
+    return false;
+  }
+
+  // Allocate room for the list of matching configurations
+  configList = (EGLConfig*)malloc(configCount * sizeof(EGLConfig));
+  if (!configList)
+  {
+    CLog::Log(LOGERROR, "EGL failure obtaining configuration list");
+    return false;
+  }
+
+  // Obtain the configuration list from EGL
+  eglStatus = eglChooseConfig(display, configAttrs, configList, configCount, &configCount);
+  CheckError();
+  if (!eglStatus || !configCount)
+  {
+    CLog::Log(LOGERROR, "EGL failed to populate configuration list: %d", eglStatus);
+    return false;
+  }
+
+  // Select an EGL configuration that matches the native window
+  *config = configList[0];
+
+  free(configList);
+  return m_result == EGL_SUCCESS;
+}
+
+void CRBP::CreateContext()
+{
+  EGLConfig egl_config;
+  GLint m_result;
+
+  m_egl_display = g_Windowing.GetEGLDisplay();
+  eglInitialize(m_egl_display, NULL, NULL);
+  CheckError();
+  eglBindAPI(EGL_OPENGL_ES_API);
+  CheckError();
+  static const EGLint contextAttrs [] = { EGL_CONTEXT_CLIENT_VERSION, 2, EGL_NONE };
+  static const EGLint configAttrs [] = {
+        EGL_RED_SIZE,        8,
+        EGL_GREEN_SIZE,      8,
+        EGL_BLUE_SIZE,       8,
+        EGL_ALPHA_SIZE,      8,
+        EGL_DEPTH_SIZE,     16,
+        EGL_STENCIL_SIZE,    0,
+        EGL_SAMPLE_BUFFERS,  0,
+        EGL_SAMPLES,         0,
+        EGL_SURFACE_TYPE,    EGL_WINDOW_BIT,
+        EGL_RENDERABLE_TYPE, EGL_OPENGL_ES2_BIT,
+        EGL_NONE
+  };
+  bool s = ChooseConfig(m_egl_display, configAttrs, &egl_config);
+  CheckError();
+  if (!s)
+  {
+    CLog::Log(LOGERROR, "%s: Could not find a compatible configuration",__FUNCTION__);
+    return;
+  }
+  m_egl_context = eglCreateContext(m_egl_display, egl_config, g_Windowing.GetEGLContext(), contextAttrs);
+  CheckError();
+  if (m_egl_context == EGL_NO_CONTEXT)
+  {
+    CLog::Log(LOGERROR, "%s: Could not create a context",__FUNCTION__);
+    return;
+  }
+  EGLSurface egl_surface = eglCreatePbufferSurface(m_egl_display, egl_config, NULL);
+  CheckError();
+  if (egl_surface == EGL_NO_SURFACE)
+  {
+    CLog::Log(LOGERROR, "%s: Could not create a surface",__FUNCTION__);
+    return;
+  }
+  s = eglMakeCurrent(m_egl_display, egl_surface, egl_surface, m_egl_context);
+  CheckError();
+  if (!s)
+  {
+    CLog::Log(LOGERROR, "%s: Could not make current",__FUNCTION__);
+    return;
+  }
+}
+
+void CRBP::Process()
+{
+  bool firsttime = true;
+
+  while(!m_bStop)
+  {
+    struct textureinfo *tex = NULL;
+    pthread_mutex_lock(&m_texqueue_mutex);
+    while (!m_bStop)
+    {
+      if (!m_texqueue.empty())
+      {
+        tex = m_texqueue.front();
+        m_texqueue.pop();
+        break;
+      }
+      int retcode = pthread_cond_wait(&m_texqueue_cond, &m_texqueue_mutex);
+      if (retcode != 0)
+        break;
+    }
+    pthread_mutex_unlock(&m_texqueue_mutex);
+
+    if (firsttime)
+      CreateContext();
+    firsttime = false;
+
+    assert(tex);
+    //printf("Got job %s\n", tex->filename);
+    if (tex->action == TEXTURE_ALLOC)
+      AllocTextureInternal(tex);
+    else if (tex->action == TEXTURE_DELETE)
+      DestroyTextureInternal(tex);
+    else assert(0);
+  }
+}
+
+void CRBP::OnStartup()
+{
+}
+
+void CRBP::OnExit()
+{
 }
 
 #endif

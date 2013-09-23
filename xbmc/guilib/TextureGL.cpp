@@ -25,6 +25,10 @@
 #include "utils/GLUtils.h"
 #include "guilib/TextureManager.h"
 
+#if defined(TARGET_RASPBERRY_PI)
+#include "linux/RBP.h"
+#endif
+
 #if defined(HAS_GL) || defined(HAS_GLES)
 
 using namespace std;
@@ -36,6 +40,10 @@ CGLTexture::CGLTexture(unsigned int width, unsigned int height, unsigned int for
 : CBaseTexture(width, height, format)
 {
   m_texture = 0;
+#ifdef TARGET_RASPBERRY_PI
+  m_egl_image = 0;
+  m_loadedToGPU = false;
+#endif
 }
 
 CGLTexture::~CGLTexture()
@@ -45,17 +53,56 @@ CGLTexture::~CGLTexture()
 
 void CGLTexture::CreateTextureObject()
 {
+#ifdef TARGET_RASPBERRY_PI
+  if (m_egl_image && !m_texture)
+  {
+    g_RBP.GetTexture(m_egl_image, &m_texture);
+    assert(m_texture);
+    return;
+  }
+#endif
   glGenTextures(1, (GLuint*) &m_texture);
 }
 
 void CGLTexture::DestroyTextureObject()
 {
+#ifdef TARGET_RASPBERRY_PI
+  if (m_egl_image)
+  {
+    g_RBP.DestroyTexture(m_egl_image);
+    m_egl_image = 0;
+    return;
+  }
+#endif
   if (m_texture)
     g_TextureManager.ReleaseHwTexture(m_texture);
 }
 
 void CGLTexture::LoadToGPU()
 {
+#ifdef TARGET_RASPBERRY_PI
+  if (m_egl_image)
+  {
+    if (m_loadedToGPU)
+    {
+      // nothing to load - probably same image (no change)
+      return;
+    }
+    if (m_texture == 0)
+    {
+      // Have OpenGL generate a texture object handle for us
+      // this happens only one time - the first time the texture is loaded
+      CreateTextureObject();
+    }
+
+    // Bind the texture object
+    glBindTexture(GL_TEXTURE_2D, m_texture);
+
+    m_loadedToGPU = true;
+    return;
+  }
+#endif
+
   if (!m_pixels)
   {
     // nothing to load - probably same image (no change)

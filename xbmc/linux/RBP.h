@@ -39,8 +39,31 @@
 #include "OMXCore.h"
 #include "cores/omxplayer/OMXImage.h"
 
-class CRBP
+#include "system_gl.h"
+#include <EGL/egl.h>
+#include <EGL/eglext.h>
+#include "xbmc/filesystem/File.h"
+#include <semaphore.h>
+#include "threads/Thread.h"
+
+enum TextureAction {TEXTURE_ALLOC, TEXTURE_DELETE };
+
+struct textureinfo {
+  TextureAction action;
+  int width, height;
+  GLuint texture;
+  EGLImageKHR egl_image;
+  sem_t sync;
+  void *parent;
+  const char *filename;
+};
+
+class CRBP : public CThread
 {
+protected:
+  virtual void OnStartup();
+  virtual void OnExit();
+  virtual void Process();
 public:
   CRBP();
   ~CRBP();
@@ -56,20 +79,30 @@ public:
   DllOMX *GetDllOMX() { return m_OMX ? m_OMX->GetDll() : NULL; }
   COMXImageFile *LoadJpeg(const CStdString& texturePath);
   void CloseJpeg(COMXImageFile *file);
+  bool DecodeJpegToTexture(COMXImageFile *file, unsigned int width, unsigned int height, void **userdata);
+  void DestroyTexture(void *userdata);
+  void GetTexture(void *userdata, GLuint *texture);
 
   bool DecodeJpeg(COMXImageFile *file, unsigned int maxWidth, unsigned int maxHeight, unsigned int stride, void *pixels);
   bool ClampLimits(unsigned int &width, unsigned int &height, unsigned int m_width, unsigned int m_height, bool transposed = false);
   bool CreateThumbnailFromSurface(unsigned char* buffer, unsigned int width, unsigned int height,
       unsigned int format, unsigned int pitch, const CStdString& destFile);
   bool CreateThumb(const CStdString& srcFile, unsigned int width, unsigned int height, std::string &additional_info, const CStdString& destFile);
-
+  void CreateContext();
 private:
   DllBcmHost *m_DllBcmHost;
   bool       m_initialized;
   bool       m_omx_initialized;
   int        m_arm_mem;
   int        m_gpu_mem;
+  EGLDisplay m_egl_display;
+  EGLContext m_egl_context;
   COMXCore   *m_OMX;
+  pthread_mutex_t   m_texqueue_mutex;
+  pthread_cond_t    m_texqueue_cond;
+  std::queue <struct textureinfo *> m_texqueue;
+  void AllocTextureInternal(struct textureinfo *tex);
+  void DestroyTextureInternal(struct textureinfo *tex);
 };
 
 extern CRBP g_RBP;

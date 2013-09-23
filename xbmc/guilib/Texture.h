@@ -129,6 +129,9 @@ protected:
   unsigned int m_format;
   int m_orientation;
   bool m_hasAlpha;
+#ifdef TARGET_RASPBERRY_PI
+  void *m_egl_image;
+#endif
 };
 
 #if defined(HAS_GL) || defined(HAS_GLES)

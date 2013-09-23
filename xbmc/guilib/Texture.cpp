@@ -47,6 +47,9 @@ CBaseTexture::CBaseTexture(unsigned int width, unsigned int height, unsigned int
  : m_hasAlpha( true )
 {
   m_pixels = NULL;
+#if defined(TARGET_RASPBERRY_PI)
+  m_egl_image = 0;
+#endif
   m_loadedToGPU = false;
   Allocate(width, height, format);
 }
@@ -66,6 +69,9 @@ void CBaseTexture::Allocate(unsigned int width, unsigned int height, unsigned in
   m_textureWidth = m_imageWidth;
   m_textureHeight = m_imageHeight;
 
+#if defined(TARGET_RASPBERRY_PI)
+  if (m_egl_image) { assert(m_pixels == 0); return; }
+#endif
   if (m_format & XB_FMT_DXT_MASK)
     while (GetPitch() < g_Windowing.GetMinDXTPitch())
       m_textureWidth += GetBlockSize();
@@ -101,12 +107,30 @@ void CBaseTexture::Allocate(unsigned int width, unsigned int height, unsigned in
   CLAMP(m_textureHeight, g_Windowing.GetMaxTextureSize());
   CLAMP(m_imageWidth, m_textureWidth);
   CLAMP(m_imageHeight, m_textureHeight);
+#if defined(TARGET_RASPBERRY_PI)
+  if (m_pixels)
+    delete[] m_pixels;
+  m_pixels = NULL;
+  if (GetPitch() * GetRows() > 0)
+  {
+    m_pixels = new unsigned char[GetPitch() * GetRows()];
+  }
+#else
   delete[] m_pixels;
   m_pixels = new unsigned char[GetPitch() * GetRows()];
+#endif
 }
 
 void CBaseTexture::Update(unsigned int width, unsigned int height, unsigned int pitch, unsigned int format, const unsigned char *pixels, bool loadToGPU)
 {
+#if defined(TARGET_RASPBERRY_PI)
+  if (m_egl_image)
+  {
+    if (loadToGPU)
+      LoadToGPU();
+     return;
+  }
+#endif
   if (pixels == NULL)
     return;
 
@@ -146,6 +170,9 @@ void CBaseTexture::Update(unsigned int width, unsigned int height, unsigned int 
 
 void CBaseTexture::ClampToEdge()
 {
+#if defined(TARGET_RASPBERRY_PI)
+  assert(!m_egl_image);
+#endif
   unsigned int imagePitch = GetPitch(m_imageWidth);
   unsigned int imageRows = GetRows(m_imageHeight);
   unsigned int texturePitch = GetPitch(m_textureWidth);
@@ -230,12 +257,14 @@ bool CBaseTexture::LoadFromFileInternal(const CStdString& texturePath, unsigned 
       int orientation = file->GetOrientation();
       // limit the sizes of jpegs (even if we fail to decode)
       g_RBP.ClampLimits(maxWidth, maxHeight, file->GetWidth(), file->GetHeight(), orientation & 4);
-      Allocate(maxWidth, maxHeight, XB_FMT_A8R8G8B8);
-      if (m_pixels && g_RBP.DecodeJpeg(file, maxWidth, GetRows(), GetPitch(), (void *)m_pixels))
+      assert(!m_egl_image);
+      if (g_RBP.DecodeJpegToTexture(file, maxWidth, maxHeight, &m_egl_image))
       {
+        assert(m_egl_image);
         m_hasAlpha = false;
         if (autoRotate && orientation)
           m_orientation = orientation - 1;
+        Allocate(maxWidth, maxHeight, XB_FMT_A8R8G8B8);
         okay = true;
       }
       g_RBP.CloseJpeg(file);
@@ -377,6 +406,9 @@ unsigned int CBaseTexture::PadPow2(unsigned int x)
 
 bool CBaseTexture::SwapBlueRed(unsigned char *pixels, unsigned int height, unsigned int pitch, unsigned int elements, unsigned int offset)
 {
+#if defined(TARGET_RASPBERRY_PI)
+  assert(pixels);
+#endif
   if (!pixels) return false;
   unsigned char *dst = pixels;
   for (unsigned int y = 0; y < height; y++)

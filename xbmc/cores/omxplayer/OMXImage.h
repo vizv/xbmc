@@ -123,4 +123,28 @@ protected:
   unsigned int                  m_nDestAllocSize;
 };
 
+class COMXTexture
+{
+public:
+  COMXTexture();
+  virtual ~COMXTexture();
+
+  // Required overrides
+  void Close(void);
+  bool Decode(const uint8_t *data, unsigned size, unsigned int width, unsigned int height, void *egl_image, void *egl_display);
+protected:
+  bool HandlePortSettingChange(unsigned int resize_width, unsigned int resize_height, void *egl_image, void *egl_display, bool port_settings_changed);
+
+  // Components
+  COMXCoreComponent m_omx_decoder;
+  COMXCoreComponent m_omx_resize;
+  COMXCoreComponent m_omx_egl_render;
+
+  COMXCoreTunel     m_omx_tunnel_decode;
+  COMXCoreTunel     m_omx_tunnel_egl;
+
+  OMX_BUFFERHEADERTYPE *m_egl_buffer;
+  CCriticalSection              m_OMXSection;
+};
+
 #endif

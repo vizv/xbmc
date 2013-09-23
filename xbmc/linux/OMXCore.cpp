@@ -1320,17 +1320,64 @@ OMX_ERRORTYPE COMXCoreComponent::DisablePort(unsigned int port, bool wait, bool 
 
 OMX_ERRORTYPE COMXCoreComponent::UseEGLImage(OMX_BUFFERHEADERTYPE** ppBufferHdr, OMX_U32 nPortIndex, OMX_PTR pAppPrivate, void* eglImage)
 {
+  OMX_ERRORTYPE omx_err = OMX_ErrorNone;
+
   if(!m_handle)
     return OMX_ErrorUndefined;
 
-  OMX_ERRORTYPE omx_err;
+  m_omx_output_use_buffers = false;
 
-  omx_err = OMX_UseEGLImage(m_handle, ppBufferHdr, nPortIndex, pAppPrivate, eglImage);
-  if(omx_err != OMX_ErrorNone) 
+  OMX_PARAM_PORTDEFINITIONTYPE portFormat;
+  OMX_INIT_STRUCTURE(portFormat);
+  portFormat.nPortIndex = m_output_port;
+
+  omx_err = OMX_GetParameter(m_handle, OMX_IndexParamPortDefinition, &portFormat);
+  if(omx_err != OMX_ErrorNone)
+    return omx_err;
+
+  if(GetState() != OMX_StateIdle)
   {
-    CLog::Log(LOGERROR, "COMXCoreComponent::UseEGLImage - %s failed with omx_err(0x%x)\n", 
-              m_componentName.c_str(), omx_err);
+    if(GetState() != OMX_StateLoaded)
+      SetStateForComponent(OMX_StateLoaded);
+
+    SetStateForComponent(OMX_StateIdle);
   }
+
+  omx_err = EnablePort(m_output_port, false);
+  if(omx_err != OMX_ErrorNone)
+    return omx_err;
+
+  m_output_alignment     = portFormat.nBufferAlignment;
+  m_output_buffer_count  = portFormat.nBufferCountActual;
+  m_output_buffer_size   = portFormat.nBufferSize;
+
+  assert(portFormat.nBufferCountActual == 1);
+
+  CLog::Log(LOGDEBUG, "COMXCoreComponent::UseEGLImage component(%s) - port(%d), nBufferCountMin(%u), nBufferCountActual(%u), nBufferSize(%u) nBufferAlignmen(%u)\n",
+            m_componentName.c_str(), m_output_port, portFormat.nBufferCountMin,
+            portFormat.nBufferCountActual, portFormat.nBufferSize, portFormat.nBufferAlignment);
+
+  for (size_t i = 0; i < portFormat.nBufferCountActual; i++)
+  {
+    omx_err = OMX_UseEGLImage(m_handle, ppBufferHdr, nPortIndex, pAppPrivate, eglImage);
+    if(omx_err != OMX_ErrorNone)
+    {
+      CLog::Log(LOGERROR, "COMXCoreComponent::UseEGLImage - %s failed with omx_err(0x%x)\n",
+                m_componentName.c_str(), omx_err);
+    }
+
+    OMX_BUFFERHEADERTYPE *buffer = *ppBufferHdr;
+    buffer->nOutputPortIndex = m_output_port;
+    buffer->nFilledLen       = 0;
+    buffer->nOffset          = 0;
+    buffer->pAppPrivate      = (void*)i;
+    m_omx_output_buffers.push_back(buffer);
+    m_omx_output_available.push(buffer);
+  }
+
+  omx_err = WaitForCommand(OMX_CommandPortEnable, m_output_port);
+
+  m_flush_output = false;
 
   return omx_err;
 }
