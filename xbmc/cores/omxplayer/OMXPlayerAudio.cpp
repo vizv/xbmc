@@ -539,7 +539,6 @@ bool OMXPlayerAudio::OpenDecoder()
 {
   if(m_DecoderOpen)
   {
-    WaitCompletion();
     m_omxAudio.Deinitialize();
     m_DecoderOpen = false;
   }
