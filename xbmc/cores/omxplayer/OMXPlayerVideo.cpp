@@ -262,7 +262,7 @@ void OMXPlayerVideo::ProcessOverlays(int iGroupId, double pts)
 void OMXPlayerVideo::Output(int iGroupId, double pts, bool bDropPacket)
 {
   if (!g_renderManager.IsStarted()) {
-    CLog::Log(LOGERROR, "%s - renderer not started", __FUNCTION__);
+    CLog::Log(LOGINFO, "%s - renderer not started", __FUNCTION__);
     return;
   }
 
