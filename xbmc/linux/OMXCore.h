@@ -73,7 +73,7 @@ public:
   bool IsInitialized();
   OMX_ERRORTYPE Flush();
   OMX_ERRORTYPE Deestablish(bool noWait = false);
-  OMX_ERRORTYPE Establish(bool portSettingsChanged, bool enable_ports = true);
+  OMX_ERRORTYPE Establish(bool portSettingsChanged, bool enable_ports = true, bool disable_ports = false);
 private:
   bool              m_portSettingsChanged;
   COMXCoreComponent *m_src_component;
@@ -124,6 +124,7 @@ public:
     OMX_HANDLETYPE hComponent, OMX_BUFFERHEADERTYPE* pBuffer);
 
   void TransitionToStateLoaded();
+  void TransitionToStateIdle();
 
   OMX_ERRORTYPE EmptyThisBuffer(OMX_BUFFERHEADERTYPE *omx_buffer);
   OMX_ERRORTYPE FillThisBuffer(OMX_BUFFERHEADERTYPE *omx_buffer);

@@ -665,6 +665,29 @@ bool COMXImage::Decode(const uint8_t *demuxer_content, unsigned demuxer_bytes, u
     return false;
   }
 
+#if 1
+  OMX_PARAM_PORTDEFINITIONTYPE portParam;
+  OMX_INIT_STRUCTURE(portParam);
+  portParam.nPortIndex = m_omx_decoder.GetInputPort();
+
+  omx_err = m_omx_decoder.GetParameter(OMX_IndexParamPortDefinition, &portParam);
+  if(omx_err != OMX_ErrorNone)
+  {
+    CLog::Log(LOGERROR, "%s::%s error GetParameter:OMX_IndexParamPortDefinition omx_err(0x%08x)\n", CLASSNAME, __func__, omx_err);
+    return false;
+  }
+
+  portParam.nBufferCountActual = portParam.nBufferCountMin;
+  portParam.nBufferSize = std::max(portParam.nBufferSize, ALIGN_UP(demuxer_bytes, portParam.nBufferAlignment));
+  portParam.format.image.eCompressionFormat = OMX_IMAGE_CodingJPEG;
+
+  omx_err = m_omx_decoder.SetParameter(OMX_IndexParamPortDefinition, &portParam);
+  if(omx_err != OMX_ErrorNone)
+  {
+    CLog::Log(LOGERROR, "%s::%s error SetParameter:OMX_IndexParamPortDefinition omx_err(0x%08x)\n", CLASSNAME, __func__, omx_err);
+    return false;
+  }
+#else
   // set input format
   OMX_IMAGE_PARAM_PORTFORMATTYPE imagePortFormat;
   OMX_INIT_STRUCTURE(imagePortFormat);
@@ -677,7 +700,7 @@ bool COMXImage::Decode(const uint8_t *demuxer_content, unsigned demuxer_bytes, u
     CLog::Log(LOGERROR, "%s::%s m_omx_decoder.SetParameter OMX_IndexParamImagePortFormat result(0x%x)\n", CLASSNAME, __func__, omx_err);
     return false;
   }
-
+#endif
   omx_err = m_omx_decoder.AllocInputBuffers();
   if(omx_err != OMX_ErrorNone)
   {
@@ -1072,6 +1095,12 @@ bool COMXImageReEnc::HandlePortSettingChange(unsigned int resize_width, unsigned
       return false;
     }
 
+    if(!m_omx_resize.Initialize("OMX.broadcom.resize", OMX_IndexParamImageInit))
+    {
+      CLog::Log(LOGERROR, "%s::%s error m_omx_resize.Initialize\n", CLASSNAME, __func__);
+      return false;
+    }
+
     port_def.nPortIndex = m_omx_resize.GetInputPort();
 
     m_omx_resize.SetParameter(OMX_IndexParamPortDefinition, &port_def);
@@ -1097,6 +1126,12 @@ bool COMXImageReEnc::HandlePortSettingChange(unsigned int resize_width, unsigned
     if(omx_err != OMX_ErrorNone)
     {
       CLog::Log(LOGERROR, "%s::%s m_omx_resize.SetParameter result(0x%x)\n", CLASSNAME, __func__, omx_err);
+      return false;
+    }
+
+    if(!m_omx_encoder.Initialize("OMX.broadcom.image_encode", OMX_IndexParamImageInit))
+    {
+      CLog::Log(LOGERROR, "%s::%s error m_omx_encoder.Initialize\n", CLASSNAME, __func__);
       return false;
     }
 
@@ -1246,19 +1281,29 @@ bool COMXImageReEnc::ReEncode(COMXImageFile &srcFile, unsigned int maxWidth, uns
     CLog::Log(LOGERROR, "%s::%s error m_omx_decoder.Initialize\n", CLASSNAME, __func__);
     return false;
   }
+#if 1
+  OMX_PARAM_PORTDEFINITIONTYPE portParam;
+  OMX_INIT_STRUCTURE(portParam);
+  portParam.nPortIndex = m_omx_decoder.GetInputPort();
 
-  if(!m_omx_resize.Initialize("OMX.broadcom.resize", OMX_IndexParamImageInit))
+  omx_err = m_omx_decoder.GetParameter(OMX_IndexParamPortDefinition, &portParam);
+  if(omx_err != OMX_ErrorNone)
   {
-    CLog::Log(LOGERROR, "%s::%s error m_omx_resize.Initialize\n", CLASSNAME, __func__);
+    CLog::Log(LOGERROR, "%s::%s error GetParameter:OMX_IndexParamPortDefinition omx_err(0x%08x)\n", CLASSNAME, __func__, omx_err);
     return false;
   }
 
-  if(!m_omx_encoder.Initialize("OMX.broadcom.image_encode", OMX_IndexParamImageInit))
+  portParam.nBufferCountActual = portParam.nBufferCountMin;
+  portParam.nBufferSize = std::max(portParam.nBufferSize, ALIGN_UP(demuxer_bytes, portParam.nBufferAlignment));
+  portParam.format.image.eCompressionFormat = OMX_IMAGE_CodingJPEG;
+
+  omx_err = m_omx_decoder.SetParameter(OMX_IndexParamPortDefinition, &portParam);
+  if(omx_err != OMX_ErrorNone)
   {
-    CLog::Log(LOGERROR, "%s::%s error m_omx_encoder.Initialize\n", CLASSNAME, __func__);
+    CLog::Log(LOGERROR, "%s::%s error SetParameter:OMX_IndexParamPortDefinition omx_err(0x%08x)\n", CLASSNAME, __func__, omx_err);
     return false;
   }
-
+#else
   // set input format
   OMX_IMAGE_PARAM_PORTFORMATTYPE imagePortFormat;
   OMX_INIT_STRUCTURE(imagePortFormat);
@@ -1271,7 +1316,7 @@ bool COMXImageReEnc::ReEncode(COMXImageFile &srcFile, unsigned int maxWidth, uns
     CLog::Log(LOGERROR, "%s::%s m_omx_decoder.SetParameter OMX_IndexParamImagePortFormat result(0x%x)\n", CLASSNAME, __func__, omx_err);
     return false;
   }
-
+#endif
   omx_err = m_omx_decoder.AllocInputBuffers();
   if(omx_err != OMX_ErrorNone)
   {
@@ -1313,7 +1358,6 @@ bool COMXImageReEnc::ReEncode(COMXImageFile &srcFile, unsigned int maxWidth, uns
          }
       }
     }
-
     omx_err = m_omx_decoder.WaitForEvent(OMX_EventPortSettingsChanged, 0);
     if(omx_err == OMX_ErrorNone)
     {
@@ -1394,11 +1438,13 @@ void COMXTexture::Close()
     m_omx_tunnel_egl.Flush();
     m_omx_tunnel_egl.Deestablish(false);
   }
+#if 0
   if(m_omx_egl_render.IsInitialized())
   {
     m_omx_egl_render.FlushInput();
     m_omx_egl_render.FlushOutput();
   }
+#endif
   // delete components
   if(m_omx_decoder.IsInitialized())
     m_omx_decoder.Deinitialize();
@@ -1437,6 +1483,12 @@ bool COMXTexture::HandlePortSettingChange(unsigned int resize_width, unsigned in
     return false;
   }
 
+  if(!m_omx_resize.Initialize("OMX.broadcom.resize", OMX_IndexParamImageInit))
+  {
+    CLog::Log(LOGERROR, "%s::%s error m_omx_resize.Initialize", CLASSNAME, __func__);
+    return false;
+  }
+
   port_def.nPortIndex = m_omx_resize.GetInputPort();
 
   omx_err = m_omx_resize.SetParameter(OMX_IndexParamPortDefinition, &port_def);
@@ -1466,6 +1518,12 @@ bool COMXTexture::HandlePortSettingChange(unsigned int resize_width, unsigned in
     return false;
   }
 
+  if(!m_omx_egl_render.Initialize("OMX.broadcom.egl_render", OMX_IndexParamVideoInit))
+  {
+    CLog::Log(LOGERROR, "%s::%s error m_omx_egl_render.Initialize", CLASSNAME, __func__);
+    return false;
+  }
+
   port_def.nPortIndex = m_omx_egl_render.GetOutputPort();
   omx_err = m_omx_egl_render.GetParameter(OMX_IndexParamPortDefinition, &port_def);
   if(omx_err != OMX_ErrorNone)
@@ -1492,7 +1550,7 @@ bool COMXTexture::HandlePortSettingChange(unsigned int resize_width, unsigned in
 
   m_omx_tunnel_decode.Initialize(&m_omx_decoder, m_omx_decoder.GetOutputPort(), &m_omx_resize, m_omx_resize.GetInputPort());
 
-  omx_err = m_omx_tunnel_decode.Establish(false);
+  omx_err = m_omx_tunnel_decode.Establish(false, true, false);
   if(omx_err != OMX_ErrorNone) {
     CLog::Log(LOGERROR, "%s::%s m_omx_tunnel_decode.Establish (%x)", CLASSNAME, __func__, omx_err);
     return false;
@@ -1500,7 +1558,7 @@ bool COMXTexture::HandlePortSettingChange(unsigned int resize_width, unsigned in
 
   m_omx_tunnel_egl.Initialize(&m_omx_resize, m_omx_resize.GetOutputPort(), &m_omx_egl_render, m_omx_egl_render.GetInputPort());
 
-  omx_err = m_omx_tunnel_egl.Establish(false);
+  omx_err = m_omx_tunnel_egl.Establish(false, true, false);
   if(omx_err != OMX_ErrorNone)
   {
     CLog::Log(LOGERROR, "%s::%s m_omx_tunnel_egl.Establish (%x)", CLASSNAME, __func__, omx_err);
@@ -1537,18 +1595,6 @@ bool COMXTexture::Decode(const uint8_t *demuxer_content, unsigned demuxer_bytes,
   if(!m_omx_decoder.Initialize("OMX.broadcom.image_decode", OMX_IndexParamImageInit))
   {
     CLog::Log(LOGERROR, "%s::%s error m_omx_decoder.Initialize", CLASSNAME, __func__);
-    return false;
-  }
-
-  if(!m_omx_resize.Initialize("OMX.broadcom.resize", OMX_IndexParamImageInit))
-  {
-    CLog::Log(LOGERROR, "%s::%s error m_omx_resize.Initialize", CLASSNAME, __func__);
-    return false;
-  }
-
-  if(!m_omx_egl_render.Initialize("OMX.broadcom.egl_render", OMX_IndexParamVideoInit))
-  {
-    CLog::Log(LOGERROR, "%s::%s error m_omx_egl_render.Initialize", CLASSNAME, __func__);
     return false;
   }
 
@@ -1650,12 +1696,14 @@ bool COMXTexture::Decode(const uint8_t *demuxer_content, unsigned demuxer_bytes,
       }
     }
   }
+#if 0
   omx_err = m_omx_egl_render.SendCommand(OMX_CommandPortDisable, m_omx_egl_render.GetOutputPort(), NULL);
   if(omx_err != OMX_ErrorNone)
   {
     CLog::Log(LOGERROR, "%s::%s error m_omx_egl_render.GetParameter (%x)", CLASSNAME, __func__, omx_err);
     return false;
   }
+#endif
   Close();
   return true;
 }
