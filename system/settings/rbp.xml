@@ -32,6 +32,10 @@
           <level>2</level>
           <default>false</default>
         </setting>
+        <setting id="videoscreen.removeguilimit" type="boolean" label="37020" help="36545">
+          <level>2</level>
+          <default>false</default>
+        </setting>
       </group>
     </category>
     <category id="audiooutput">

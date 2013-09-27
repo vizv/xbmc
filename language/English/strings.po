@@ -14361,6 +14361,11 @@ msgctxt "#36544"
 msgid "Use higher quality textures for covers and fanart"
 msgstr ""
 
+#: system/settings/rbp.xml
+msgctxt "#36545"
+msgid "Remove 720p GUI resolution limit. Requires a restart"
+msgstr ""
+
 #reserved strings 365XX
 
 #: xbmc/cores/dvdplayer/DVDInputStreams/DVDInputStreamNavigator.cpp
@@ -14423,4 +14428,9 @@ msgstr ""
 #: system/settings/rbp.xml
 msgctxt "#37019"
 msgid "Enable 32 bit textures"
+msgstr ""
+
+#: system/settings/rbp.xml
+msgctxt "#37020"
+msgid "Remove 720p GUI resolution limit"
 msgstr ""
