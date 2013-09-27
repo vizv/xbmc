@@ -14356,6 +14356,11 @@ msgctxt "#36543"
 msgid "Enable this to make dialogue louder compared to background sounds when downmixing multichannel audio"
 msgstr ""
 
+#: system/settings/rbp.xml
+msgctxt "#36544"
+msgid "Use higher quality textures for covers and fanart"
+msgstr ""
+
 #reserved strings 365XX
 
 #: xbmc/cores/dvdplayer/DVDInputStreams/DVDInputStreamNavigator.cpp
@@ -14413,4 +14418,9 @@ msgstr ""
 #: system/settings/rbp.xml
 msgctxt "#37018"
 msgid "Boost centre channel when downmixing"
+msgstr ""
+
+#: system/settings/rbp.xml
+msgctxt "#37019"
+msgid "Enable 32 bit textures"
 msgstr ""

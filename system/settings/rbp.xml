@@ -28,6 +28,10 @@
         <setting id="videoscreen.fakefullscreen">
           <visible>false</visible>
         </setting>
+        <setting id="videoscreen.textures32" type="boolean" label="37019" help="36544">
+          <level>2</level>
+          <default>false</default>
+        </setting>
       </group>
     </category>
     <category id="audiooutput">
