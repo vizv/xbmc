@@ -22,6 +22,7 @@
 #if defined(TARGET_RASPBERRY_PI)
 
 #include "utils/log.h"
+#include "settings/AdvancedSettings.h"
 
 CRBP::CRBP()
 {
@@ -57,6 +58,9 @@ bool CRBP::Initialize()
     vc_gencmd_number_property(response, "arm", &m_arm_mem);
   if (vc_gencmd(response, sizeof response, "get_mem gpu") == 0)
     vc_gencmd_number_property(response, "gpu", &m_gpu_mem);
+
+  if (g_advancedSettings.m_streamSilence)
+    vc_gencmd(response, sizeof response, "force_audio hdmi 1");
 
   return true;
 }
