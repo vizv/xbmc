@@ -383,6 +383,7 @@ protected:
   int m_audio_fifo;
   double m_last_check_time;         // we periodically check for gpu underrun
   double m_stamp;                   // last media stamp
+  float m_latency;
 
   CDVDOverlayContainer m_overlayContainer;
 
