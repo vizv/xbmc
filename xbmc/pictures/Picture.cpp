@@ -146,7 +146,6 @@ bool CPicture::CreateTiledThumb(const std::vector<std::string> &files, const std
 {
   if (!files.size())
     return false;
-
   unsigned int num_across = (unsigned int)ceil(sqrt((float)files.size()));
   unsigned int num_down = (files.size() + num_across - 1) / num_across;
 
@@ -163,7 +162,8 @@ bool CPicture::CreateTiledThumb(const std::vector<std::string> &files, const std
     int y = i / num_across;
     // load in the image
     unsigned int width = tile_width - 2*tile_gap, height = tile_height - 2*tile_gap;
-    CBaseTexture *texture = CTexture::LoadFromFile(files[i], width, height, g_guiSettings.GetBool("pictures.useexifrotation"));
+    CBaseTexture *texture = CTexture::LoadFromFile(files[i], width, height, g_guiSettings.GetBool("pictures.useexifrotation"), true);
+
     if (texture && texture->GetWidth() && texture->GetHeight())
     {
       GetScale(texture->GetWidth(), texture->GetHeight(), width, height);
