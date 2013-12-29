@@ -573,7 +573,7 @@ bool COMXPlayer::CloseFile()
   m_HasVideo = false;
   m_HasAudio = false;
 
-  CLog::Log(LOGNOTICE, "DVDPlayer: finished waiting");
+  CLog::Log(LOGNOTICE, "COMXPlayer: finished waiting");
 #if defined(HAS_VIDEO_PLAYBACK)
   g_renderManager.UnInit();
 #endif
