@@ -57,9 +57,9 @@ public:
 
   static int Read(void *h, uint8_t* buf, int size);
   static offset_t Seek(void *h, offset_t pos, int whence);
+  std::string m_filename;
 
 protected:
-  std::string m_filename;
   XFILE::CFile *m_pFile;
   bool m_isSeekPosible;
   int m_fileSize;

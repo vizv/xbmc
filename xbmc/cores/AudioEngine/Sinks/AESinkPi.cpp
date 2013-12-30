@@ -36,6 +36,11 @@
 #define NUM_OMX_BUFFERS 2
 #define AUDIO_PLAYBUFFER (1.0/20.0)
 
+// See CEA spec: Table 20, Audio InfoFrame data byte 4 for the ordering here
+static const enum AEChannel CEAChannelMap[] = {
+  AE_CH_FL, AE_CH_FR, AE_CH_LFE, AE_CH_FC, AE_CH_BL, AE_CH_BR, AE_CH_SL, AE_CH_SR
+};
+
 CAEDeviceInfo CAESinkPi::m_info;
 
 CAESinkPi::CAESinkPi() :
@@ -74,6 +79,12 @@ bool CAESinkPi::Initialize(AEAudioFormat &format, std::string &device)
   format.m_frameSamples  = format.m_channelLayout.Count();
   format.m_frameSize     = format.m_frameSamples * (CAEUtil::DataFormatToBits(format.m_dataFormat) >> 3);
   format.m_sampleRate    = std::max(8000U, std::min(96000U, format.m_sampleRate));
+
+  CAEChannelInfo layout;
+  unsigned int count = 2; 
+  for (unsigned int i = 0; i < count; ++i)
+    layout += CEAChannelMap[i];
+  format.m_channelLayout = layout;
 
   m_format = format;
 

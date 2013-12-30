@@ -19,16 +19,14 @@
  *
  */
 
-#ifdef TARGET_RASPBERRY_PI
-#include "ActiveAEResamplePi.h"
-#else
-
 #include "DllAvUtil.h"
 #include "DllSwResample.h"
 #include "Utils/AEChannelInfo.h"
 #include "Utils/AEAudioFormat.h"
 #include "ActiveAEBuffer.h"
 #include "Interfaces/AE.h"
+
+#include "linux/OMXCore.h"
 
 namespace ActiveAE
 {
@@ -53,6 +51,7 @@ public:
   int GetAVChannelIndex(enum AEChannel aechannel, uint64_t layout);
 
 protected:
+  void DeInit();
   DllAvUtil m_dllAvUtil;
   DllSwResample m_dllSwResample;
   bool m_loaded;
@@ -63,8 +62,16 @@ protected:
   int m_src_bits, m_dst_bits;
   SwrContext *m_pContext;
   double m_rematrix[AE_CH_MAX][AE_CH_MAX];
+
+  OMX_AUDIO_PARAM_PCMMODETYPE m_pcm_input;
+  OMX_AUDIO_PARAM_PCMMODETYPE m_pcm_output;
+  COMXCoreComponent    m_omx_mixer;
+  bool                 m_Initialized;
+  SwrContext*     m_pConvert;
+  AVSampleFormat m_last_src_fmt, m_last_dst_fmt;
+
+  void ConvertFormat(uint8_t *dst_planes[SWR_CH_MAX], AVSampleFormat dst_fmt, uint8_t *src_planes[SWR_CH_MAX], AVSampleFormat src_fmt, int samples);
 };
 
 }
 
-#endif

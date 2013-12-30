@@ -2483,19 +2483,35 @@ bool CActiveAE::ResampleSound(CActiveAESound *sound)
   uint8_t **dst_buffer;
   int dst_samples;
 
+  struct timespec now;
+  uint64_t  Start, End;
+
   if (m_mode == MODE_RAW || m_internalFormat.m_dataFormat == AE_FMT_INVALID)
     return false;
 
   if (!sound->GetSound(true))
     return false;
 
+  clock_gettime(CLOCK_MONOTONIC, &now);
+  Start = ((int64_t)now.tv_sec * 1000000000L) + now.tv_nsec;
+
   orig_config = sound->GetSound(true)->config;
+
+  clock_gettime(CLOCK_MONOTONIC, &now);
+  End = ((int64_t)now.tv_sec * 1000000000L) + now.tv_nsec;
+  CLog::Log(LOGNOTICE, "ActiveAE::%s - resample %s took %.0fms", __FUNCTION__, sound->m_filename.c_str(), (End-Start)*1e-6);
+  Start=End;
 
   dst_config.channel_layout = CActiveAEResample::GetAVChannelLayout(m_internalFormat.m_channelLayout);
   dst_config.channels = m_internalFormat.m_channelLayout.Count();
   dst_config.sample_rate = m_internalFormat.m_sampleRate;
   dst_config.fmt = CActiveAEResample::GetAVSampleFormat(m_internalFormat.m_dataFormat);
   dst_config.bits_per_sample = CAEUtil::DataFormatToUsedBits(m_internalFormat.m_dataFormat);
+
+  clock_gettime(CLOCK_MONOTONIC, &now);
+  End = ((int64_t)now.tv_sec * 1000000000L) + now.tv_nsec;
+  CLog::Log(LOGNOTICE, "ActiveAE::%s - resample %s took %.0fms", __FUNCTION__, sound->m_filename.c_str(), (End-Start)*1e-6);
+  Start=End;
 
   CActiveAEResample *resampler = new CActiveAEResample();
   resampler->Init(dst_config.channel_layout,
@@ -2513,9 +2529,19 @@ bool CActiveAE::ResampleSound(CActiveAESound *sound)
                   NULL,
                   m_settings.resampleQuality);
 
+  clock_gettime(CLOCK_MONOTONIC, &now);
+  End = ((int64_t)now.tv_sec * 1000000000L) + now.tv_nsec;
+  CLog::Log(LOGNOTICE, "ActiveAE::%s - resample %s took %.0fms", __FUNCTION__, sound->m_filename.c_str(), (End-Start)*1e-6);
+  Start=End;
+
   dst_samples = resampler->CalcDstSampleCount(sound->GetSound(true)->nb_samples,
                                               m_internalFormat.m_sampleRate,
                                               orig_config.sample_rate);
+
+  clock_gettime(CLOCK_MONOTONIC, &now);
+  End = ((int64_t)now.tv_sec * 1000000000L) + now.tv_nsec;
+  CLog::Log(LOGNOTICE, "ActiveAE::%s - resample %s took %.0fms", __FUNCTION__, sound->m_filename.c_str(), (End-Start)*1e-6);
+  Start=End;
 
   dst_buffer = sound->InitSound(false, dst_config, dst_samples);
   if (!dst_buffer)
@@ -2523,15 +2549,40 @@ bool CActiveAE::ResampleSound(CActiveAESound *sound)
     delete resampler;
     return false;
   }
+  clock_gettime(CLOCK_MONOTONIC, &now);
+  End = ((int64_t)now.tv_sec * 1000000000L) + now.tv_nsec;
+  CLog::Log(LOGNOTICE, "ActiveAE::%s - resample %s took %.0fms", __FUNCTION__, sound->m_filename.c_str(), (End-Start)*1e-6);
+  Start=End;
+
   int samples = resampler->Resample(dst_buffer, dst_samples,
                                     sound->GetSound(true)->data,
                                     sound->GetSound(true)->nb_samples,
                                     1.0);
 
+  clock_gettime(CLOCK_MONOTONIC, &now);
+  End = ((int64_t)now.tv_sec * 1000000000L) + now.tv_nsec;
+  CLog::Log(LOGNOTICE, "ActiveAE::%s 6 - resample %s took %.0fms", __FUNCTION__, sound->m_filename.c_str(), (End-Start)*1e-6);
+  Start=End;
+
   sound->GetSound(false)->nb_samples = samples;
+  clock_gettime(CLOCK_MONOTONIC, &now);
+  End = ((int64_t)now.tv_sec * 1000000000L) + now.tv_nsec;
+  CLog::Log(LOGNOTICE, "ActiveAE::%s 7 - resample %s took %.0fms", __FUNCTION__, sound->m_filename.c_str(), (End-Start)*1e-6);
+  Start=End;
 
   delete resampler;
+  clock_gettime(CLOCK_MONOTONIC, &now);
+  End = ((int64_t)now.tv_sec * 1000000000L) + now.tv_nsec;
+  CLog::Log(LOGNOTICE, "ActiveAE::%s 8 - resample %s took %.0fms", __FUNCTION__, sound->m_filename.c_str(), (End-Start)*1e-6);
+  Start=End;
+
   sound->SetConverted(true);
+
+  clock_gettime(CLOCK_MONOTONIC, &now);
+  End = ((int64_t)now.tv_sec * 1000000000L) + now.tv_nsec;
+  CLog::Log(LOGNOTICE, "ActiveAE::%s 9 - resample %s took %.0fms", __FUNCTION__, sound->m_filename.c_str(), (End-Start)*1e-6);
+  Start=End;
+
   return true;
 }
 
