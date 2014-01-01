@@ -60,7 +60,9 @@ protected:
   int m_src_channels, m_dst_channels;
   AVSampleFormat m_src_fmt, m_dst_fmt;
   int m_src_bits, m_dst_bits;
+#if 1
   SwrContext *m_pContext;
+#endif
   double m_rematrix[AE_CH_MAX][AE_CH_MAX];
 
   OMX_AUDIO_PARAM_PCMMODETYPE m_pcm_input;

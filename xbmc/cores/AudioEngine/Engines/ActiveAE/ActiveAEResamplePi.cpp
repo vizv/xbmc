@@ -34,7 +34,9 @@ using namespace ActiveAE;
 CActiveAEResample::CActiveAEResample()
 {
   CLog::Log(LOGINFO, "%s::%s", CLASSNAME, __func__);
+#if 1
   m_pContext = NULL;
+#endif
   m_loaded = false;
   if (m_dllAvUtil.Load() && m_dllSwResample.Load())
     m_loaded = true;
@@ -50,9 +52,10 @@ CActiveAEResample::~CActiveAEResample()
 {
   CLog::Log(LOGINFO, "%s::%s", CLASSNAME, __func__);
   DeInit();
+#if 1
   if (m_pContext)
     m_dllSwResample.swr_free(&m_pContext);
-
+#endif
   m_dllAvUtil.Unload();
   m_dllSwResample.Unload();
 }
@@ -90,6 +93,7 @@ bool CActiveAEResample::Init(uint64_t dst_chan_layout, int dst_channels, int dst
   if (m_src_chan_layout == 0)
     m_src_chan_layout = m_dllAvUtil.av_get_default_channel_layout(m_src_channels);
 
+#if 1
   m_pContext = m_dllSwResample.swr_alloc_set_opts(NULL, m_dst_chan_layout, m_dst_fmt, m_dst_rate,
                                                         m_src_chan_layout, m_src_fmt, m_src_rate,
                                                         0, NULL);
@@ -129,6 +133,7 @@ bool CActiveAEResample::Init(uint64_t dst_chan_layout, int dst_channels, int dst
     CLog::Log(LOGERROR, "CActiveAEResample::Init - create context failed");
     return false;
   }
+#endif
   if (remapLayout)
   {
     // one-to-one mapping of channels
@@ -146,6 +151,7 @@ bool CActiveAEResample::Init(uint64_t dst_chan_layout, int dst_channels, int dst
       }
     }
 
+#if 0
     m_dllAvUtil.av_opt_set_int(m_pContext, "out_channel_count", m_dst_channels, 0);
     m_dllAvUtil.av_opt_set_int(m_pContext, "out_channel_layout", m_dst_chan_layout, 0);
 
@@ -154,6 +160,7 @@ bool CActiveAEResample::Init(uint64_t dst_chan_layout, int dst_channels, int dst
       CLog::Log(LOGERROR, "CActiveAEResample::Init - setting channel matrix failed");
       return false;
     }
+#endif
   }
   // stereo upmix
   else if (upmix && m_src_channels == 2 && m_dst_channels > 2)
@@ -187,18 +194,22 @@ bool CActiveAEResample::Init(uint64_t dst_chan_layout, int dst_channels, int dst
       }
     }
 
+#if 0
     if (m_dllSwResample.swr_set_matrix(m_pContext, (const double*)m_rematrix, AE_CH_MAX) < 0)
     {
       CLog::Log(LOGERROR, "CActiveAEResample::Init - setting channel matrix failed");
       return false;
     }
+#endif
   }
 
+#if 0
   if(m_dllSwResample.swr_init(m_pContext) < 0)
   {
     CLog::Log(LOGERROR, "CActiveAEResample::Init - init resampler failed");
     return false;
   }
+#endif
 
   // This may be called before Application calls g_RBP.Initialise, so call it here too
   g_RBP.Initialize();
@@ -322,10 +333,11 @@ void CActiveAEResample::ConvertFormat(uint8_t *dst_planes[SWR_CH_MAX], AVSampleF
 
 int CActiveAEResample::Resample(uint8_t **dst_buffer, int dst_samples, uint8_t **src_buffer, int src_samples, double ratio)
 {
-  CLog::Log(LOGINFO, "%s::%s format:%d->%d rate:%d->%d chan:%d->%d samples %d->%d (%f) %d", CLASSNAME, __func__, (int)m_src_fmt, (int)m_dst_fmt, m_src_rate, m_dst_rate, m_src_channels, m_dst_channels, src_samples, dst_samples, ratio, m_Initialized);
   if (!m_Initialized)
     return 0;
-
+#if 1
+  int ret;
+#else
   if (ratio != 1.0)
   {
     if (m_dllSwResample.swr_set_compensation(m_pContext,
@@ -343,7 +355,7 @@ int CActiveAEResample::Resample(uint8_t **dst_buffer, int dst_samples, uint8_t *
     CLog::Log(LOGERROR, "CActiveAEResample::Resample - resample failed");
     return 0;
   }
-
+#endif
   OMX_ERRORTYPE omx_err   = OMX_ErrorNone;
 
 
@@ -360,9 +372,18 @@ int CActiveAEResample::Resample(uint8_t **dst_buffer, int dst_samples, uint8_t *
     CLog::Log(LOGINFO, "  %s", s);
   }
 
-  for(size_t out = 0; out < m_dst_channels; ++out)
+  int sum = 0;
+  for(size_t out = 0; out < (size_t)m_dst_channels; ++out)
     for(size_t in = 0; in < 8; ++in)
-      mix.coeff[out*8+in] = static_cast<unsigned int>(0x10000 * m_rematrix[out][in]);
+    {
+      mix.coeff[out*8+in] = static_cast<unsigned int>(0x10000 * m_rematrix[out][in]); 
+      sum += abs(mix.coeff[out*8+in]);
+    }
+
+  if (sum == 0)
+    for(size_t out = 0; out < (size_t)m_dst_channels; ++out)
+      for(size_t in = 0; in < 8; ++in)
+        mix.coeff[out*8+in] = in == out ? 0x10000:0; 
 
   mix.nPortIndex = m_omx_mixer.GetInputPort();
   omx_err = m_omx_mixer.SetConfig(OMX_IndexConfigBrcmAudioDownmixCoefficients8x8, &mix);
@@ -427,7 +448,11 @@ int CActiveAEResample::Resample(uint8_t **dst_buffer, int dst_samples, uint8_t *
     return false;
   }
   assert(m_encoded_buffer->nFilledLen < m_encoded_buffer->nAllocLen);
-//printf("%s::%s Got %d (%x)\n", CLASSNAME, __func__, m_encoded_buffer->nFilledLen, m_encoded_buffer->nFlags);
+  const int d_pitch = m_dst_channels * 2;
+  ret = m_encoded_buffer->nFilledLen / d_pitch;
+printf("%s::%s Got %d (%x) format:%d->%d rate:%d->%d chan:%d->%d samples %d->%d (%f) %d =%d\n", CLASSNAME, __func__, m_encoded_buffer->nFilledLen, m_encoded_buffer->nFlags,
+(int)m_src_fmt, (int)m_dst_fmt, m_src_rate, m_dst_rate, m_src_channels, m_dst_channels, src_samples, dst_samples, ratio, m_Initialized, ret
+);
 
   if(m_omx_mixer.BadState())
   {
@@ -439,41 +464,74 @@ int CActiveAEResample::Resample(uint8_t **dst_buffer, int dst_samples, uint8_t *
   tmp_buffer[0] = m_encoded_buffer->pBuffer;
 
 //CLog::MemDump((char *)tmp_buffer[0], 256);
-//  ConvertFormat(dst_buffer, m_dst_fmt, tmp_buffer, AV_SAMPLE_FMT_S16, dst_samples);
+  ConvertFormat(dst_buffer, m_dst_fmt, tmp_buffer, AV_SAMPLE_FMT_S16, dst_samples);
+
 //CLog::MemDump((char *)dst_buffer[0], 256);
 
+  CLog::Log(LOGINFO, "%s::%s format:%d->%d rate:%d->%d chan:%d->%d samples %d->%d (%f) %d =%d", CLASSNAME, __func__, (int)m_src_fmt, (int)m_dst_fmt, m_src_rate, m_dst_rate, m_src_channels, m_dst_channels, src_samples, dst_samples, ratio, m_Initialized, ret);
   return ret;
 }
 
 int64_t CActiveAEResample::GetDelay(int64_t base)
 {
-  CLog::Log(LOGINFO, "%s::%s", CLASSNAME, __func__);
-  return m_dllSwResample.swr_get_delay(m_pContext, base);
+#if 1
+  int ret = 0;
+#else
+  int ret = m_dllSwResample.swr_get_delay(m_pContext, base);
+#endif
+  CLog::Log(LOGINFO, "%s::%s = %d", CLASSNAME, __func__, ret);
+  return ret;
 }
 
 int CActiveAEResample::GetBufferedSamples()
 {
-  CLog::Log(LOGINFO, "%s::%s", CLASSNAME, __func__);
-  return m_dllAvUtil.av_rescale_rnd(m_dllSwResample.swr_get_delay(m_pContext, m_src_rate),
+#if 1
+  int ret = 0;
+#else
+  int ret = m_dllAvUtil.av_rescale_rnd(m_dllSwResample.swr_get_delay(m_pContext, m_src_rate),
                                     m_dst_rate, m_src_rate, AV_ROUND_UP);
+#endif
+  CLog::Log(LOGINFO, "%s::%s = %d", CLASSNAME, __func__, ret);
+  return ret;
 }
 
 int CActiveAEResample::CalcDstSampleCount(int src_samples, int dst_rate, int src_rate)
 {
-  CLog::Log(LOGINFO, "%s::%s", CLASSNAME, __func__);
-  return m_dllAvUtil.av_rescale_rnd(src_samples, dst_rate, src_rate, AV_ROUND_UP);
+#if 0
+  int ret = (src_samples * dst_rate + src_rate-1) / src_rate;
+#else
+  int ret = m_dllAvUtil.av_rescale_rnd(src_samples, dst_rate, src_rate, AV_ROUND_UP);
+  int ret2 = (src_samples * dst_rate + src_rate-1) / src_rate;
+  if (ret != ret2)
+    printf("%s::%s = %d * %d/%d = %d (%d)", CLASSNAME, __func__, src_samples, dst_rate, src_rate, ret, ret2);
+#endif
+  CLog::Log(LOGINFO, "%s::%s = %d", CLASSNAME, __func__, ret);
+  return ret;
 }
 
 int CActiveAEResample::GetSrcBufferSize(int samples)
 {
-  CLog::Log(LOGINFO, "%s::%s", CLASSNAME, __func__);
-  return m_dllAvUtil.av_samples_get_buffer_size(NULL, m_src_channels, samples, m_src_fmt, 1);
+#if 1
+  int ret = 0;
+#else
+  int ret = m_dllAvUtil.av_samples_get_buffer_size(NULL, m_src_channels, samples, m_src_fmt, 1);
+#endif
+  CLog::Log(LOGINFO, "%s::%s = %d", CLASSNAME, __func__, ret);
+  return ret;
 }
 
 int CActiveAEResample::GetDstBufferSize(int samples)
 {
-  CLog::Log(LOGINFO, "%s::%s", CLASSNAME, __func__);
-  return m_dllAvUtil.av_samples_get_buffer_size(NULL, m_dst_channels, samples, m_dst_fmt, 1);
+#if 0
+  int ret = CalcDstSampleCount(samples, m_dst_rate, m_src_rate);
+#else
+  int ret = m_dllAvUtil.av_samples_get_buffer_size(NULL, m_dst_channels, samples, m_dst_fmt, 1);
+  int ret2 = CalcDstSampleCount(samples, m_dst_rate, m_src_rate);
+  if (ret != ret2)
+    printf("%s::%s = %d * %d/%d = %d (%d)", CLASSNAME, __func__, samples, m_dst_rate, m_src_rate, ret, ret2);
+#endif
+  CLog::Log(LOGINFO, "%s::%s = %d", CLASSNAME, __func__, ret);
+  return ret;
 }
 
 uint64_t CActiveAEResample::GetAVChannelLayout(CAEChannelInfo &info)
