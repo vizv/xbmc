@@ -34,9 +34,6 @@ using namespace ActiveAE;
 CActiveAEResample::CActiveAEResample()
 {
   CLog::Log(LOGINFO, "%s::%s", CLASSNAME, __func__);
-#if 1
-  m_pContext = NULL;
-#endif
   m_loaded = false;
   if (m_dllAvUtil.Load() && m_dllSwResample.Load())
     m_loaded = true;
@@ -45,6 +42,8 @@ CActiveAEResample::CActiveAEResample()
   m_pConvert = NULL;
   m_last_src_fmt = AV_SAMPLE_FMT_NONE;
   m_last_dst_fmt = AV_SAMPLE_FMT_NONE;
+  m_last_src_channels = 0;
+  m_last_dst_channels = 0;
   memset(m_rematrix, 0, sizeof(m_rematrix));
 }
 
@@ -52,10 +51,6 @@ CActiveAEResample::~CActiveAEResample()
 {
   CLog::Log(LOGINFO, "%s::%s", CLASSNAME, __func__);
   DeInit();
-#if 1
-  if (m_pContext)
-    m_dllSwResample.swr_free(&m_pContext);
-#endif
   m_dllAvUtil.Unload();
   m_dllSwResample.Unload();
 }
@@ -93,47 +88,6 @@ bool CActiveAEResample::Init(uint64_t dst_chan_layout, int dst_channels, int dst
   if (m_src_chan_layout == 0)
     m_src_chan_layout = m_dllAvUtil.av_get_default_channel_layout(m_src_channels);
 
-#if 1
-  m_pContext = m_dllSwResample.swr_alloc_set_opts(NULL, m_dst_chan_layout, m_dst_fmt, m_dst_rate,
-                                                        m_src_chan_layout, m_src_fmt, m_src_rate,
-                                                        0, NULL);
-  if(quality == AE_QUALITY_HIGH)
-  {
-    m_dllAvUtil.av_opt_set_double(m_pContext, "cutoff", 1.0, 0);
-    m_dllAvUtil.av_opt_set_int(m_pContext,"filter_size", 256, 0);
-  }
-  else if(quality == AE_QUALITY_MID)
-  {
-    // 0.97 is default cutoff so use (1.0 - 0.97) / 2.0 + 0.97
-    m_dllAvUtil.av_opt_set_double(m_pContext, "cutoff", 0.985, 0);
-    m_dllAvUtil.av_opt_set_int(m_pContext,"filter_size", 64, 0);
-  }
-  else if(quality == AE_QUALITY_LOW)
-  {
-    m_dllAvUtil.av_opt_set_double(m_pContext, "cutoff", 0.97, 0);
-    m_dllAvUtil.av_opt_set_int(m_pContext,"filter_size", 32, 0);
-  }
-
-  if (m_dst_fmt == AV_SAMPLE_FMT_S32 || m_dst_fmt == AV_SAMPLE_FMT_S32P)
-  {
-    m_dllAvUtil.av_opt_set_int(m_pContext, "output_sample_bits", m_dst_bits, 0);
-  }
-
-  // tell resampler to clamp float values
-  // not required for sink stage (remapLayout == true)
-  if ((m_dst_fmt == AV_SAMPLE_FMT_FLT || m_dst_fmt == AV_SAMPLE_FMT_FLTP) &&
-      (m_src_fmt == AV_SAMPLE_FMT_FLT || m_src_fmt == AV_SAMPLE_FMT_FLTP) &&
-      !remapLayout && normalize)
-  {
-     m_dllAvUtil.av_opt_set_double(m_pContext, "rematrix_maxval", 1.0, 0);
-  }
-
-  if(!m_pContext)
-  {
-    CLog::Log(LOGERROR, "CActiveAEResample::Init - create context failed");
-    return false;
-  }
-#endif
   if (remapLayout)
   {
     // one-to-one mapping of channels
@@ -150,17 +104,6 @@ bool CActiveAEResample::Init(uint64_t dst_chan_layout, int dst_channels, int dst
         m_rematrix[out][idx] = 1.0;
       }
     }
-
-#if 0
-    m_dllAvUtil.av_opt_set_int(m_pContext, "out_channel_count", m_dst_channels, 0);
-    m_dllAvUtil.av_opt_set_int(m_pContext, "out_channel_layout", m_dst_chan_layout, 0);
-
-    if (m_dllSwResample.swr_set_matrix(m_pContext, (const double*)m_rematrix, AE_CH_MAX) < 0)
-    {
-      CLog::Log(LOGERROR, "CActiveAEResample::Init - setting channel matrix failed");
-      return false;
-    }
-#endif
   }
   // stereo upmix
   else if (upmix && m_src_channels == 2 && m_dst_channels > 2)
@@ -193,23 +136,7 @@ bool CActiveAEResample::Init(uint64_t dst_chan_layout, int dst_channels, int dst
           break;
       }
     }
-
-#if 0
-    if (m_dllSwResample.swr_set_matrix(m_pContext, (const double*)m_rematrix, AE_CH_MAX) < 0)
-    {
-      CLog::Log(LOGERROR, "CActiveAEResample::Init - setting channel matrix failed");
-      return false;
-    }
-#endif
   }
-
-#if 0
-  if(m_dllSwResample.swr_init(m_pContext) < 0)
-  {
-    CLog::Log(LOGERROR, "CActiveAEResample::Init - init resampler failed");
-    return false;
-  }
-#endif
 
   // This may be called before Application calls g_RBP.Initialise, so call it here too
   g_RBP.Initialize();
@@ -226,11 +153,20 @@ bool CActiveAEResample::Init(uint64_t dst_chan_layout, int dst_channels, int dst
   m_pcm_input.bInterleaved          = OMX_TRUE;
   m_pcm_input.nBitPerSample         = 16;
   m_pcm_input.ePCMMode              = OMX_AUDIO_PCMModeLinear;
-  m_pcm_input.nChannels             = src_channels;
+  // round up to power of 2
+  m_pcm_input.nChannels = src_channels > 4 ? 8 : src_channels > 2 ? 4 : src_channels;
+
   m_pcm_input.nSamplingRate         = src_rate;
   m_pcm_input.eChannelMapping[0] = OMX_AUDIO_ChannelLF;
   m_pcm_input.eChannelMapping[1] = OMX_AUDIO_ChannelRF;
-  m_pcm_input.eChannelMapping[2] = OMX_AUDIO_ChannelMax;
+  m_pcm_input.eChannelMapping[2] = OMX_AUDIO_ChannelCF;
+  m_pcm_input.eChannelMapping[3] = OMX_AUDIO_ChannelLFE;
+  m_pcm_input.eChannelMapping[4] = OMX_AUDIO_ChannelLR;
+  m_pcm_input.eChannelMapping[5] = OMX_AUDIO_ChannelRR;
+  m_pcm_input.eChannelMapping[6] = OMX_AUDIO_ChannelLS;
+  m_pcm_input.eChannelMapping[7] = OMX_AUDIO_ChannelRS;
+  for (int i = src_channels; i < 8; i++)
+    m_pcm_input.eChannelMapping[i] = OMX_AUDIO_ChannelNone;
 
   omx_err = m_omx_mixer.SetParameter(OMX_IndexParamAudioPcm, &m_pcm_input);
   if (omx_err != OMX_ErrorNone)
@@ -243,11 +179,20 @@ bool CActiveAEResample::Init(uint64_t dst_chan_layout, int dst_channels, int dst
   m_pcm_output.bInterleaved          = OMX_TRUE;
   m_pcm_output.nBitPerSample         = 16;
   m_pcm_output.ePCMMode              = OMX_AUDIO_PCMModeLinear;
-  m_pcm_output.nChannels             = dst_channels;
+  // round up to power of 2
+  m_pcm_output.nChannels = dst_channels > 4 ? 8 : dst_channels > 2 ? 4 : dst_channels;
+
   m_pcm_output.nSamplingRate         = dst_rate;
   m_pcm_output.eChannelMapping[0] = OMX_AUDIO_ChannelLF;
   m_pcm_output.eChannelMapping[1] = OMX_AUDIO_ChannelRF;
-  m_pcm_output.eChannelMapping[2] = OMX_AUDIO_ChannelMax;
+  m_pcm_output.eChannelMapping[2] = OMX_AUDIO_ChannelCF;
+  m_pcm_output.eChannelMapping[3] = OMX_AUDIO_ChannelLFE;
+  m_pcm_output.eChannelMapping[4] = OMX_AUDIO_ChannelLR;
+  m_pcm_output.eChannelMapping[5] = OMX_AUDIO_ChannelRR;
+  m_pcm_output.eChannelMapping[6] = OMX_AUDIO_ChannelLS;
+  m_pcm_output.eChannelMapping[7] = OMX_AUDIO_ChannelRS;
+  for (int i = src_channels; i < 8; i++)
+    m_pcm_input.eChannelMapping[i] = OMX_AUDIO_ChannelNone;
 
   omx_err = m_omx_mixer.SetParameter(OMX_IndexParamAudioPcm, &m_pcm_output);
   if (omx_err != OMX_ErrorNone)
@@ -301,14 +246,14 @@ bool CActiveAEResample::Init(uint64_t dst_chan_layout, int dst_channels, int dst
   return true;
 }
 
-void CActiveAEResample::ConvertFormat(uint8_t *dst_planes[SWR_CH_MAX], AVSampleFormat dst_fmt, uint8_t *src_planes[SWR_CH_MAX], AVSampleFormat src_fmt, int samples)
+void CActiveAEResample::ConvertFormat(uint8_t *dst_planes[SWR_CH_MAX], AVSampleFormat dst_fmt, int dst_channels, uint8_t *src_planes[SWR_CH_MAX], AVSampleFormat src_fmt, int src_channels, int samples)
 {
   const int sample_rate = 48000;
-  const int channels = 2;
-  const int64_t ch_layout = m_dllAvUtil.av_get_default_channel_layout(channels);
+  const int64_t src_ch_layout = m_dllAvUtil.av_get_default_channel_layout(src_channels);
+  const int64_t dst_ch_layout = m_dllAvUtil.av_get_default_channel_layout(dst_channels);
  
   /* need to convert format */
-  if (m_pConvert && (src_fmt != m_last_src_fmt || dst_fmt != m_last_dst_fmt))
+  if (m_pConvert && (src_fmt != m_last_src_fmt || dst_fmt != m_last_dst_fmt || src_channels != m_last_src_channels || dst_channels != m_last_dst_channels))
   {
     m_dllSwResample.swr_free(&m_pConvert);
   }
@@ -317,9 +262,11 @@ void CActiveAEResample::ConvertFormat(uint8_t *dst_planes[SWR_CH_MAX], AVSampleF
   {
     m_last_src_fmt = src_fmt;
     m_last_dst_fmt = dst_fmt;
+    m_last_src_channels = src_channels;
+    m_last_dst_channels = dst_channels;
     m_pConvert = m_dllSwResample.swr_alloc_set_opts(NULL,
-                      ch_layout, dst_fmt, sample_rate,
-                      ch_layout, src_fmt, sample_rate,
+                      dst_ch_layout, dst_fmt, sample_rate,
+                      src_ch_layout, src_fmt, sample_rate,
                       0, NULL);
 
     if(!m_pConvert || m_dllSwResample.swr_init(m_pConvert) < 0)
@@ -335,29 +282,7 @@ int CActiveAEResample::Resample(uint8_t **dst_buffer, int dst_samples, uint8_t *
 {
   if (!m_Initialized)
     return 0;
-#if 1
-  int ret;
-#else
-  if (ratio != 1.0)
-  {
-    if (m_dllSwResample.swr_set_compensation(m_pContext,
-                                            (dst_samples*ratio-dst_samples)*m_dst_rate/m_src_rate,
-                                             dst_samples*m_dst_rate/m_src_rate) < 0)
-    {
-      CLog::Log(LOGERROR, "CActiveAEResample::Resample - set compensation failed");
-      return 0;
-    }
-  }
-
-  int ret = m_dllSwResample.swr_convert(m_pContext, dst_buffer, dst_samples, (const uint8_t**)src_buffer, src_samples);
-  if (ret < 0)
-  {
-    CLog::Log(LOGERROR, "CActiveAEResample::Resample - resample failed");
-    return 0;
-  }
-#endif
   OMX_ERRORTYPE omx_err   = OMX_ErrorNone;
-
 
   OMX_CONFIG_BRCMAUDIODOWNMIXCOEFFICIENTS8x8 mix;
   OMX_INIT_STRUCTURE(mix);
@@ -394,18 +319,12 @@ int CActiveAEResample::Resample(uint8_t **dst_buffer, int dst_samples, uint8_t *
     return false;
   }
 
-
   BYTE *tmp_buffer[SWR_CH_MAX] = {0};
   tmp_buffer[0] = (BYTE*)m_dllAvUtil.av_malloc(BUFFERSIZE + FF_INPUT_BUFFER_PADDING_SIZE);
 
-//CLog::MemDump((char *)src_buffer[0], 256);
-//CLog::MemDump((char *)dst_buffer[0], 256);
+  ConvertFormat(tmp_buffer, AV_SAMPLE_FMT_S16, m_pcm_input.nChannels, src_buffer, m_src_fmt, m_src_channels, src_samples);
 
-  ConvertFormat(tmp_buffer, AV_SAMPLE_FMT_S16, src_buffer, m_src_fmt, src_samples);
-
-//CLog::MemDump((char *)tmp_buffer[0], 256);
-
-  const int pitch = m_src_channels * 2;
+  const int pitch = m_pcm_input.nChannels * 2;
   OMX_BUFFERHEADERTYPE *omx_buffer = NULL;
   OMX_BUFFERHEADERTYPE *m_encoded_buffer = NULL;
 
@@ -422,6 +341,7 @@ int CActiveAEResample::Resample(uint8_t **dst_buffer, int dst_samples, uint8_t *
 
   omx_buffer->nFlags |= OMX_BUFFERFLAG_EOS;
 
+printf("Empty: %d %x\n", omx_buffer->nFilledLen, omx_buffer->nFlags);
   omx_err = m_omx_mixer.EmptyThisBuffer(omx_buffer);
   if (omx_err != OMX_ErrorNone)
   {
@@ -448,9 +368,9 @@ int CActiveAEResample::Resample(uint8_t **dst_buffer, int dst_samples, uint8_t *
     return false;
   }
   assert(m_encoded_buffer->nFilledLen < m_encoded_buffer->nAllocLen);
-  const int d_pitch = m_dst_channels * 2;
-  ret = m_encoded_buffer->nFilledLen / d_pitch;
-printf("%s::%s Got %d (%x) format:%d->%d rate:%d->%d chan:%d->%d samples %d->%d (%f) %d =%d\n", CLASSNAME, __func__, m_encoded_buffer->nFilledLen, m_encoded_buffer->nFlags,
+  const int d_pitch = m_pcm_output.nChannels * 2;
+  int ret = m_encoded_buffer->nFilledLen / d_pitch;
+printf("%s::%s Got %d/%d (%x/%x) format:%d->%d rate:%d->%d chan:%d->%d samples %d->%d (%f) %d =%d\n", CLASSNAME, __func__, omx_buffer->nFilledLen, m_encoded_buffer->nFilledLen, omx_buffer->nFlags, m_encoded_buffer->nFlags,
 (int)m_src_fmt, (int)m_dst_fmt, m_src_rate, m_dst_rate, m_src_channels, m_dst_channels, src_samples, dst_samples, ratio, m_Initialized, ret
 );
 
@@ -463,10 +383,7 @@ printf("%s::%s Got %d (%x) format:%d->%d rate:%d->%d chan:%d->%d samples %d->%d 
   m_dllAvUtil.av_free(tmp_buffer[0]);
   tmp_buffer[0] = m_encoded_buffer->pBuffer;
 
-//CLog::MemDump((char *)tmp_buffer[0], 256);
-  ConvertFormat(dst_buffer, m_dst_fmt, tmp_buffer, AV_SAMPLE_FMT_S16, dst_samples);
-
-//CLog::MemDump((char *)dst_buffer[0], 256);
+  ConvertFormat(dst_buffer, m_dst_fmt, m_dst_channels, tmp_buffer, AV_SAMPLE_FMT_S16, m_pcm_output.nChannels, dst_samples);
 
   CLog::Log(LOGINFO, "%s::%s format:%d->%d rate:%d->%d chan:%d->%d samples %d->%d (%f) %d =%d", CLASSNAME, __func__, (int)m_src_fmt, (int)m_dst_fmt, m_src_rate, m_dst_rate, m_src_channels, m_dst_channels, src_samples, dst_samples, ratio, m_Initialized, ret);
   return ret;
@@ -474,62 +391,35 @@ printf("%s::%s Got %d (%x) format:%d->%d rate:%d->%d chan:%d->%d samples %d->%d 
 
 int64_t CActiveAEResample::GetDelay(int64_t base)
 {
-#if 1
   int ret = 0;
-#else
-  int ret = m_dllSwResample.swr_get_delay(m_pContext, base);
-#endif
   CLog::Log(LOGINFO, "%s::%s = %d", CLASSNAME, __func__, ret);
   return ret;
 }
 
 int CActiveAEResample::GetBufferedSamples()
 {
-#if 1
   int ret = 0;
-#else
-  int ret = m_dllAvUtil.av_rescale_rnd(m_dllSwResample.swr_get_delay(m_pContext, m_src_rate),
-                                    m_dst_rate, m_src_rate, AV_ROUND_UP);
-#endif
   CLog::Log(LOGINFO, "%s::%s = %d", CLASSNAME, __func__, ret);
   return ret;
 }
 
 int CActiveAEResample::CalcDstSampleCount(int src_samples, int dst_rate, int src_rate)
 {
-#if 0
   int ret = (src_samples * dst_rate + src_rate-1) / src_rate;
-#else
-  int ret = m_dllAvUtil.av_rescale_rnd(src_samples, dst_rate, src_rate, AV_ROUND_UP);
-  int ret2 = (src_samples * dst_rate + src_rate-1) / src_rate;
-  if (ret != ret2)
-    printf("%s::%s = %d * %d/%d = %d (%d)", CLASSNAME, __func__, src_samples, dst_rate, src_rate, ret, ret2);
-#endif
   CLog::Log(LOGINFO, "%s::%s = %d", CLASSNAME, __func__, ret);
   return ret;
 }
 
 int CActiveAEResample::GetSrcBufferSize(int samples)
 {
-#if 1
   int ret = 0;
-#else
-  int ret = m_dllAvUtil.av_samples_get_buffer_size(NULL, m_src_channels, samples, m_src_fmt, 1);
-#endif
   CLog::Log(LOGINFO, "%s::%s = %d", CLASSNAME, __func__, ret);
   return ret;
 }
 
 int CActiveAEResample::GetDstBufferSize(int samples)
 {
-#if 0
   int ret = CalcDstSampleCount(samples, m_dst_rate, m_src_rate);
-#else
-  int ret = m_dllAvUtil.av_samples_get_buffer_size(NULL, m_dst_channels, samples, m_dst_fmt, 1);
-  int ret2 = CalcDstSampleCount(samples, m_dst_rate, m_src_rate);
-  if (ret != ret2)
-    printf("%s::%s = %d * %d/%d = %d (%d)", CLASSNAME, __func__, samples, m_dst_rate, m_src_rate, ret, ret2);
-#endif
   CLog::Log(LOGINFO, "%s::%s = %d", CLASSNAME, __func__, ret);
   return ret;
 }

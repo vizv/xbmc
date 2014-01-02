@@ -60,9 +60,6 @@ protected:
   int m_src_channels, m_dst_channels;
   AVSampleFormat m_src_fmt, m_dst_fmt;
   int m_src_bits, m_dst_bits;
-#if 1
-  SwrContext *m_pContext;
-#endif
   double m_rematrix[AE_CH_MAX][AE_CH_MAX];
 
   OMX_AUDIO_PARAM_PCMMODETYPE m_pcm_input;
@@ -71,8 +68,9 @@ protected:
   bool                 m_Initialized;
   SwrContext*     m_pConvert;
   AVSampleFormat m_last_src_fmt, m_last_dst_fmt;
+  int m_last_src_channels, m_last_dst_channels;
 
-  void ConvertFormat(uint8_t *dst_planes[SWR_CH_MAX], AVSampleFormat dst_fmt, uint8_t *src_planes[SWR_CH_MAX], AVSampleFormat src_fmt, int samples);
+  void ConvertFormat(uint8_t *dst_planes[SWR_CH_MAX], AVSampleFormat dst_fmt, int dst_channels, uint8_t *src_planes[SWR_CH_MAX], AVSampleFormat src_fmt, int src_channels, int samples);
 };
 
 }
