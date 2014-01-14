@@ -43,32 +43,41 @@ static const enum AEChannel CEAChannelMap[] = {
 
 CAEDeviceInfo CAESinkPi::m_info;
 
-static void BuildChannelMapOMX(enum OMX_AUDIO_CHANNELTYPE *channelMap, uint64_t layout)
+static enum OMX_AUDIO_CHANNELTYPE AEChannelToPAChannel(AEChannel ae_channel)
 {
-  int index = 0;
+  enum OMX_AUDIO_CHANNELTYPE pa_channel;
+  switch (ae_channel)
+  {
+    case AE_CH_FL:    pa_channel = OMX_AUDIO_ChannelLF; break;
+    case AE_CH_FR:    pa_channel = OMX_AUDIO_ChannelRF; break;
+    case AE_CH_FC:    pa_channel = OMX_AUDIO_ChannelCF; break;
+    case AE_CH_LFE:   pa_channel = OMX_AUDIO_ChannelLFE; break;
+    case AE_CH_BL:    pa_channel = OMX_AUDIO_ChannelLR; break;
+    case AE_CH_BR:    pa_channel = OMX_AUDIO_ChannelRR; break;
+    case AE_CH_FLOC:  pa_channel = OMX_AUDIO_ChannelLS; break;
+    case AE_CH_BC:    pa_channel = OMX_AUDIO_ChannelCS; break;
+    case AE_CH_SL:    pa_channel = OMX_AUDIO_ChannelLS; break;
+    case AE_CH_SR:    pa_channel = OMX_AUDIO_ChannelRS; break;
+    default:          pa_channel = OMX_AUDIO_ChannelNone; break;
+  }
+  return pa_channel;
+}
 
-  if (layout & AV_CH_FRONT_LEFT           ) channelMap[index++] = OMX_AUDIO_ChannelLF;
-  if (layout & AV_CH_FRONT_RIGHT          ) channelMap[index++] = OMX_AUDIO_ChannelRF;
-  if (layout & AV_CH_FRONT_CENTER         ) channelMap[index++] = OMX_AUDIO_ChannelCF;
-  if (layout & AV_CH_LOW_FREQUENCY        ) channelMap[index++] = OMX_AUDIO_ChannelLFE;
-  if (layout & AV_CH_BACK_LEFT            ) channelMap[index++] = OMX_AUDIO_ChannelLR;
-  if (layout & AV_CH_BACK_RIGHT           ) channelMap[index++] = OMX_AUDIO_ChannelRR;
-  if (layout & AV_CH_SIDE_LEFT            ) channelMap[index++] = OMX_AUDIO_ChannelLS;
-  if (layout & AV_CH_SIDE_RIGHT           ) channelMap[index++] = OMX_AUDIO_ChannelRS;
-  if (layout & AV_CH_BACK_CENTER          ) channelMap[index++] = OMX_AUDIO_ChannelCS;
-  // following are not in openmax spec, but gpu does accept them
-  if (layout & AV_CH_FRONT_LEFT_OF_CENTER ) channelMap[index++] = (enum OMX_AUDIO_CHANNELTYPE)10;
-  if (layout & AV_CH_FRONT_RIGHT_OF_CENTER) channelMap[index++] = (enum OMX_AUDIO_CHANNELTYPE)11;
-  if (layout & AV_CH_TOP_CENTER           ) channelMap[index++] = (enum OMX_AUDIO_CHANNELTYPE)12;
-  if (layout & AV_CH_TOP_FRONT_LEFT       ) channelMap[index++] = (enum OMX_AUDIO_CHANNELTYPE)13;
-  if (layout & AV_CH_TOP_FRONT_CENTER     ) channelMap[index++] = (enum OMX_AUDIO_CHANNELTYPE)14;
-  if (layout & AV_CH_TOP_FRONT_RIGHT      ) channelMap[index++] = (enum OMX_AUDIO_CHANNELTYPE)15;
-  if (layout & AV_CH_TOP_BACK_LEFT        ) channelMap[index++] = (enum OMX_AUDIO_CHANNELTYPE)16;
-  if (layout & AV_CH_TOP_BACK_CENTER      ) channelMap[index++] = (enum OMX_AUDIO_CHANNELTYPE)17;
-  if (layout & AV_CH_TOP_BACK_RIGHT       ) channelMap[index++] = (enum OMX_AUDIO_CHANNELTYPE)18;
 
-  while (index<OMX_AUDIO_MAXCHANNELS)
+static void BuildChannelMapOMX(enum OMX_AUDIO_CHANNELTYPE *channelMap, const CAEChannelInfo &info)
+{
+  unsigned int index = 0;
+  unsigned int count = std::min(info.Count(), (unsigned int)OMX_AUDIO_MAXCHANNELS);
+printf("%s: %d %d\n", __func__, info.Count(), count);
+  for (unsigned int i = 0; i < count; ++i)
+{
+printf("%s: %d->%d\n", __func__, info[i], AEChannelToPAChannel(info[i]));
+}
+  while (index < OMX_AUDIO_MAXCHANNELS)
     channelMap[index++] = OMX_AUDIO_ChannelNone;
+
+channelMap[0] = OMX_AUDIO_ChannelLF;
+channelMap[1] = OMX_AUDIO_ChannelRF;
 }
 
 CAESinkPi::CAESinkPi() :
@@ -103,6 +112,13 @@ bool CAESinkPi::Initialize(AEAudioFormat &format, std::string &device)
 {
   m_initDevice = device;
   m_initFormat = format;
+
+  bool passthrough = AE_IS_RAW(format.m_dataFormat);
+  if (passthrough)
+  {
+    format.m_channelLayout = AE_CH_LAYOUT_2_0;
+  }
+
   // setup for a 50ms sink feed from SoftAE
   format.m_dataFormat    = AE_FMT_S16NE;
   format.m_frameSamples  = format.m_channelLayout.Count();
@@ -150,8 +166,7 @@ bool CAESinkPi::Initialize(AEAudioFormat &format, std::string &device)
   m_pcm_input.nChannels             = padded_channels;
   m_pcm_input.nSamplingRate         = m_format.m_sampleRate;
 
-  uint64_t channelMap = (1<<m_format.m_frameSamples)-1; // TODO: correct channel map
-  BuildChannelMapOMX(m_pcm_input.eChannelMapping, channelMap);
+  BuildChannelMapOMX(m_pcm_input.eChannelMapping, format.m_channelLayout);
 
   omx_err = m_omx_render.SetParameter(OMX_IndexParamAudioPcm, &m_pcm_input);
   if (omx_err != OMX_ErrorNone)
