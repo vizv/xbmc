@@ -15039,3 +15039,8 @@ msgstr ""
 msgctxt "#37021"
 msgid "Set GUI resolution limit"
 msgstr ""
+
++#: system/settings/rbp.xml
+msgctxt "#40000"
+msgid "Not recommended on Pi as this requires a lot of CPU"
+msgstr ""
