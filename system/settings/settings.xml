@@ -2352,6 +2352,37 @@
           </dependencies>
           <control type="toggle" />
         </setting>
+        <setting id="audiooutput.ac3transcode" type="boolean" label="667" help="36365">
+          <level>2</level>
+          <default>true</default>
+          <dependencies>
+            <dependency type="visible">
+              <and>
+                <condition setting="audiooutput.passthrough" operator="is">true</condition>
+                <condition setting="audiooutput.ac3passthrough" operator="is">true</condition>
+                <condition on="property" name="aesettingvisible" setting="audiooutput.channels">audiooutput.ac3transcode</condition>
+                <condition on="property" name="aesettingvisible" setting="audiooutput.config">audiooutput.ac3transcode</condition>
+              </and>
+            </dependency>
+          </dependencies>
+          <control type="toggle" />
+        </setting>
+        <setting id="audiooutput.ac3upmix" type="boolean" label="668" help="36365">
+          <level>2</level>
+          <default>true</default>
+          <dependencies>
+            <dependency type="visible">
+              <and>
+                <condition setting="audiooutput.passthrough" operator="is">true</condition>
+                <condition setting="audiooutput.ac3passthrough" operator="is">true</condition>
+                <condition setting="audiooutput.ac3transcode" operator="is">true</condition>
+                <condition on="property" name="aesettingvisible" setting="audiooutput.channels">audiooutput.ac3upmix</condition>
+                <condition on="property" name="aesettingvisible" setting="audiooutput.config">audiooutput.ac3upmix</condition>
+              </and>
+            </dependency>
+          </dependencies>
+          <control type="toggle" />
+        </setting>
         <setting id="audiooutput.eac3passthrough" type="boolean" label="448" help="37016">
           <level>2</level>
           <default>false</default>

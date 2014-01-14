@@ -2797,7 +2797,17 @@ msgctxt "#666"
 msgid "Verbose logging..."
 msgstr ""
 
-#empty strings from id 667 to 699
+#: system/settings/settings.xml
+msgctxt "#667"
+msgid "Enable AC3 transcoding"
+msgstr ""
+
+#: system/settings/settings.xml
+msgctxt "#668"
+msgid "Stereo upmix via AC3 transcoding"
+msgstr ""
+
+#empty strings from id 669 to 699
 
 msgctxt "#700"
 msgid "Cleaning up library"
@@ -14743,7 +14753,17 @@ msgctxt "#36428"
 msgid "Record"
 msgstr ""
 
-#empty strings from id 36429 to 36499
+#: system/settings/settings.xml
+msgctxt "#36429"
+msgid "Select if audio with more than two channels should be encoded into AC3 5.1"
+msgstr ""
+
+#: system/settings/settings.xml
+msgctxt "#36430"
+msgid "Stereo upmix using AC3 5.1 encoding"
+msgstr ""
+
+#empty strings from id 36431 to 36499
 #end reservation
 
 #: system/settings/settings.xml
