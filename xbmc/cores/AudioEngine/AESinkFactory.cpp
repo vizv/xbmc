@@ -27,6 +27,7 @@
   #include "Sinks/AESinkAUDIOTRACK.h"
 #elif defined(TARGET_RASPBERRY_PI)
   #include "Sinks/AESinkPi.h"
+  #include "Sinks/AESinkALSA.h"
 #elif defined(TARGET_LINUX) || defined(TARGET_FREEBSD)
   #if defined(HAS_ALSA)
     #include "Sinks/AESinkALSA.h"
@@ -62,6 +63,7 @@ void CAESinkFactory::ParseDevice(std::string &device, std::string &driver)
         driver == "AUDIOTRACK"  ||
 #elif defined(TARGET_RASPBERRY_PI)
         driver == "PI"          ||
+        driver == "ALSA"        ||
 #elif defined(TARGET_LINUX) || defined(TARGET_FREEBSD)
   #if defined(HAS_ALSA)
         driver == "ALSA"        ||
@@ -96,7 +98,12 @@ IAESink *CAESinkFactory::TrySink(std::string &driver, std::string &device, AEAud
 #elif defined(TARGET_ANDROID)
   sink = new CAESinkAUDIOTRACK();
 #elif defined(TARGET_RASPBERRY_PI)
-  sink = new CAESinkPi();
+  else if (driver == "PI")
+    sink = new CAESinkPi();
+  #if defined(HAS_ALSA)
+  else if (driver == "ALSA")
+    sink = new CAESinkALSA();
+  #endif
 #elif defined(TARGET_LINUX) || defined(TARGET_FREEBSD)
   #if defined(HAS_PULSEAUDIO)
   else if (driver == "PULSE")
@@ -174,6 +181,14 @@ void CAESinkFactory::EnumerateEx(AESinkInfoList &list, bool force)
   CAESinkPi::EnumerateDevicesEx(info.m_deviceInfoList, force);
   if(!info.m_deviceInfoList.empty())
     list.push_back(info);
+
+  #if defined(HAS_ALSA)
+  info.m_deviceInfoList.clear();
+  info.m_sinkName = "ALSA";
+  CAESinkALSA::EnumerateDevicesEx(info.m_deviceInfoList, force);
+  if(!info.m_deviceInfoList.empty())
+    list.push_back(info);
+  #endif
 
 #elif defined(TARGET_LINUX) || defined(TARGET_FREEBSD)
   // check if user wants us to do something specific
