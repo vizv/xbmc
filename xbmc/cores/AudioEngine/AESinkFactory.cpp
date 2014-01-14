@@ -27,6 +27,9 @@
   #include "Sinks/AESinkAUDIOTRACK.h"
 #elif defined(TARGET_RASPBERRY_PI)
   #include "Sinks/AESinkPi.h"
+  #if defined(HAS_ALSA)
+    #include "Sinks/AESinkALSA.h"
+  #endif
 #elif defined(TARGET_LINUX) || defined(TARGET_FREEBSD)
   #if defined(HAS_ALSA)
     #include "Sinks/AESinkALSA.h"
@@ -174,6 +177,14 @@ void CAESinkFactory::EnumerateEx(AESinkInfoList &list, bool force)
   CAESinkPi::EnumerateDevicesEx(info.m_deviceInfoList, force);
   if(!info.m_deviceInfoList.empty())
     list.push_back(info);
+
+  #if defined(HAS_ALSA)
+  info.m_deviceInfoList.clear();
+  info.m_sinkName = "ALSA";
+  CAESinkALSA::EnumerateDevicesEx(info.m_deviceInfoList, force);
+  if(!info.m_deviceInfoList.empty())
+    list.push_back(info);
+  #endif
 
 #elif defined(TARGET_LINUX) || defined(TARGET_FREEBSD)
   // check if user wants us to do something specific
