@@ -15051,3 +15051,8 @@ msgctxt "#40001"
 msgid "Enable for live tv and VoD streams"
 msgstr ""
 
+#: system/settings/rbp.xml
+msgctxt "#40002"
+msgid "Not recommended on Pi as this requires a lot of CPU"
+msgstr ""
+
