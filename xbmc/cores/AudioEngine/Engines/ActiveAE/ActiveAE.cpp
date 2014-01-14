@@ -1052,7 +1052,7 @@ void CActiveAE::Configure(AEAudioFormat *desiredFmt)
       {
         (*it)->m_resampleBuffers = new CActiveAEBufferPoolResample((*it)->m_inputBuffers->m_format, outputFormat, m_settings.resampleQuality);
         (*it)->m_resampleBuffers->m_changeResampler = (*it)->m_forceResampler;
-        (*it)->m_resampleBuffers->Create(MAX_CACHE_LEVEL*1000, false, m_settings.stereoupmix, m_settings.normalizelevels);
+        (*it)->m_resampleBuffers->Create(MAX_CACHE_LEVEL*1000, false, m_settings.stereoupmix || m_settings.ac3upmix, m_settings.normalizelevels);
       }
       if (m_mode == MODE_TRANSCODE || m_streams.size() > 1)
         (*it)->m_resampleBuffers->m_fillPackets = true;
@@ -1303,13 +1303,13 @@ void CActiveAE::ChangeResamplers()
 
     if ((*it)->m_resampleBuffers && (*it)->m_resampleBuffers->m_resampler &&
         (((*it)->m_resampleBuffers->m_resampleQuality != m_settings.resampleQuality) ||
-        (((*it)->m_resampleBuffers->m_stereoUpmix != m_settings.stereoupmix)) ||
+        (((*it)->m_resampleBuffers->m_stereoUpmix != (m_settings.stereoupmix || m_settings.ac3upmix))) ||
         ((*it)->m_resampleBuffers->m_normalize != normalize)))
     {
       (*it)->m_resampleBuffers->m_changeResampler = true;
     }
     (*it)->m_resampleBuffers->m_resampleQuality = m_settings.resampleQuality;
-    (*it)->m_resampleBuffers->m_stereoUpmix = m_settings.stereoupmix;
+    (*it)->m_resampleBuffers->m_stereoUpmix = (m_settings.stereoupmix || m_settings.ac3upmix);
     (*it)->m_resampleBuffers->m_normalize = normalize;
   }
 }
@@ -1338,8 +1338,9 @@ void CActiveAE::ApplySettingsToFormat(AEAudioFormat &format, AudioSettings &sett
   else if (settings.channels <= AE_CH_LAYOUT_2_0 && // no multichannel pcm
            settings.passthrough &&
            settings.ac3passthrough &&
+           settings.ac3transcode &&
            !m_streams.empty() &&
-           (format.m_channelLayout.Count() > 2 || settings.stereoupmix))
+           (format.m_channelLayout.Count() > 2 || settings.ac3upmix))
   {
     format.m_dataFormat = AE_FMT_AC3;
     format.m_sampleRate = 48000;
@@ -2033,6 +2034,8 @@ void CActiveAE::LoadSettings()
 
   m_settings.passthrough = m_settings.config == AE_CONFIG_FIXED ? false : CSettings::Get().GetBool("audiooutput.passthrough");
   m_settings.ac3passthrough = CSettings::Get().GetBool("audiooutput.ac3passthrough");
+  m_settings.ac3transcode = CSettings::Get().GetBool("audiooutput.ac3transcode");
+  m_settings.ac3upmix = IsSettingVisible("audiooutput.ac3upmix") ? CSettings::Get().GetBool("audiooutput.ac3upmix") : false;
   m_settings.eac3passthrough = CSettings::Get().GetBool("audiooutput.eac3passthrough");
   m_settings.truehdpassthrough = CSettings::Get().GetBool("audiooutput.truehdpassthrough");
   m_settings.dtspassthrough = CSettings::Get().GetBool("audiooutput.dtspassthrough");
@@ -2097,6 +2100,8 @@ void CActiveAE::OnSettingsChange(const std::string& setting)
       setting == "audiooutput.audiodevice"       ||
       setting == "audiooutput.config"            ||
       setting == "audiooutput.ac3passthrough"    ||
+      setting == "audiooutput.ac3transcode"      ||
+      setting == "audiooutput.ac3upmix"          ||
       setting == "audiooutput.eac3passthrough"   ||
       setting == "audiooutput.dtspassthrough"    ||
       setting == "audiooutput.truehdpassthrough" ||
@@ -2178,18 +2183,26 @@ bool CActiveAE::IsSettingVisible(const std::string &settingId)
   }
   else if (settingId == "audiooutput.stereoupmix")
   {
-    if (m_sink.GetDeviceType(CSettings::Get().GetString("audiooutput.audiodevice")) != AE_DEVTYPE_IEC958)
-    {
-      if (CSettings::Get().GetInt("audiooutput.channels") > AE_CH_LAYOUT_2_0)
-        return true;
-    }
-    else
-    {
-      if (m_sink.HasPassthroughDevice() &&
-          CSettings::Get().GetBool("audiooutput.passthrough") &&
-          CSettings::Get().GetBool("audiooutput.ac3passthrough"))
-        return true;
-    }
+    if (CSettings::Get().GetInt("audiooutput.channels") > AE_CH_LAYOUT_2_0)
+      return true;
+  }
+  else if (settingId == "audiooutput.ac3transcode")
+  {
+    if (m_sink.HasPassthroughDevice() &&
+        CSettings::Get().GetBool("audiooutput.ac3passthrough") &&
+        CSettings::Get().GetInt("audiooutput.config") != AE_CONFIG_FIXED &&
+        CSettings::Get().GetInt("audiooutput.channels") <= AE_CH_LAYOUT_2_0)
+      return true;
+  }
+  else if (settingId == "audiooutput.ac3upmix")
+  {
+    if (m_sink.HasPassthroughDevice() &&
+        CSettings::Get().GetInt("audiooutput.config") != AE_CONFIG_FIXED &&
+        CSettings::Get().GetInt("audiooutput.channels") <= AE_CH_LAYOUT_2_0 &&
+        CSettings::Get().GetBool("audiooutput.passthrough") &&
+        CSettings::Get().GetBool("audiooutput.ac3passthrough") &&
+        CSettings::Get().GetBool("audiooutput.ac3transcode"))
+      return true;
   }
   return false;
 }

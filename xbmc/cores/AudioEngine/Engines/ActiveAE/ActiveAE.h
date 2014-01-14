@@ -50,6 +50,8 @@ struct AudioSettings
   std::string passthoughdevice;
   int channels;
   bool ac3passthrough;
+  bool ac3transcode;
+  bool ac3upmix;
   bool eac3passthrough;
   bool dtspassthrough;
   bool truehdpassthrough;
