@@ -66,6 +66,9 @@ struct SVertex
 };
 
 
+#include "GUIFontCache.h"
+
+
 class CGUIFontTTFBase
 {
   friend class CGUIFont;
@@ -167,6 +170,8 @@ protected:
 
   CStdString m_strFileName;
   XUTILS::auto_buffer m_fontFileInMemory; // used only in some cases, see CFreeTypeLibrary::GetFont()
+
+  CGUIFontCache<CGUIFontCacheStaticPosition, CGUIFontCacheStaticValue> m_staticCache;
 
 private:
   virtual bool FirstBegin() = 0;
