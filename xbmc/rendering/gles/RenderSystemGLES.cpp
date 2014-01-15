@@ -678,4 +678,12 @@ GLint CRenderSystemGLES::GUIShaderGetCoord0Matrix()
   return -1;
 }
 
+GLint CRenderSystemGLES::GUIShaderGetModel()
+{
+  if (m_pGUIshader[m_method])
+    return m_pGUIshader[m_method]->GetModelLoc();
+
+  return -1;
+}
+
 #endif
