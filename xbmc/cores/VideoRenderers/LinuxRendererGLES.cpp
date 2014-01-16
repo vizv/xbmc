@@ -861,7 +861,7 @@ inline void CLinuxRendererGLES::ReorderDrawPoints()
   CBaseRenderer::ReorderDrawPoints();//call base impl. for rotating the points
 
   //corevideo and EGL are flipped in y
-  if(m_renderMethod & RENDER_CVREF)
+  if(m_renderMethod & (RENDER_CVREF | RENDER_OMXEGL))
   {
     CPoint tmp;
     tmp = m_rotatedDestCoords[0];
@@ -1324,6 +1324,8 @@ void CLinuxRendererGLES::RenderOpenMax(int index, int field)
   glEnable(m_textureTarget);
   glActiveTexture(GL_TEXTURE0);
   glBindTexture(m_textureTarget, textureId);
+  glTexParameteri(m_textureTarget, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+  glTexParameteri(m_textureTarget, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
 
   g_Windowing.EnableGUIShader(SM_TEXTURE_RGBA);
 

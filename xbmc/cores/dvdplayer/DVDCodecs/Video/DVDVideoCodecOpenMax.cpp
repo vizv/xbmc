@@ -29,6 +29,7 @@
 #include "DVDStreamInfo.h"
 #include "DVDVideoCodecOpenMax.h"
 #include "OpenMaxVideo.h"
+#include "settings/Settings.h"
 #include "utils/log.h"
 
 #define CLASSNAME "COpenMax"
@@ -67,7 +68,7 @@ bool CDVDVideoCodecOpenMax::Open(CDVDStreamInfo &hints, CDVDCodecOptions &option
           return false;
         }
         // valid avcC data (bitstream) always starts with the value 1 (version)
-        if ( *(char*)hints.extradata == 1 )
+        if (0) //( *(char*)hints.extradata == 1 )
           m_convert_bitstream = bitstream_convert_init(hints.extradata, hints.extrasize);
       }
       break;
