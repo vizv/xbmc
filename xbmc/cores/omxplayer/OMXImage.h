@@ -46,7 +46,7 @@ class COMXImageFile;
 
 class COMXImage : public CThread
 {
-enum TextureAction {TEXTURE_ALLOC, TEXTURE_DELETE };
+enum TextureAction {TEXTURE_ALLOC, TEXTURE_DELETE, TEXTURE_CALLBACK };
 
 struct textureinfo {
   TextureAction action;
@@ -56,6 +56,9 @@ struct textureinfo {
   void *parent;
   const char *filename;
   CEvent sync;
+  bool (*callback)(void *cookie);
+  void *cookie;
+  bool result;
 };
 
 protected:
@@ -75,6 +78,7 @@ public:
       unsigned int format, unsigned int pitch, const CStdString& destFile);
   static bool ClampLimits(unsigned int &width, unsigned int &height, unsigned int m_width, unsigned int m_height, bool transposed = false);
   static bool CreateThumb(const CStdString& srcFile, unsigned int width, unsigned int height, std::string &additional_info, const CStdString& destFile);
+  bool SendMessage(bool (*callback)(void *cookie), void *cookie);
   bool DecodeJpegToTexture(COMXImageFile *file, unsigned int width, unsigned int height, void **userdata);
   void DestroyTexture(void *userdata);
   void GetTexture(void *userdata, GLuint *texture);
