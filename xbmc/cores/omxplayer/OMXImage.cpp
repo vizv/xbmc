@@ -195,6 +195,35 @@ bool COMXImage::CreateThumb(const CStdString& srcFile, unsigned int maxHeight, u
   return okay;
 }
 
+bool COMXImage::SendMessage(bool (*callback)(void *cookie), void *cookie)
+{
+  // we can only call gl functions from the application thread or texture thread
+  if ( g_application.IsCurrentThread() )
+  {
+     return callback(cookie);
+  }
+  struct textureinfo *tex = new struct textureinfo;
+  if (!tex)
+    return false;
+
+  tex->action = TEXTURE_CALLBACK;
+  tex->callback = callback;
+  tex->cookie = cookie;
+  tex->result = false;
+  tex->sync.Reset();
+  {
+    CSingleLock lock(m_texqueue_lock);
+    m_texqueue.push(tex);
+    m_texqueue_cond.notifyAll();
+  }
+  // wait for function to have finished (in texture thread)
+  tex->sync.Wait();
+  bool result = tex->result;
+  delete tex;
+  return result;
+}
+
+
 void COMXImage::AllocTextureInternal(struct textureinfo *tex)
 {
   glGenTextures(1, (GLuint*) &tex->texture);
@@ -418,6 +447,11 @@ void COMXImage::Process()
       AllocTextureInternal(tex);
     else if (tex && tex->action == TEXTURE_DELETE)
       DestroyTextureInternal(tex);
+    else if (tex && tex->action == TEXTURE_CALLBACK)
+    {
+      tex->result = tex->callback(tex->cookie);
+      tex->sync.Set();
+    }
     else
       CLog::Log(LOGERROR, "%s: Unexpected texture job: %p:%d", __func__, tex, tex ? tex->action : 0);
   }

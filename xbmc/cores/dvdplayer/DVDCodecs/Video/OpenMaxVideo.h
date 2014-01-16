@@ -21,9 +21,37 @@
 
 #if defined(HAVE_LIBOPENMAX)
 
-#include "OpenMax.h"
+#include "system_gl.h"
 #include <EGL/egl.h>
 #include <EGL/eglext.h>
+
+#include "linux/OMXCore.h"
+#include "linux/OMXClock.h"
+
+#include "cores/dvdplayer/DVDStreamInfo.h"
+#include "DVDVideoCodec.h"
+#include "threads/Event.h"
+
+#include <queue>
+#include <semaphore.h>
+
+
+
+typedef struct omx_codec_capability {
+    // level is OMX_VIDEO_AVCPROFILETYPE, OMX_VIDEO_H263PROFILETYPE, 
+    // or OMX_VIDEO_MPEG4PROFILETYPE depending on context.
+    OMX_U32 level;
+    // level is OMX_VIDEO_AVCLEVELTYPE, OMX_VIDEO_H263LEVELTYPE, 
+    // or OMX_VIDEO_MPEG4PROFILETYPE depending on context.
+    OMX_U32 profile;
+} omx_codec_capability;
+
+typedef struct omx_demux_packet {
+  OMX_U8 *buff;
+  int size;
+  double dts;
+  double pts;
+} omx_demux_packet;
 
 // an omx egl video frame
 typedef struct OpenMaxVideoBuffer {
@@ -36,6 +64,8 @@ typedef struct OpenMaxVideoBuffer {
   EGLImageKHR egl_image;
   GLuint texture_id;
 } OpenMaxVideoBuffer;
+
+class COpenMax {};
 
 class COpenMaxVideo : public COpenMax
 {
@@ -50,29 +80,24 @@ public:
   void Reset(void);
   bool GetPicture(DVDVideoPicture *pDvdVideoPicture);
   void SetDropState(bool bDrop);
+  // OpenMax decoder callback routines.
+  OMX_ERRORTYPE DecoderFillBufferDone(OMX_HANDLETYPE hComponent, OMX_BUFFERHEADERTYPE* pBuffer);
+
 protected:
   void QueryCodec(void);
   OMX_ERRORTYPE PrimeFillBuffers(void);
   OMX_ERRORTYPE AllocOMXInputBuffers(void);
-  OMX_ERRORTYPE FreeOMXInputBuffers(bool wait);
-  OMX_ERRORTYPE AllocOMXOutputBuffers(void);
-  OMX_ERRORTYPE FreeOMXOutputBuffers(bool wait);
-  static void CallbackAllocOMXEGLTextures(void*);
+  OMX_ERRORTYPE FreeOMXInputBuffers(void);
+  bool AllocOMXOutputBuffers(void);
+  bool FreeOMXOutputBuffers(void);
+  static bool CallbackAllocOMXEGLTextures(void*);
   OMX_ERRORTYPE AllocOMXOutputEGLTextures(void);
-  static void CallbackFreeOMXEGLTextures(void*);
-  OMX_ERRORTYPE FreeOMXOutputEGLTextures(bool wait);
+  static bool CallbackFreeOMXEGLTextures(void*);
+  OMX_ERRORTYPE FreeOMXOutputEGLTextures(void);
 
   // TODO Those should move into the base class. After start actions can be executed by callbacks.
   OMX_ERRORTYPE StartDecoder(void);
   OMX_ERRORTYPE StopDecoder(void);
-
-  // OpenMax decoder callback routines.
-  virtual OMX_ERRORTYPE DecoderEventHandler(OMX_HANDLETYPE hComponent, OMX_PTR pAppData,
-    OMX_EVENTTYPE eEvent, OMX_U32 nData1, OMX_U32 nData2, OMX_PTR pEventData);
-  virtual OMX_ERRORTYPE DecoderEmptyBufferDone(
-    OMX_HANDLETYPE hComponent, OMX_PTR pAppData, OMX_BUFFERHEADERTYPE* pBuffer);
-  virtual OMX_ERRORTYPE DecoderFillBufferDone(
-    OMX_HANDLETYPE hComponent, OMX_PTR pAppData, OMX_BUFFERHEADERTYPE* pBufferHeader);
 
   // EGL Resources
   EGLDisplay        m_egl_display;
@@ -88,13 +113,8 @@ protected:
   std::queue<omx_demux_packet> m_demux_queue;
 
   // OpenMax input buffers (demuxer packets)
-  pthread_mutex_t   m_omx_input_mutex;
-  std::queue<OMX_BUFFERHEADERTYPE*> m_omx_input_avaliable;
-  std::vector<OMX_BUFFERHEADERTYPE*> m_omx_input_buffers;
   bool              m_omx_input_eos;
-  int               m_omx_input_port;
   //sem_t             *m_omx_flush_input;
-  CEvent            m_input_consumed_event;
 
   // OpenMax output buffers (video frames)
   pthread_mutex_t   m_omx_output_mutex;
@@ -102,12 +122,28 @@ protected:
   std::queue<OpenMaxVideoBuffer*> m_omx_output_ready;
   std::vector<OpenMaxVideoBuffer*> m_omx_output_buffers;
   bool              m_omx_output_eos;
-  int               m_omx_output_port;
   //sem_t             *m_omx_flush_output;
 
   bool              m_portChanging;
 
   volatile bool     m_videoplayback_done;
+
+  bool              m_is_open;
+  // initialize OpenMax and get decoder component
+  bool Initialize( const CStdString &decoder_name);
+  void Deinitialize();
+
+  // Components
+  COMXCoreComponent m_omx_decoder;
+  COMXCoreComponent m_omx_egl_render;
+
+  COMXCoreTunel     m_omx_tunnel;
+  OMX_VIDEO_CODINGTYPE m_codingType;
+  bool m_port_settings_changed;
+
+  bool PortSettingsChanged();
+  bool SendDecoderConfig(uint8_t *extradata, int extrasize);
+  bool NaluFormatStartCodes(enum AVCodecID codec, uint8_t *extradata, int extrasize);
 };
 
 // defined(HAVE_LIBOPENMAX)
