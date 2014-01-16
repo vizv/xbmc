@@ -50,9 +50,7 @@ struct DVDCodecAvailableType
 namespace DXVA { class CSurfaceContext; }
 namespace VAAPI { class CVaapiRenderPicture; }
 namespace VDPAU { class CVdpauRenderPicture; }
-class COpenMax;
-class COpenMaxVideo;
-struct OpenMaxVideoBuffer;
+class COpenMaxVideoBuffer;
 class CDVDVideoCodecStageFright;
 class CDVDMediaCodecInfo;
 class CDVDVideoCodecIMXBuffer;
@@ -82,8 +80,7 @@ struct DVDVideoPicture
     };
 
     struct {
-      COpenMax *openMax;
-      OpenMaxVideoBuffer *openMaxBuffer;
+      COpenMaxVideoBuffer *openMaxBuffer;
     };
 
     struct {
