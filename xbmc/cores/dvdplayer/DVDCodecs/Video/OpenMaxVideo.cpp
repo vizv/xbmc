@@ -587,7 +587,7 @@ bool COpenMaxVideo::GetPicture(DVDVideoPicture* pDvdVideoPicture)
 {
   //CLog::Log(LOGDEBUG, "%s::%s - m_omx_output_busy.size()=%d m_omx_output_ready.size()=%d\n", CLASSNAME, __func__, m_omx_output_busy.size(), m_omx_output_ready.size());
 
-  while (m_omx_output_busy.size() > 1)
+  while (m_omx_output_busy.size() > 2)
   {
     // fetch a output buffer and pop it off the busy list
     pthread_mutex_lock(&m_omx_output_mutex);
