@@ -338,7 +338,7 @@ void COpenMaxVideo::SetDropState(bool bDrop)
 #if defined(OMX_DEBUG_VERBOSE)
   if (m_drop_state != bDrop)
     CLog::Log(LOGDEBUG, "%s::%s - m_drop_state(%d)\n",
-      CLASSNAME, __func__, m_drop_state);
+      CLASSNAME, __func__, bDrop);
 #endif
   m_drop_state = bDrop;
 }
@@ -541,8 +541,8 @@ bool COpenMaxVideo::PortSettingsChanged()
 int COpenMaxVideo::Decode(uint8_t* pData, int iSize, double dts, double pts)
 {
   #if defined(OMX_DEBUG_VERBOSE)
-  CLog::Log(LOGDEBUG, "%s::%s - %p %d %.2f %.2f m_demux_queue_size(%d) m_dts_queue.size(%d)\n",
-     CLASSNAME, __func__, pData, iSize, dts, pts, m_demux_queue.size(), m_dts_queue.size());
+  CLog::Log(LOGDEBUG, "%s::%s - %-8p %-6d dts:%.3f pts:%.3f demux_queue(%d) dts_queue(%d) ready_queue(%d) busy_queue(%d)\n",
+     CLASSNAME, __func__, pData, iSize, dts == DVD_NOPTS_VALUE ? 0.0 : dts*1e-6, pts == DVD_NOPTS_VALUE ? 0.0 : pts*1e-6, m_demux_queue.size(), m_dts_queue.size(), m_omx_output_ready.size(), m_omx_output_busy.size());
   #endif
 
   OMX_ERRORTYPE omx_err;
@@ -612,8 +612,16 @@ int COpenMaxVideo::Decode(uint8_t* pData, int iSize, double dts, double pts)
 
       if (demuxer_bytes == 0)
         omx_buffer->nFlags |= OMX_BUFFERFLAG_ENDOFFRAME;
+      if (pts == DVD_NOPTS_VALUE)
+        omx_buffer->nFlags |= OMX_BUFFERFLAG_TIME_UNKNOWN;
+      if (m_drop_state) // hijack an omx flag to signal this frame to be dropped - it will be returned with the picture (but otherwise ignored)
+        omx_buffer->nFlags |= OMX_BUFFERFLAG_DATACORRUPT;
 
-      //CLog::Log(LOGINFO, "VideD: dts:%.0f pts:%.0f flags:%x len:%d remain:%d)\n", dts, pts, omx_buffer->nFlags, omx_buffer->nFilledLen, demuxer_bytes);
+#if defined(OMX_DEBUG_VERBOSE)
+      CLog::Log(LOGDEBUG, "%s::%s - %-6d dts:%.3f pts:%.3f flags:%x\n",
+        CLASSNAME, __func__, omx_buffer->nFilledLen, dts == DVD_NOPTS_VALUE ? 0.0 : dts*1e-6, pts == DVD_NOPTS_VALUE ? 0.0 : pts*1e-6, omx_buffer->nFlags);
+#endif
+
       omx_err = m_omx_decoder.EmptyThisBuffer(omx_buffer);
       if (omx_err != OMX_ErrorNone)
       {
@@ -785,15 +793,17 @@ bool COpenMaxVideo::GetPicture(DVDVideoPicture* pDvdVideoPicture)
     pDvdVideoPicture->pts = (ts == 0) ? DVD_NOPTS_VALUE : ts;
     pDvdVideoPicture->openMaxBuffer->Acquire();
     pDvdVideoPicture->iFlags  = DVP_FLAG_ALLOCATED;
-    pDvdVideoPicture->iFlags |= m_drop_state ? DVP_FLAG_DROPPED : 0;
+    if (buffer->omx_buffer->nFlags & OMX_BUFFERFLAG_DATACORRUPT)
+      pDvdVideoPicture->iFlags |= DVP_FLAG_DROPPED;
 #if defined(OMX_DEBUG_VERBOSE)
-    CLog::Log(LOGINFO, "%s::%s dts:%.0f pts:%.0f flags:%x openMaxBuffer:%p omx_buffer:%p egl_image:%p texture_id:%x\n", CLASSNAME, __func__, pDvdVideoPicture->dts, pDvdVideoPicture->pts, pDvdVideoPicture->iFlags, pDvdVideoPicture->openMaxBuffer, pDvdVideoPicture->openMaxBuffer->omx_buffer, pDvdVideoPicture->openMaxBuffer->egl_image, pDvdVideoPicture->openMaxBuffer->texture_id);
+    CLog::Log(LOGINFO, "%s::%s dts:%.3f pts:%.3f flags:%x:%x openMaxBuffer:%p omx_buffer:%p egl_image:%p texture_id:%x\n", CLASSNAME, __func__,
+        pDvdVideoPicture->dts == DVD_NOPTS_VALUE ? 0.0 : pDvdVideoPicture->dts*1e-6, pDvdVideoPicture->pts == DVD_NOPTS_VALUE ? 0.0 : pDvdVideoPicture->pts*1e-6,
+        pDvdVideoPicture->iFlags, buffer->omx_buffer->nFlags, pDvdVideoPicture->openMaxBuffer, pDvdVideoPicture->openMaxBuffer->omx_buffer, pDvdVideoPicture->openMaxBuffer->egl_image, pDvdVideoPicture->openMaxBuffer->texture_id);
 #endif
   }
   else
   {
-    CLog::Log(LOGERROR, "%s::%s - called but m_omx_output_ready is empty\n",
-      CLASSNAME, __func__);
+    CLog::Log(LOGERROR, "%s::%s - called but m_omx_output_ready is empty\n", CLASSNAME, __func__);
     return false;
   }
   return true;
@@ -818,8 +828,8 @@ OMX_ERRORTYPE COpenMaxVideo::DecoderFillBufferDone(
   COpenMaxVideoBuffer *buffer = (COpenMaxVideoBuffer*)pBuffer->pAppPrivate;
 
   #if defined(OMX_DEBUG_VERBOSE)
-  CLog::Log(LOGDEBUG, "%s::%s - %p (%p,%p) buffer_size(%u), timestamp(%.0f)\n",
-    CLASSNAME, __func__, buffer, pBuffer, buffer->omx_buffer, pBuffer->nFilledLen, (double)FromOMXTime(buffer->omx_buffer->nTimeStamp));
+  CLog::Log(LOGDEBUG, "%s::%s - %p (%p,%p) buffer_size(%u), pts:%.3f\n",
+    CLASSNAME, __func__, buffer, pBuffer, buffer->omx_buffer, pBuffer->nFilledLen, (double)FromOMXTime(buffer->omx_buffer->nTimeStamp)*1e-6);
   #endif
 
   // queue output omx buffer to ready list.
