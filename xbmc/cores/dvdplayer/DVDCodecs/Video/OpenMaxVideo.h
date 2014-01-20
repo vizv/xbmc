@@ -54,7 +54,9 @@ typedef struct omx_demux_packet {
 } omx_demux_packet;
 
 // an omx egl video frame
-typedef struct OpenMaxVideoBuffer {
+class OpenMaxVideoBuffer
+{
+public:
   OMX_BUFFERHEADERTYPE *omx_buffer;
   int width;
   int height;
@@ -64,7 +66,13 @@ typedef struct OpenMaxVideoBuffer {
   // used for egl based rendering if active
   EGLImageKHR egl_image;
   GLuint texture_id;
-} OpenMaxVideoBuffer;
+    // reference counting
+  OpenMaxVideoBuffer* Retain();
+  long                Release();
+
+private:
+  long                m_refs;
+};
 
 class COpenMax {};
 
