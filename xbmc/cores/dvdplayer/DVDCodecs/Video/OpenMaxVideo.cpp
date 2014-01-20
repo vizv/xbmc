@@ -764,7 +764,7 @@ OMX_ERRORTYPE COpenMaxVideo::AllocOMXOutputEGLTextures(void)
   if (omx_err != OMX_ErrorNone)
     CLog::Log(LOGERROR, "%s::%s - m_omx_egl_render.GetParameter OMX_IndexParamPortDefinition omx_err(0x%08x)", CLASSNAME, __func__, omx_err);
 
-  port_format.nBufferCountActual = 8;
+  port_format.nBufferCountActual = 4;
   omx_err = m_omx_egl_render.SetParameter(OMX_IndexParamPortDefinition, &port_format);
   if (omx_err != OMX_ErrorNone)
     CLog::Log(LOGERROR, "%s::%s - m_omx_egl_render.SetParameter OMX_IndexParamPortDefinition omx_err(0x%08x)", CLASSNAME, __func__, omx_err);
