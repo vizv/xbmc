@@ -59,6 +59,7 @@ typedef struct OpenMaxVideoBuffer {
   int width;
   int height;
   int index;
+  int m_refCount;
 
   // used for egl based rendering if active
   EGLImageKHR egl_image;

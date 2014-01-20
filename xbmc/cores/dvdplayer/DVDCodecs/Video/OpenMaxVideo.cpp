@@ -86,9 +86,9 @@ COpenMaxVideo::~COpenMaxVideo()
 
 bool COpenMaxVideo::Open(CDVDStreamInfo &hints)
 {
-  #if defined(OMX_DEBUG_VERBOSE)
+  //#if defined(OMX_DEBUG_VERBOSE)
   CLog::Log(LOGDEBUG, "%s::%s\n", CLASSNAME, __func__);
-  #endif
+  //#endif
 
   OMX_ERRORTYPE omx_err = OMX_ErrorNone;
   std::string decoder_name;
@@ -104,19 +104,8 @@ bool COpenMaxVideo::Open(CDVDStreamInfo &hints)
   switch (hints.codec)
   {
     case AV_CODEC_ID_H264:
-    {
-      switch(hints.profile)
-      {
-        case FF_PROFILE_H264_BASELINE:
-        case FF_PROFILE_H264_MAIN:
-        case FF_PROFILE_H264_HIGH:
-          m_codingType = OMX_VIDEO_CodingAVC;
-        break;
-        default:
-          return false;
-        break;
-      }
-    }
+      // H.264
+      m_codingType = OMX_VIDEO_CodingAVC;
     break;
     case AV_CODEC_ID_H263:
     case AV_CODEC_ID_MPEG4:
@@ -235,7 +224,7 @@ bool COpenMaxVideo::Open(CDVDStreamInfo &hints)
     }
   }
 
-  // Alloc buffers for the omx intput port.
+  // Alloc buffers for the omx input port.
   omx_err = m_omx_decoder.AllocInputBuffers();
   if (omx_err != OMX_ErrorNone)
   {
@@ -306,6 +295,8 @@ void COpenMaxVideo::SetDropState(bool bDrop)
       // return the omx buffer back to OpenMax to fill.
       omx_buffer->nFlags = 0;
       omx_buffer->nFilledLen = 0;
+      assert(omx_buffer->nOutputPortIndex == m_omx_egl_render.GetOutputPort());
+      CLog::Log(LOGDEBUG, "%s::%s FillThisBuffer(%p) %p->%d (%p)\n", CLASSNAME, __func__, omx_buffer, (void *)0, 0, (void *)0);
       omx_err = m_omx_egl_render.FillThisBuffer(omx_buffer);
 
       if (omx_err)
@@ -646,6 +637,7 @@ bool COpenMaxVideo::GetPicture(DVDVideoPicture* pDvdVideoPicture)
   pDvdVideoPicture->iFlags  = DVP_FLAG_ALLOCATED;
   pDvdVideoPicture->iFlags |= m_drop_state ? DVP_FLAG_DROPPED : 0;
 
+  CLog::Log(LOGDEBUG, "%s::%s acquire %p->%d (%p)\n", CLASSNAME, __func__, pDvdVideoPicture->openMaxBuffer, pDvdVideoPicture->openMaxBuffer->m_refCount, pDvdVideoPicture);
   return true;
 }
 
@@ -656,10 +648,10 @@ OMX_ERRORTYPE COpenMaxVideo::DecoderFillBufferDone(
 {
   OpenMaxVideoBuffer *buffer = (OpenMaxVideoBuffer*)pBuffer->pAppPrivate;
 
-  #if defined(OMX_DEBUG_FILLBUFFERDONE)
-  CLog::Log(LOGDEBUG, "%s::%s - buffer_size(%u), timestamp(%.0f)\n",
-    CLASSNAME, __func__, pBuffer->nFilledLen, (double)FromOMXTime(buffer->omx_buffer->nTimeStamp));
-  #endif
+  //#if defined(OMX_DEBUG_FILLBUFFERDONE)
+  CLog::Log(LOGDEBUG, "%s::%s - %p (%p,%p) buffer_size(%u), timestamp(%.0f)\n",
+    CLASSNAME, __func__, pBuffer, buffer, buffer->omx_buffer, pBuffer->nFilledLen, (double)FromOMXTime(buffer->omx_buffer->nTimeStamp));
+  //#endif
 
   if (!m_portChanging)
   {
@@ -693,6 +685,7 @@ OMX_ERRORTYPE COpenMaxVideo::PrimeFillBuffers(void)
     buffer->omx_buffer->nFlags = 0;
     buffer->omx_buffer->nFilledLen = 0;
 
+    CLog::Log(LOGDEBUG, "%s::%s FillThisBuffer(%p) %p->%d (%p)\n", CLASSNAME, __func__, buffer->omx_buffer, buffer, buffer->m_refCount, (void *)0);
     omx_err = m_omx_egl_render.FillThisBuffer(buffer->omx_buffer);
     if (omx_err)
       CLog::Log(LOGERROR, "%s::%s - OMX_FillThisBuffer failed with omx_err(0x%x)\n",
