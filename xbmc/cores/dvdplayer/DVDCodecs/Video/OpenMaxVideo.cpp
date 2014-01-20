@@ -574,6 +574,25 @@ void COpenMaxVideo::Reset(void)
   ::Sleep(100);
 }
 
+void COpenMaxVideo::ReleaseOpenMaxBuffer(OpenMaxVideoBuffer *buffer)
+{
+  COpenMaxVideo *ctx = static_cast<COpenMaxVideo*>(buffer->omx_buffer->pPlatformPrivate);
+  bool done = buffer->omx_buffer->nFlags & OMX_BUFFERFLAG_EOS;
+  if (!done)
+  {
+    // return the omx buffer back to OpenMax to fill.
+    buffer->omx_buffer->nFlags = 0;
+    buffer->omx_buffer->nFilledLen = 0;
+    assert(buffer->omx_buffer->nOutputPortIndex == ctx->m_omx_egl_render.GetOutputPort());
+    CLog::Log(LOGDEBUG, "%s::%s FillThisBuffer(%p) %p->%d (%p)\n", CLASSNAME, __func__, buffer->omx_buffer, buffer, buffer->m_refCount, (void *)0);
+    OMX_ERRORTYPE omx_err = ctx->m_omx_egl_render.FillThisBuffer(buffer->omx_buffer);
+
+    if (omx_err)
+      CLog::Log(LOGERROR, "%s::%s - OMX_FillThisBuffer, omx_err(0x%x)\n",
+        CLASSNAME, __func__, omx_err);
+  }
+}
+
 bool COpenMaxVideo::GetPicture(DVDVideoPicture* pDvdVideoPicture)
 {
   //CLog::Log(LOGDEBUG, "%s::%s - m_omx_output_busy.size()=%d m_omx_output_ready.size()=%d\n", CLASSNAME, __func__, m_omx_output_busy.size(), m_omx_output_ready.size());
@@ -585,19 +604,8 @@ bool COpenMaxVideo::GetPicture(DVDVideoPicture* pDvdVideoPicture)
     OpenMaxVideoBuffer *buffer = m_omx_output_busy.front();
     m_omx_output_busy.pop();
     pthread_mutex_unlock(&m_omx_output_mutex);
-
-    bool done = buffer->omx_buffer->nFlags & OMX_BUFFERFLAG_EOS;
-    if (!done)
-    {
-      // return the omx buffer back to OpenMax to fill.
-      buffer->omx_buffer->nFlags = 0;
-      buffer->omx_buffer->nFilledLen = 0;
-      OMX_ERRORTYPE omx_err = m_omx_egl_render.FillThisBuffer(buffer->omx_buffer);
-
-      if (omx_err)
-        CLog::Log(LOGERROR, "%s::%s - OMX_FillThisBuffer, omx_err(0x%x)\n",
-          CLASSNAME, __func__, omx_err);
-    }
+    ReleaseOpenMaxBuffer(buffer);
+    CLog::Log(LOGDEBUG, "%s::%s release %p->%d\n", CLASSNAME, __func__, buffer, buffer->m_refCount);
   }
 
   if (!m_omx_output_ready.empty())

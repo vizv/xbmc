@@ -145,6 +145,7 @@ protected:
   bool PortSettingsChanged();
   bool SendDecoderConfig(uint8_t *extradata, int extrasize);
   bool NaluFormatStartCodes(enum AVCodecID codec, uint8_t *extradata, int extrasize);
+  void ReleaseOpenMaxBuffer(OpenMaxVideoBuffer *buffer);
 };
 
 // defined(HAVE_LIBOPENMAX)
