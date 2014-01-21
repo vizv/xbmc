@@ -69,8 +69,6 @@ COpenMaxVideo::COpenMaxVideo()
 {
   m_portChanging = false;
 
-  pthread_mutex_init(&m_omx_output_mutex, NULL);
-
   memset(&m_videobuffer, 0, sizeof(DVDVideoPicture));
   m_drop_state = false;
   m_decoded_width = 0;
@@ -89,7 +87,6 @@ COpenMaxVideo::~COpenMaxVideo()
   #endif
   if (m_is_open)
     Close();
-  pthread_mutex_destroy(&m_omx_output_mutex);
 }
 
 bool COpenMaxVideo::Open(CDVDStreamInfo &hints)
@@ -295,16 +292,17 @@ void COpenMaxVideo::SetDropState(bool bDrop)
     // blow all but the last ready video frame
     while (m_omx_output_ready.size() > 1)
     {
-      pthread_mutex_lock(&m_omx_output_mutex);
+      CSingleLock lock(m_bufferPool.renderPicSec);
       m_dts_queue.pop();
-      OMX_BUFFERHEADERTYPE *omx_buffer = m_omx_output_ready.front()->omx_buffer;
+      COpenMaxVideoBuffer *buffer = m_omx_output_ready.front();
+      OMX_BUFFERHEADERTYPE *omx_buffer = buffer->omx_buffer;
       m_omx_output_ready.pop();
-      pthread_mutex_unlock(&m_omx_output_mutex);
+      lock.Leave();
       // return the omx buffer back to OpenMax to fill.
       omx_buffer->nFlags = 0;
       omx_buffer->nFilledLen = 0;
       assert(omx_buffer->nOutputPortIndex == m_omx_egl_render.GetOutputPort());
-      CLog::Log(LOGDEBUG, "%s::%s FillThisBuffer(%p) %p->%d (%p)\n", CLASSNAME, __func__, omx_buffer, (void *)0, 0, (void *)0);
+      CLog::Log(LOGDEBUG, "%s::%s FillThisBuffer(%p) %d (%p)\n", CLASSNAME, __func__, buffer, buffer->refCount, omx_buffer);
       omx_err = m_omx_egl_render.FillThisBuffer(omx_buffer);
 
       if (omx_err)
@@ -626,10 +624,10 @@ bool COpenMaxVideo::GetPicture(DVDVideoPicture* pDvdVideoPicture)
   while (m_omx_output_busy.size() > 2)
   {
     // fetch a output buffer and pop it off the busy list
-    pthread_mutex_lock(&m_omx_output_mutex);
+    CSingleLock lock(m_bufferPool.renderPicSec);
     COpenMaxVideoBuffer *buffer = m_omx_output_busy.front();
     m_omx_output_busy.pop();
-    pthread_mutex_unlock(&m_omx_output_mutex);
+    lock.Leave();
     ReleaseOpenMaxBuffer(buffer);
     CLog::Log(LOGDEBUG, "%s::%s release %p->%d\n", CLASSNAME, __func__, buffer, buffer->refCount);
   }
@@ -638,11 +636,11 @@ bool COpenMaxVideo::GetPicture(DVDVideoPicture* pDvdVideoPicture)
   {
     COpenMaxVideoBuffer *buffer;
     // fetch a output buffer and pop it off the ready list
-    pthread_mutex_lock(&m_omx_output_mutex);
+    CSingleLock lock(m_bufferPool.renderPicSec);
     buffer = m_omx_output_ready.front();
     m_omx_output_ready.pop();
     m_omx_output_busy.push(buffer);
-    pthread_mutex_unlock(&m_omx_output_mutex);
+    lock.Leave();
 
     pDvdVideoPicture->dts = DVD_NOPTS_VALUE;
     pDvdVideoPicture->pts = DVD_NOPTS_VALUE;
@@ -683,15 +681,15 @@ OMX_ERRORTYPE COpenMaxVideo::DecoderFillBufferDone(
 
   //#if defined(OMX_DEBUG_FILLBUFFERDONE)
   CLog::Log(LOGDEBUG, "%s::%s - %p (%p,%p) buffer_size(%u), timestamp(%.0f)\n",
-    CLASSNAME, __func__, pBuffer, buffer, buffer->omx_buffer, pBuffer->nFilledLen, (double)FromOMXTime(buffer->omx_buffer->nTimeStamp));
+    CLASSNAME, __func__, buffer, pBuffer, buffer->omx_buffer, pBuffer->nFilledLen, (double)FromOMXTime(buffer->omx_buffer->nTimeStamp));
   //#endif
 
   if (!m_portChanging)
   {
     // queue output omx buffer to ready list.
-    pthread_mutex_lock(&m_omx_output_mutex);
+    CSingleLock lock(m_bufferPool.renderPicSec);
     m_omx_output_ready.push(buffer);
-    pthread_mutex_unlock(&m_omx_output_mutex);
+    lock.Leave();
   }
 
   return OMX_ErrorNone;
@@ -706,9 +704,9 @@ OMX_ERRORTYPE COpenMaxVideo::PrimeFillBuffers(void)
   CLog::Log(LOGDEBUG, "%s::%s\n", CLASSNAME, __func__);
   #endif
   // tell OpenMax to start filling output buffers
-  for (size_t i = 0; i < m_omx_output_buffers.size(); i++)
+  for (size_t i = 0; i < m_bufferPool.allRenderPics.size(); i++)
   {
-    buffer = m_omx_output_buffers[i];
+    buffer = m_bufferPool.allRenderPics[i];
     // always set the port index.
     buffer->omx_buffer->nOutputPortIndex = m_omx_egl_render.GetOutputPort();
     // Need to clear the EOS flag.
@@ -718,7 +716,7 @@ OMX_ERRORTYPE COpenMaxVideo::PrimeFillBuffers(void)
     buffer->omx_buffer->nFlags = 0;
     buffer->omx_buffer->nFilledLen = 0;
 
-    CLog::Log(LOGDEBUG, "%s::%s FillThisBuffer(%p) %p->%d (%p)\n", CLASSNAME, __func__, buffer->omx_buffer, buffer, buffer->refCount, (void *)0);
+    CLog::Log(LOGDEBUG, "%s::%s FillThisBuffer(%p) %d (%p)\n", CLASSNAME, __func__, buffer, buffer->refCount, buffer->omx_buffer);
     omx_err = m_omx_egl_render.FillThisBuffer(buffer->omx_buffer);
     if (omx_err)
       CLog::Log(LOGERROR, "%s::%s - OMX_FillThisBuffer failed with omx_err(0x%x)\n",
@@ -853,7 +851,7 @@ OMX_ERRORTYPE COpenMaxVideo::AllocOMXOutputEGLTextures(void)
         CLASSNAME, __func__, omx_err);
       return(omx_err);
     }
-    m_omx_output_buffers.push_back(egl_buffer);
+    m_bufferPool.allRenderPics.push_back(egl_buffer);
 
     CLog::Log(LOGDEBUG, "%s::%s - Texture %p Width %d Height %d\n",
       CLASSNAME, __func__, egl_buffer->egl_image, egl_buffer->width, egl_buffer->height);
@@ -863,12 +861,12 @@ OMX_ERRORTYPE COpenMaxVideo::AllocOMXOutputEGLTextures(void)
     CLog::Log(LOGERROR, "%s::%s m_omx_egl_render.WaitForCommand(OMX_CommandPortEnable) omx_err(0x%08x)\n", CLASSNAME, __func__, omx_err);
 
   m_omx_output_eos = false;
-  pthread_mutex_lock(&m_omx_output_mutex);
+  CSingleLock lock(m_bufferPool.renderPicSec);
   while (!m_omx_output_busy.empty())
     m_omx_output_busy.pop();
   while (!m_omx_output_ready.empty())
     m_omx_output_ready.pop();
-  pthread_mutex_unlock(&m_omx_output_mutex);
+  lock.Leave();
 
   return omx_err;
 }
@@ -882,9 +880,9 @@ OMX_ERRORTYPE COpenMaxVideo::FreeOMXOutputEGLTextures(void)
   if (omx_err != OMX_ErrorNone)
     CLog::Log(LOGERROR, "%s::%s m_omx_egl_render.DisablePort(%d) omx_err(0x%08x)\n", CLASSNAME, __func__, m_omx_egl_render.GetOutputPort(), omx_err);
 
-  for (size_t i = 0; i < m_omx_output_buffers.size(); i++)
+  for (size_t i = 0; i < m_bufferPool.allRenderPics.size(); i++)
   {
-    egl_buffer = m_omx_output_buffers[i];
+    egl_buffer = m_bufferPool.allRenderPics[i];
     // tell decoder output port to stop using the EGLImage
     omx_err = m_omx_egl_render.FreeOutputBuffer(egl_buffer->omx_buffer);
     if (omx_err != OMX_ErrorNone)
@@ -895,7 +893,7 @@ OMX_ERRORTYPE COpenMaxVideo::FreeOMXOutputEGLTextures(void)
     glDeleteTextures(1, &egl_buffer->texture_id);
     delete egl_buffer;
   }
-  m_omx_output_buffers.clear();
+  m_bufferPool.allRenderPics.clear();
   omx_err = m_omx_egl_render.WaitForCommand(OMX_CommandPortDisable, m_omx_egl_render.GetOutputPort());
   if (omx_err != OMX_ErrorNone)
     CLog::Log(LOGERROR, "%s::%s WaitForCommand:OMX_CommandPortDisable omx_err(0x%08x)\n", CLASSNAME, __func__, omx_err);

@@ -158,7 +158,6 @@ public:
   pthread_mutex_t   m_omx_output_mutex;
   std::queue<COpenMaxVideoBuffer*> m_omx_output_busy;
   std::queue<COpenMaxVideoBuffer*> m_omx_output_ready;
-  std::vector<COpenMaxVideoBuffer*> m_omx_output_buffers;
   bool              m_omx_output_eos;
   //sem_t             *m_omx_flush_output;
 
