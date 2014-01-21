@@ -35,9 +35,7 @@
 namespace DXVA { class CSurfaceContext; }
 namespace VAAPI { struct CHolder; }
 namespace VDPAU { class CVdpauRenderPicture; }
-class COpenMax;
-class COpenMaxVideo;
-struct OpenMaxVideoBuffer;
+class COpenMaxVideoBuffer;
 class CDVDVideoCodecStageFright;
 class CDVDMediaCodecInfo;
 typedef void* EGLImageKHR;
@@ -66,8 +64,7 @@ struct DVDVideoPicture
     };
 
     struct {
-      COpenMax *openMax;
-      OpenMaxVideoBuffer *openMaxBuffer;
+      COpenMaxVideoBuffer *openMaxBuffer;
     };
 
     struct {

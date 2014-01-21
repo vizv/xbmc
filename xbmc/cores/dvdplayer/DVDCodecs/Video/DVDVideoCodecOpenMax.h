@@ -23,7 +23,7 @@
 
 #include "DVDVideoCodec.h"
 
-class COpenVideoMax;
+class COpenMaxVideo;
 class CDVDVideoCodecOpenMax : public CDVDVideoCodec
 {
 public:

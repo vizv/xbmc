@@ -755,7 +755,7 @@ OMX_ERRORTYPE COpenMaxVideo::AllocOMXOutputEGLTextures(void)
   OMX_ERRORTYPE omx_err;
 
   EGLint attrib = EGL_NONE;
-  OpenMaxVideoBuffer *egl_buffer;
+  COpenMaxVideoBuffer *egl_buffer;
 
   // Obtain the information about the output port.
   OMX_PARAM_PORTDEFINITIONTYPE port_format;

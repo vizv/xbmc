@@ -54,7 +54,7 @@ typedef struct omx_demux_packet {
 } omx_demux_packet;
 
 // an omx egl video frame
-class OpenMaxVideoBuffer
+class COpenMaxVideoBuffer
 {
 public:
   OMX_BUFFERHEADERTYPE *omx_buffer;
@@ -74,9 +74,7 @@ private:
   long                m_refs;
 };
 
-class COpenMax {};
-
-class COpenMaxVideo : public COpenMax
+class COpenMaxVideo
 {
 public:
   COpenMaxVideo();

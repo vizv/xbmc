@@ -45,7 +45,7 @@
 #include "dialogs/GUIDialogKaiToast.h"
 #include "guilib/Texture.h"
 #include "lib/DllSwScale.h"
-#include "../dvdplayer/DVDCodecs/Video/OpenMaxVideo.h"
+#include "DVDCodecs/Video/OpenMaxVideo.h"
 #include "threads/SingleLock.h"
 #include "RenderCapture.h"
 #include "RenderFormats.h"
@@ -2654,10 +2654,12 @@ unsigned int CLinuxRendererGLES::GetProcessorSize()
 }
 
 #ifdef HAVE_LIBOPENMAX
-void CLinuxRendererGLES::AddProcessor(COpenMax* openMax, DVDVideoPicture *picture, int index)
+void CLinuxRendererGLES::AddProcessor(COpenMaxVideoBuffer *openMaxBuffer, int index)
 {
   YUVBUFFER &buf = m_buffers[index];
-  buf.openMaxBuffer = picture->openMaxBuffer;
+  COpenMaxVideoBuffer *pic = openMaxBuffer->Acquire();
+  SAFE_RELEASE(buf.openMaxBuffer);
+  buf.openMaxBuffer = pic;
 }
 #endif
 #ifdef HAVE_VIDEOTOOLBOXDECODER
