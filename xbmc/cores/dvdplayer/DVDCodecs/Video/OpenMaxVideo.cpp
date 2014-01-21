@@ -641,13 +641,14 @@ void COpenMaxVideoBuffer::ReturnUnused()
 void COpenMaxVideoBuffer::Sync()
 {
   CSingleLock lock(renderPicSection);
-  CLog::Log(LOGDEBUG, "%s::%s %p fence:%p refCount:%d", CLASSNAME, __func__, this, fence, refCount);
   if (fence)
   {
+    CLog::Log(LOGDEBUG, "%s::%s %p destroy fence:%p refCount:%d", CLASSNAME, __func__, this, fence, refCount);
     eglDestroySyncKHR(m_omv->getDisplay(), fence);
     fence = 0;
   }
   fence = eglCreateSyncKHR(m_omv->getDisplay(), EGL_SYNC_FENCE_KHR, NULL);
+  CLog::Log(LOGDEBUG, "%s::%s %p fence:%p refCount:%d", CLASSNAME, __func__, this, fence, refCount);
   assert(fence);
 }
 
@@ -681,6 +682,7 @@ void COpenMaxVideo::ReleaseOpenMaxBuffer(COpenMaxVideoBuffer *buffer)
 
 void COpenMaxVideo::QueueReturnPicture(COpenMaxVideoBuffer *pic)
 {
+  CLog::Log(LOGDEBUG, "%s::%s - pic %p", CLASSNAME, __func__, pic);
   std::deque<int>::iterator it;
   for (it = m_bufferPool.usedRenderPics.begin(); it != m_bufferPool.usedRenderPics.end(); ++it)
   {
@@ -713,6 +715,7 @@ bool COpenMaxVideo::ProcessSyncPicture()
 {
   COpenMaxVideoBuffer *pic;
   bool busy = false;
+  CLog::Log(LOGDEBUG, "%s::%s", CLASSNAME, __func__);
 
   std::deque<int>::iterator it;
   for (it = m_bufferPool.syncRenderPics.begin(); it != m_bufferPool.syncRenderPics.end(); )
@@ -737,7 +740,7 @@ bool COpenMaxVideo::ProcessSyncPicture()
       }
     }
 
-    m_bufferPool.freeRenderPics.push_back(*it);
+    //m_bufferPool.freeRenderPics.push_back(*it);
 
     std::deque<int>::iterator it2 = find(m_bufferPool.usedRenderPics.begin(),
                                          m_bufferPool.usedRenderPics.end(),
@@ -767,7 +770,7 @@ bool COpenMaxVideo::ProcessSyncPicture()
 void COpenMaxVideo::ProcessReturnPicture(COpenMaxVideoBuffer *pic)
 {
   CLog::Log(LOGDEBUG, "%s::%s - return of %p", CLASSNAME, __FUNCTION__, pic);
-  //ReleaseOpenMaxBuffer(pic);
+  ReleaseOpenMaxBuffer(pic);
 }
 
 
@@ -775,6 +778,7 @@ bool COpenMaxVideo::GetPicture(DVDVideoPicture* pDvdVideoPicture)
 {
   //CLog::Log(LOGDEBUG, "%s::%s - m_bufferPool.usedRenderPics.size()=%d m_omx_output_ready.size()=%d\n", CLASSNAME, __func__, m_bufferPool.usedRenderPics.size(), m_omx_output_ready.size());
 
+#if 0
   while (m_bufferPool.usedRenderPics.size() > 2)
   {
     // fetch a output buffer and pop it off the busy list
@@ -785,7 +789,7 @@ bool COpenMaxVideo::GetPicture(DVDVideoPicture* pDvdVideoPicture)
     ReleaseOpenMaxBuffer(buffer);
     CLog::Log(LOGDEBUG, "%s::%s release %p->%d\n", CLASSNAME, __func__, buffer, buffer->refCount);
   }
-
+#endif
   if (!m_omx_output_ready.empty())
   {
     COpenMaxVideoBuffer *buffer;
@@ -812,7 +816,8 @@ bool COpenMaxVideo::GetPicture(DVDVideoPicture* pDvdVideoPicture)
     pDvdVideoPicture->pts = DVD_NOPTS_VALUE;
     pDvdVideoPicture->format = RENDER_FMT_OMXEGL;
     pDvdVideoPicture->openMaxBuffer = buffer;
-
+    buffer->valid = true;
+    
     if (!m_dts_queue.empty())
     {
       pDvdVideoPicture->dts = m_dts_queue.front();
@@ -954,7 +959,7 @@ OMX_ERRORTYPE COpenMaxVideo::AllocOMXOutputEGLTextures(void)
   if (omx_err != OMX_ErrorNone)
     CLog::Log(LOGERROR, "%s::%s - m_omx_egl_render.GetParameter OMX_IndexParamPortDefinition omx_err(0x%08x)", CLASSNAME, __func__, omx_err);
 
-  port_format.nBufferCountActual = 4;
+  port_format.nBufferCountActual = 8;
   omx_err = m_omx_egl_render.SetParameter(OMX_IndexParamPortDefinition, &port_format);
   if (omx_err != OMX_ErrorNone)
     CLog::Log(LOGERROR, "%s::%s - m_omx_egl_render.SetParameter OMX_IndexParamPortDefinition omx_err(0x%08x)", CLASSNAME, __func__, omx_err);
