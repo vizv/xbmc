@@ -597,6 +597,59 @@ COpenMaxVideoBuffer::~COpenMaxVideoBuffer()
 {
 }
 
+COpenMaxVideoBuffer* COpenMaxVideoBuffer::Acquire()
+{
+  CSingleLock lock(renderPicSection);
+
+  //if (refCount == 0)
+  //  vdpau->Acquire();
+
+  refCount++;
+  CLog::Log(LOGDEBUG, "%s::%s %p fence:%p refCount:%d", CLASSNAME, __func__, this, fence, refCount);
+  return this;
+}
+
+long COpenMaxVideoBuffer::Release()
+{
+  CSingleLock lock(renderPicSection);
+
+  refCount--;
+  CLog::Log(LOGDEBUG, "%s::%s %p fence:%p refCount:%d", CLASSNAME, __func__, this, fence, refCount);
+  if (refCount > 0)
+    return refCount;
+
+  lock.Leave();
+  //vdpau->ReturnRenderPicture(this);
+  m_omv->QueueReturnPicture(this);
+  //vdpau->ReleasePicReference();
+
+  return refCount;
+}
+
+void COpenMaxVideoBuffer::ReturnUnused()
+{
+  CLog::Log(LOGDEBUG, "%s::%s %p fence:%p refCount:%d", CLASSNAME, __func__, this, fence, refCount);
+  {
+    CSingleLock lock(renderPicSection);
+    if (refCount > 0)
+      return;
+  }
+  //if (vdpau)
+    //vdpau->ReturnRenderPicture(this);
+}
+
+void COpenMaxVideoBuffer::Sync()
+{
+  CSingleLock lock(renderPicSection);
+  CLog::Log(LOGDEBUG, "%s::%s %p fence:%p refCount:%d", CLASSNAME, __func__, this, fence, refCount);
+  if (fence)
+  {
+    eglDestroySyncKHR(m_omv->getDisplay(), fence);
+    fence = 0;
+  }
+  fence = eglCreateSyncKHR(m_omv->getDisplay(), EGL_SYNC_FENCE_KHR, NULL);
+  assert(fence);
+}
 
 void COpenMaxVideo::ReleaseOpenMaxBuffer(COpenMaxVideoBuffer *buffer)
 {
@@ -608,7 +661,15 @@ void COpenMaxVideo::ReleaseOpenMaxBuffer(COpenMaxVideoBuffer *buffer)
     buffer->omx_buffer->nFlags = 0;
     buffer->omx_buffer->nFilledLen = 0;
     assert(buffer->omx_buffer->nOutputPortIndex == ctx->m_omx_egl_render.GetOutputPort());
-    CLog::Log(LOGDEBUG, "%s::%s FillThisBuffer(%p) %p->%d (%p)\n", CLASSNAME, __func__, buffer->omx_buffer, buffer, buffer->refCount, (void *)0);
+
+    GLint state = 0;
+    if (buffer->fence)
+    {
+      EGLBoolean s = eglGetSyncAttribKHR(m_egl_display, buffer->fence, EGL_SYNC_CONDITION_KHR, &state);
+      assert(s);
+    }
+
+    CLog::Log(LOGDEBUG, "%s::%s FillThisBuffer(%p) %d (%p) [%p=%x]\n", CLASSNAME, __func__, buffer, buffer->refCount, buffer->omx_buffer, buffer->fence, state);
     OMX_ERRORTYPE omx_err = ctx->m_omx_egl_render.FillThisBuffer(buffer->omx_buffer);
 
     if (omx_err)
@@ -616,6 +677,99 @@ void COpenMaxVideo::ReleaseOpenMaxBuffer(COpenMaxVideoBuffer *buffer)
         CLASSNAME, __func__, omx_err);
   }
 }
+
+
+void COpenMaxVideo::QueueReturnPicture(COpenMaxVideoBuffer *pic)
+{
+  std::deque<int>::iterator it;
+  for (it = m_bufferPool.usedRenderPics.begin(); it != m_bufferPool.usedRenderPics.end(); ++it)
+  {
+    if (m_bufferPool.allRenderPics[*it] == pic)
+    {
+      break;
+    }
+  }
+
+  if (it == m_bufferPool.usedRenderPics.end())
+  {
+    CLog::Log(LOGWARNING, "%s::%s - pic %p not found", CLASSNAME, __func__, pic);
+    return;
+  }
+
+  // check if already queued
+  std::deque<int>::iterator it2 = find(m_bufferPool.syncRenderPics.begin(),
+                                       m_bufferPool.syncRenderPics.end(),
+                                       *it);
+  if (it2 == m_bufferPool.syncRenderPics.end())
+  {
+    m_bufferPool.syncRenderPics.push_back(*it);
+  }
+
+  ProcessSyncPicture();
+}
+
+
+bool COpenMaxVideo::ProcessSyncPicture()
+{
+  COpenMaxVideoBuffer *pic;
+  bool busy = false;
+
+  std::deque<int>::iterator it;
+  for (it = m_bufferPool.syncRenderPics.begin(); it != m_bufferPool.syncRenderPics.end(); )
+  {
+    pic = m_bufferPool.allRenderPics[*it];
+
+    if (pic->fence)
+    {
+      GLint state;
+      EGLBoolean s = eglGetSyncAttribKHR(m_egl_display, pic->fence, EGL_SYNC_CONDITION_KHR, &state);
+      assert(s);
+      if (state == EGL_SYNC_PRIOR_COMMANDS_COMPLETE_KHR)
+      {
+        eglDestroySyncKHR(m_egl_display, pic->fence);
+        pic->fence = 0;
+      }
+      else
+      {
+        busy = true;
+        ++it;
+        continue;
+      }
+    }
+
+    m_bufferPool.freeRenderPics.push_back(*it);
+
+    std::deque<int>::iterator it2 = find(m_bufferPool.usedRenderPics.begin(),
+                                         m_bufferPool.usedRenderPics.end(),
+                                         *it);
+    if (it2 == m_bufferPool.usedRenderPics.end())
+    {
+      CLog::Log(LOGERROR, "%s::%s - pic not found in queue", CLASSNAME, __func__);
+    }
+    else
+    {
+      m_bufferPool.usedRenderPics.erase(it2);
+    }
+    it = m_bufferPool.syncRenderPics.erase(it);
+
+    if (pic->valid)
+    {
+      ProcessReturnPicture(pic);
+    }
+    else
+    {
+      CLog::Log(LOGDEBUG, "%s::%s - return of invalid render pic", CLASSNAME, __FUNCTION__);
+    }
+  }
+  return busy;
+}
+
+void COpenMaxVideo::ProcessReturnPicture(COpenMaxVideoBuffer *pic)
+{
+  CLog::Log(LOGDEBUG, "%s::%s - return of %p", CLASSNAME, __FUNCTION__, pic);
+  //ReleaseOpenMaxBuffer(pic);
+}
+
 
 bool COpenMaxVideo::GetPicture(DVDVideoPicture* pDvdVideoPicture)
 {
