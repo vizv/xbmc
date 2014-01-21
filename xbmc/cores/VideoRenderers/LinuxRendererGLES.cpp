@@ -1375,6 +1375,11 @@ void CLinuxRendererGLES::RenderOpenMax(int index, int field)
 
   glDisable(m_textureTarget);
   VerifyGLState();
+
+  if (m_buffers[index].openMaxBuffer)
+  {
+//xxx    m_buffers[index].openMaxBuffer->Sync();
+  }
 #endif
 }
 
@@ -2657,8 +2662,9 @@ unsigned int CLinuxRendererGLES::GetProcessorSize()
 void CLinuxRendererGLES::AddProcessor(COpenMaxVideoBuffer *openMaxBuffer, int index)
 {
   YUVBUFFER &buf = m_buffers[index];
-  COpenMaxVideoBuffer *pic = openMaxBuffer->Acquire();
-  SAFE_RELEASE(buf.openMaxBuffer);
+  COpenMaxVideoBuffer *pic = openMaxBuffer;//xxx
+  //COpenMaxVideoBuffer *pic = openMaxBuffer->Acquire();
+  //SAFE_RELEASE(buf.openMaxBuffer);
   buf.openMaxBuffer = pic;
 }
 #endif

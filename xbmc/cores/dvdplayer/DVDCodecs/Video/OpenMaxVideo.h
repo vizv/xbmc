@@ -53,29 +53,55 @@ typedef struct omx_demux_packet {
   double pts;
 } omx_demux_packet;
 
+class COpenMaxVideo;
+class COpenMaxVideoBuffer;
+
+/**
+ * Buffer pool holds allocated vdpau and gl resources
+ * Embedded in COutput
+ */
+struct VdpauBufferPool
+{
+  VdpauBufferPool();
+  virtual ~VdpauBufferPool();
+
+  std::vector<COpenMaxVideoBuffer*> allRenderPics;
+  std::deque<int> usedRenderPics;
+  std::deque<int> freeRenderPics;
+  std::deque<int> syncRenderPics;
+  CCriticalSection renderPicSec;
+};
+
 // an omx egl video frame
 class COpenMaxVideoBuffer
 {
+  friend class OpenMaxVideo;
 public:
+  COpenMaxVideoBuffer(COpenMaxVideo *omv, CCriticalSection &section);
+  virtual ~COpenMaxVideoBuffer();
+  void Sync();
+
   OMX_BUFFERHEADERTYPE *omx_buffer;
   int width;
   int height;
   int index;
-  int m_refCount;
 
-  // used for egl based rendering if active
   EGLImageKHR egl_image;
   GLuint texture_id;
-    // reference counting
-  OpenMaxVideoBuffer* Retain();
-  long                Release();
-
-private:
-  long                m_refs;
+  bool valid;
+  COpenMaxVideo *m_omv;
+  COpenMaxVideoBuffer* Acquire();
+  long Release();
+//private:
+  void ReturnUnused();
+  EGLSyncKHR fence;
+  int refCount;
+  CCriticalSection &renderPicSection;
 };
 
 class COpenMaxVideo
 {
+  friend class COpenMaxVideoBuffer;
 public:
   COpenMaxVideo();
   virtual ~COpenMaxVideo();
@@ -89,8 +115,13 @@ public:
   void SetDropState(bool bDrop);
   // OpenMax decoder callback routines.
   OMX_ERRORTYPE DecoderFillBufferDone(OMX_HANDLETYPE hComponent, OMX_BUFFERHEADERTYPE* pBuffer);
+  EGLDisplay getDisplay() { return m_egl_display; }
+  EGLContext getContext() { return m_egl_context; }
+  void QueueReturnPicture(COpenMaxVideoBuffer *pic);
+  void ProcessReturnPicture(COpenMaxVideoBuffer *pic);
+  bool ProcessSyncPicture();
 
-protected:
+//protected:
   void QueryCodec(void);
   OMX_ERRORTYPE PrimeFillBuffers(void);
   OMX_ERRORTYPE AllocOMXInputBuffers(void);
@@ -125,9 +156,9 @@ protected:
 
   // OpenMax output buffers (video frames)
   pthread_mutex_t   m_omx_output_mutex;
-  std::queue<OpenMaxVideoBuffer*> m_omx_output_busy;
-  std::queue<OpenMaxVideoBuffer*> m_omx_output_ready;
-  std::vector<OpenMaxVideoBuffer*> m_omx_output_buffers;
+  std::queue<COpenMaxVideoBuffer*> m_omx_output_busy;
+  std::queue<COpenMaxVideoBuffer*> m_omx_output_ready;
+  std::vector<COpenMaxVideoBuffer*> m_omx_output_buffers;
   bool              m_omx_output_eos;
   //sem_t             *m_omx_flush_output;
 
@@ -151,7 +182,8 @@ protected:
   bool PortSettingsChanged();
   bool SendDecoderConfig(uint8_t *extradata, int extrasize);
   bool NaluFormatStartCodes(enum AVCodecID codec, uint8_t *extradata, int extrasize);
-  void ReleaseOpenMaxBuffer(OpenMaxVideoBuffer *buffer);
+  void ReleaseOpenMaxBuffer(COpenMaxVideoBuffer *buffer);
+  struct VdpauBufferPool m_bufferPool;
 };
 
 // defined(HAVE_LIBOPENMAX)
