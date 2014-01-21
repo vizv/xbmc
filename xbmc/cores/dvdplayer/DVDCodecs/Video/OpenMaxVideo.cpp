@@ -619,14 +619,14 @@ void COpenMaxVideo::ReleaseOpenMaxBuffer(COpenMaxVideoBuffer *buffer)
 
 bool COpenMaxVideo::GetPicture(DVDVideoPicture* pDvdVideoPicture)
 {
-  //CLog::Log(LOGDEBUG, "%s::%s - m_omx_output_busy.size()=%d m_omx_output_ready.size()=%d\n", CLASSNAME, __func__, m_omx_output_busy.size(), m_omx_output_ready.size());
+  //CLog::Log(LOGDEBUG, "%s::%s - m_bufferPool.usedRenderPics.size()=%d m_omx_output_ready.size()=%d\n", CLASSNAME, __func__, m_bufferPool.usedRenderPics.size(), m_omx_output_ready.size());
 
-  while (m_omx_output_busy.size() > 2)
+  while (m_bufferPool.usedRenderPics.size() > 2)
   {
     // fetch a output buffer and pop it off the busy list
     CSingleLock lock(m_bufferPool.renderPicSec);
-    COpenMaxVideoBuffer *buffer = m_omx_output_busy.front();
-    m_omx_output_busy.pop();
+    COpenMaxVideoBuffer *buffer = m_bufferPool.allRenderPics[m_bufferPool.usedRenderPics.front()];
+    m_bufferPool.usedRenderPics.pop_front();
     lock.Leave();
     ReleaseOpenMaxBuffer(buffer);
     CLog::Log(LOGDEBUG, "%s::%s release %p->%d\n", CLASSNAME, __func__, buffer, buffer->refCount);
@@ -639,8 +639,20 @@ bool COpenMaxVideo::GetPicture(DVDVideoPicture* pDvdVideoPicture)
     CSingleLock lock(m_bufferPool.renderPicSec);
     buffer = m_omx_output_ready.front();
     m_omx_output_ready.pop();
-    m_omx_output_busy.push(buffer);
+    bool found = false;
+    for (unsigned int i=0; i<m_bufferPool.allRenderPics.size(); i++)
+    {
+      if (m_bufferPool.allRenderPics[i] == buffer)
+      {
+        m_bufferPool.usedRenderPics.push_back(i);
+        found = true;
+        break;
+      }            
+    }
     lock.Leave();
+
+    if (!found)
+      CLog::Log(LOGERROR, "COutput::ProcessSyncPicture - pic %p not found in queue", buffer);
 
     pDvdVideoPicture->dts = DVD_NOPTS_VALUE;
     pDvdVideoPicture->pts = DVD_NOPTS_VALUE;
@@ -862,8 +874,8 @@ OMX_ERRORTYPE COpenMaxVideo::AllocOMXOutputEGLTextures(void)
 
   m_omx_output_eos = false;
   CSingleLock lock(m_bufferPool.renderPicSec);
-  while (!m_omx_output_busy.empty())
-    m_omx_output_busy.pop();
+  while (!m_bufferPool.usedRenderPics.empty())
+    m_bufferPool.usedRenderPics.pop_front();
   while (!m_omx_output_ready.empty())
     m_omx_output_ready.pop();
   lock.Leave();

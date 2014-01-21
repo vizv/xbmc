@@ -155,8 +155,6 @@ public:
   //sem_t             *m_omx_flush_input;
 
   // OpenMax output buffers (video frames)
-  pthread_mutex_t   m_omx_output_mutex;
-  std::queue<COpenMaxVideoBuffer*> m_omx_output_busy;
   std::queue<COpenMaxVideoBuffer*> m_omx_output_ready;
   bool              m_omx_output_eos;
   //sem_t             *m_omx_flush_output;
