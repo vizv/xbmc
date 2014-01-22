@@ -184,12 +184,21 @@ void CDVDVideoCodecOpenMax::Reset(void)
   m_omx_decoder->Reset();
 }
 
+bool CDVDVideoCodecOpenMax::ClearPicture(DVDVideoPicture* pDvdVideoPicture)
+{
+  return m_omx_decoder->ClearPicture(pDvdVideoPicture);
+}
+
 bool CDVDVideoCodecOpenMax::GetPicture(DVDVideoPicture* pDvdVideoPicture)
 {
+#if 1
+  return m_omx_decoder->GetPicture(pDvdVideoPicture);
+#else
   m_omx_decoder->GetPicture(&m_videobuffer);
   *pDvdVideoPicture = m_videobuffer;
 
   return VC_PICTURE | VC_BUFFER;
+#endif
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////

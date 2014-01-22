@@ -112,6 +112,7 @@ public:
   int  Decode(uint8_t *pData, int iSize, double dts, double pts);
   void Reset(void);
   bool GetPicture(DVDVideoPicture *pDvdVideoPicture);
+  bool ClearPicture(DVDVideoPicture* pDvdVideoPicture);
   void SetDropState(bool bDrop);
   // OpenMax decoder callback routines.
   OMX_ERRORTYPE DecoderFillBufferDone(OMX_HANDLETYPE hComponent, OMX_BUFFERHEADERTYPE* pBuffer);

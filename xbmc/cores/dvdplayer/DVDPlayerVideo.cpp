@@ -610,6 +610,7 @@ void CDVDPlayerVideo::Process()
         {
 
           // try to retrieve the picture (should never fail!), unless there is a demuxer bug ofcours
+          CLog::Log(LOGDEBUG, "CDVDPlayerVideo - ClearPicture %p", &picture);
           m_pVideoCodec->ClearPicture(&picture);
           if (m_pVideoCodec->GetPicture(&picture))
           {
@@ -753,6 +754,7 @@ void CDVDPlayerVideo::Process()
   }
 
   // we need to let decoder release any picture retained resources.
+  CLog::Log(LOGDEBUG, "CDVDPlayerVideo - ClearPicture2 %p", &picture);
   m_pVideoCodec->ClearPicture(&picture);
 }
 

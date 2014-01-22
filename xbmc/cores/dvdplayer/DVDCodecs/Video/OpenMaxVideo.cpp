@@ -695,6 +695,7 @@ void COpenMaxVideo::QueueReturnPicture(COpenMaxVideoBuffer *pic)
   if (it == m_bufferPool.usedRenderPics.end())
   {
     CLog::Log(LOGWARNING, "%s::%s - pic %p not found", CLASSNAME, __func__, pic);
+    assert(0);
     return;
   }
 
@@ -727,6 +728,7 @@ bool COpenMaxVideo::ProcessSyncPicture()
       GLint state;
       EGLBoolean s = eglGetSyncAttribKHR(m_egl_display, pic->fence, EGL_SYNC_CONDITION_KHR, &state);
       assert(s);
+      CLog::Log(LOGDEBUG, "%s::%s eglGetSyncAttribKHR(%p) %d (%p) [%p=%x]\n", CLASSNAME, __func__, pic, pic->refCount, pic->omx_buffer, pic->fence, state);
       if (state == EGL_SYNC_PRIOR_COMMANDS_COMPLETE_KHR)
       {
         eglDestroySyncKHR(m_egl_display, pic->fence);
@@ -774,6 +776,20 @@ void COpenMaxVideo::ProcessReturnPicture(COpenMaxVideoBuffer *pic)
 }
 
 
+bool COpenMaxVideo::ClearPicture(DVDVideoPicture* pDvdVideoPicture)
+{
+  CLog::Log(LOGDEBUG, "%s::%s - return of %p %p (%d,%d)", CLASSNAME, __FUNCTION__, pDvdVideoPicture->openMaxBuffer, pDvdVideoPicture, pDvdVideoPicture->format, RENDER_FMT_OMXEGL);
+  if (pDvdVideoPicture->format == RENDER_FMT_OMXEGL)
+  {
+    if (pDvdVideoPicture->openMaxBuffer->refCount == 0)
+      pDvdVideoPicture->openMaxBuffer->Acquire();
+    SAFE_RELEASE(pDvdVideoPicture->openMaxBuffer);
+  }
+  memset(pDvdVideoPicture, 0x00, sizeof(DVDVideoPicture));
+
+  return true;
+}
+
 bool COpenMaxVideo::GetPicture(DVDVideoPicture* pDvdVideoPicture)
 {
   //CLog::Log(LOGDEBUG, "%s::%s - m_bufferPool.usedRenderPics.size()=%d m_omx_output_ready.size()=%d\n", CLASSNAME, __func__, m_bufferPool.usedRenderPics.size(), m_omx_output_ready.size());
@@ -787,7 +803,7 @@ bool COpenMaxVideo::GetPicture(DVDVideoPicture* pDvdVideoPicture)
     m_bufferPool.usedRenderPics.pop_front();
     lock.Leave();
     ReleaseOpenMaxBuffer(buffer);
-    CLog::Log(LOGDEBUG, "%s::%s release %p->%d\n", CLASSNAME, __func__, buffer, buffer->refCount);
+    CLog::Log(LOGDEBUG, "%s::%s %p->%d\n", CLASSNAME, __func__, buffer, buffer->refCount);
   }
 #endif
   if (!m_omx_output_ready.empty())
@@ -839,7 +855,7 @@ bool COpenMaxVideo::GetPicture(DVDVideoPicture* pDvdVideoPicture)
   pDvdVideoPicture->iFlags  = DVP_FLAG_ALLOCATED;
   pDvdVideoPicture->iFlags |= m_drop_state ? DVP_FLAG_DROPPED : 0;
 
-  CLog::Log(LOGDEBUG, "%s::%s acquire %p->%d (%p)\n", CLASSNAME, __func__, pDvdVideoPicture->openMaxBuffer, pDvdVideoPicture->openMaxBuffer->refCount, pDvdVideoPicture);
+  CLog::Log(LOGDEBUG, "%s::%s %p->%d (%p)\n", CLASSNAME, __func__, pDvdVideoPicture->openMaxBuffer, pDvdVideoPicture->openMaxBuffer->refCount, pDvdVideoPicture);
   return true;
 }
 
