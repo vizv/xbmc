@@ -213,6 +213,10 @@ protected:
   void DeleteSurfaceTexture(int index);
   bool CreateSurfaceTexture(int index);
 
+  void UploadOMXEGLTexture(int index);
+  void DeleteOMXEGLTexture(int index);
+  bool CreateOMXEGLTexture(int index);
+
   void UploadIMXMAPTexture(int index);
   void DeleteIMXMAPTexture(int index);
   bool CreateIMXMAPTexture(int index);
