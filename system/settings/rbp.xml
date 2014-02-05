@@ -9,9 +9,6 @@
         <setting id="videoplayer.hqscalers">
           <visible>false</visible>
         </setting>
-        <setting id="videoplayer.synctype">
-          <visible>false</visible>
-        </setting>
         <setting id="videoplayer.useframemtdec">
           <visible>false</visible>
         </setting>
