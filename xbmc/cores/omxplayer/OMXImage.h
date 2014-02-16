@@ -46,26 +46,24 @@ class COMXImageFile;
 
 class COMXImage : public CThread
 {
-enum TextureAction {TEXTURE_ALLOC, TEXTURE_DELETE, TEXTURE_CALLBACK };
-
-struct textureinfo {
-  TextureAction action;
-  int width, height;
-  GLuint texture;
-  EGLImageKHR egl_image;
-  void *parent;
-  const char *filename;
-  CEvent sync;
-  bool (*callback)(void *cookie);
-  void *cookie;
-  bool result;
-};
-
+  struct callbackinfo {
+    CEvent sync;
+    bool (*callback)(void *cookie);
+    void *cookie;
+    bool result;
+  };
 protected:
   virtual void OnStartup();
   virtual void OnExit();
   virtual void Process();
 public:
+  struct textureinfo {
+    int width, height;
+    GLuint texture;
+    EGLImageKHR egl_image;
+    void *parent;
+    const char *filename;
+  };
   COMXImage();
   virtual ~COMXImage();
   void Initialize();
@@ -82,6 +80,8 @@ public:
   bool DecodeJpegToTexture(COMXImageFile *file, unsigned int width, unsigned int height, void **userdata);
   void DestroyTexture(void *userdata);
   void GetTexture(void *userdata, GLuint *texture);
+  bool AllocTextureInternal(struct textureinfo *tex);
+  bool DestroyTextureInternal(struct textureinfo *tex);
 private:
   EGLDisplay m_egl_display;
   EGLContext m_egl_context;
@@ -89,9 +89,7 @@ private:
   void CreateContext();
   CCriticalSection               m_texqueue_lock;
   XbmcThreads::ConditionVariable m_texqueue_cond;
-  std::queue <struct textureinfo *> m_texqueue;
-  void AllocTextureInternal(struct textureinfo *tex);
-  void DestroyTextureInternal(struct textureinfo *tex);
+  std::queue <struct callbackinfo *> m_texqueue;
 };
 
 class COMXImageFile
