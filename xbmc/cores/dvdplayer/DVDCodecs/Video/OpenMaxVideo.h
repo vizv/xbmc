@@ -148,6 +148,8 @@ protected:
   EDEINTERLACEMODE  m_deinterlace_request;
   bool              m_deinterlace_second_field;
 
+  bool              m_startframe;
+
   bool PortSettingsChanged();
   bool SendDecoderConfig(uint8_t *extradata, int extrasize);
   bool NaluFormatStartCodes(enum AVCodecID codec, uint8_t *extradata, int extrasize);
