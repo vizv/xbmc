@@ -83,10 +83,9 @@ public:
   bool AllocTextureInternal(struct textureinfo *tex);
   bool DestroyTextureInternal(struct textureinfo *tex);
 private:
-  EGLDisplay m_egl_display;
   EGLContext m_egl_context;
-
   void CreateContext();
+  EGLContext GetEGLContext();
   CCriticalSection               m_texqueue_lock;
   XbmcThreads::ConditionVariable m_texqueue_cond;
   std::queue <struct callbackinfo *> m_texqueue;
@@ -186,9 +185,9 @@ public:
 
   // Required overrides
   void Close(void);
-  bool Decode(const uint8_t *data, unsigned size, unsigned int width, unsigned int height, void *egl_image, void *egl_display);
+  bool Decode(const uint8_t *data, unsigned size, unsigned int width, unsigned int height, void *egl_image);
 protected:
-  bool HandlePortSettingChange(unsigned int resize_width, unsigned int resize_height, void *egl_image, void *egl_display, bool port_settings_changed);
+  bool HandlePortSettingChange(unsigned int resize_width, unsigned int resize_height, void *egl_image, bool port_settings_changed);
 
   // Components
   COMXCoreComponent m_omx_decoder;
