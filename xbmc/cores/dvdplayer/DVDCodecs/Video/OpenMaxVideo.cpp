@@ -135,6 +135,7 @@ COpenMaxVideo::COpenMaxVideo()
   m_deinterlace = false;
   m_deinterlace_request = VS_DEINTERLACEMODE_OFF;
   m_deinterlace_second_field = false;
+  m_startframe = false;
 }
 
 COpenMaxVideo::~COpenMaxVideo()
@@ -713,8 +714,11 @@ int COpenMaxVideo::Decode(uint8_t* pData, int iSize, double dts, double pts)
 
       if (demuxer_bytes == 0)
         omx_buffer->nFlags |= OMX_BUFFERFLAG_ENDOFFRAME;
-      if (pts == DVD_NOPTS_VALUE)
+      // openmax doesn't like an unknown timestamp as first frame
+      if (pts == DVD_NOPTS_VALUE && m_startframe)
         omx_buffer->nFlags |= OMX_BUFFERFLAG_TIME_UNKNOWN;
+      if (pts == DVD_NOPTS_VALUE) // hijack an omx flag to indicate there wasn't a real timestamp - it will be returned with the picture (but otherwise ignored)
+        omx_buffer->nFlags |= OMX_BUFFERFLAG_DISCONTINUITY;
       if (m_drop_state) // hijack an omx flag to signal this frame to be dropped - it will be returned with the picture (but otherwise ignored)
         omx_buffer->nFlags |= OMX_BUFFERFLAG_DATACORRUPT;
 
@@ -731,6 +735,7 @@ int COpenMaxVideo::Decode(uint8_t* pData, int iSize, double dts, double pts)
       }
       if (demuxer_bytes == 0)
       {
+        m_startframe = true;
 #ifdef DTS_QUEUE
         // only push if we are successful with feeding OMX_EmptyThisBuffer
         m_dts_queue.push(dts);
@@ -914,10 +919,11 @@ bool COpenMaxVideo::GetPicture(DVDVideoPicture* pDvdVideoPicture)
       m_deinterlace_second_field = !m_deinterlace_second_field;
 #endif
     // nTimeStamp is in microseconds
-    double ts = FromOMXTime(buffer->omx_buffer->nTimeStamp);
-    pDvdVideoPicture->pts = (ts == 0) ? DVD_NOPTS_VALUE : ts;
+    pDvdVideoPicture->pts = FromOMXTime(buffer->omx_buffer->nTimeStamp);
     pDvdVideoPicture->openMaxBuffer->Acquire();
     pDvdVideoPicture->iFlags  = DVP_FLAG_ALLOCATED;
+    if (buffer->omx_buffer->nFlags & OMX_BUFFERFLAG_DISCONTINUITY)
+      pDvdVideoPicture->pts = DVD_NOPTS_VALUE;
     if (buffer->omx_buffer->nFlags & OMX_BUFFERFLAG_DATACORRUPT)
       pDvdVideoPicture->iFlags |= DVP_FLAG_DROPPED;
 #if defined(OMX_DEBUG_VERBOSE)
