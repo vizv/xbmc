@@ -827,6 +827,7 @@ void COpenMaxVideo::Reset(void)
 
   while (!m_demux_queue.empty())
     m_demux_queue.pop();
+  m_startframe = false;
 }
 
 
