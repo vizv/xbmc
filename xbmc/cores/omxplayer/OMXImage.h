@@ -48,7 +48,7 @@ class COMXImage : public CThread
 {
   struct callbackinfo {
     CEvent sync;
-    bool (*callback)(void *cookie);
+    bool (*callback)(EGLDisplay egl_display, EGLContext egl_context, void *cookie);
     void *cookie;
     bool result;
   };
@@ -76,12 +76,12 @@ public:
       unsigned int format, unsigned int pitch, const CStdString& destFile);
   static bool ClampLimits(unsigned int &width, unsigned int &height, unsigned int m_width, unsigned int m_height, bool transposed = false);
   static bool CreateThumb(const CStdString& srcFile, unsigned int width, unsigned int height, std::string &additional_info, const CStdString& destFile);
-  bool SendMessage(bool (*callback)(void *cookie), void *cookie);
+  bool SendMessage(bool (*callback)(EGLDisplay egl_display, EGLContext egl_context, void *cookie), void *cookie);
   bool DecodeJpegToTexture(COMXImageFile *file, unsigned int width, unsigned int height, void **userdata);
   void DestroyTexture(void *userdata);
   void GetTexture(void *userdata, GLuint *texture);
-  bool AllocTextureInternal(struct textureinfo *tex);
-  bool DestroyTextureInternal(struct textureinfo *tex);
+  bool AllocTextureInternal(EGLDisplay egl_display, EGLContext egl_context, struct textureinfo *tex);
+  bool DestroyTextureInternal(EGLDisplay egl_display, EGLContext egl_context, struct textureinfo *tex);
 private:
   EGLContext m_egl_context;
   void CreateContext();
