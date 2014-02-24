@@ -198,12 +198,12 @@ bool COMXImage::CreateThumb(const CStdString& srcFile, unsigned int maxHeight, u
   return okay;
 }
 
-bool COMXImage::SendMessage(bool (*callback)(void *cookie), void *cookie)
+bool COMXImage::SendMessage(bool (*callback)(EGLDisplay egl_display, EGLContext egl_context, void *cookie), void *cookie)
 {
   // we can only call gl functions from the application thread or texture thread
   if ( g_application.IsCurrentThread() )
   {
-     return callback(cookie);
+    return callback(g_Windowing.GetEGLDisplay(), GetEGLContext(), cookie);
   }
   struct callbackinfo mess;
   mess.callback = callback;
@@ -225,17 +225,15 @@ bool COMXImage::SendMessage(bool (*callback)(void *cookie), void *cookie)
 }
 
 
-static bool AllocTextureCallback(void *cookie)
+static bool AllocTextureCallback(EGLDisplay egl_display, EGLContext egl_context, void *cookie)
 {
   struct COMXImage::textureinfo *tex = static_cast<struct COMXImage::textureinfo *>(cookie);
   COMXImage *img = static_cast<COMXImage*>(tex->parent);
-  return img->AllocTextureInternal(tex);
+  return img->AllocTextureInternal(egl_display, egl_context, tex);
 }
 
-bool COMXImage::AllocTextureInternal(struct textureinfo *tex)
+bool COMXImage::AllocTextureInternal(EGLDisplay egl_display, EGLContext egl_context, struct textureinfo *tex)
 {
-  EGLDisplay egl_display = g_Windowing.GetEGLDisplay();
-  EGLContext egl_context = GetEGLContext();
   glGenTextures(1, (GLuint*) &tex->texture);
   glBindTexture(GL_TEXTURE_2D, tex->texture);
   glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
@@ -256,11 +254,11 @@ void COMXImage::GetTexture(void *userdata, GLuint *texture)
   *texture = tex->texture;
 }
 
-static bool DestroyTextureCallback(void *cookie)
+static bool DestroyTextureCallback(EGLDisplay egl_display, EGLContext egl_context, void *cookie)
 {
   struct COMXImage::textureinfo *tex = static_cast<struct COMXImage::textureinfo *>(cookie);
   COMXImage *img = static_cast<COMXImage*>(tex->parent);
-  return img->DestroyTextureInternal(tex);
+  return img->DestroyTextureInternal(egl_display, egl_context, tex);
 }
 
 void COMXImage::DestroyTexture(void *userdata)
@@ -268,9 +266,8 @@ void COMXImage::DestroyTexture(void *userdata)
   SendMessage(DestroyTextureCallback, userdata);
 }
 
-bool COMXImage::DestroyTextureInternal(struct textureinfo *tex)
+bool COMXImage::DestroyTextureInternal(EGLDisplay egl_display, EGLContext egl_context, struct textureinfo *tex)
 {
-  EGLDisplay egl_display = g_Windowing.GetEGLDisplay();
   bool s = true;
   if (!tex->egl_image || !tex->texture)
   {
@@ -435,7 +432,7 @@ void COMXImage::Process()
       lock.Leave();
       CLog::Log(LOGDEBUG, "%s: texture job: %p:%p:%p", __func__, mess, mess->callback, mess->cookie);
 
-      mess->result = mess->callback(mess->cookie);
+      mess->result = mess->callback(g_Windowing.GetEGLDisplay(), GetEGLContext(), mess->cookie);
       CLog::Log(LOGDEBUG, "%s: texture job about to Set: %p:%p:%p", __func__, mess, mess->callback, mess->cookie);
       {
         CSingleLock lock(m_texqueue_lock);

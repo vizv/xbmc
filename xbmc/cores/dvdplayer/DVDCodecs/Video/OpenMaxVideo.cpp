@@ -183,8 +183,6 @@ bool COpenMaxVideo::Open(CDVDStreamInfo &hints, CDVDCodecOptions &options, OpenM
   m_forced_aspect_ratio = hints.forced_aspect;
   m_aspect_ratio = hints.aspect;
 
-  m_egl_display = g_Windowing.GetEGLDisplay();
-  m_egl_context = g_Windowing.GetEGLContext();
   m_egl_buffer_count = 4;
 
   m_codingType = OMX_VIDEO_CodingUnused;
@@ -1007,16 +1005,16 @@ OMX_ERRORTYPE COpenMaxVideo::FreeOMXInputBuffers(void)
   return(omx_err);
 }
 
-bool COpenMaxVideo::CallbackAllocOMXEGLTextures(void *userdata)
+bool COpenMaxVideo::CallbackAllocOMXEGLTextures(EGLDisplay egl_display, EGLContext egl_context, void *userdata)
 {
   COpenMaxVideo *omx = static_cast<COpenMaxVideo*>(userdata);
-  return omx->AllocOMXOutputEGLTextures() == OMX_ErrorNone;
+  return omx->AllocOMXOutputEGLTextures(egl_display, egl_context) == OMX_ErrorNone;
 }
 
-bool COpenMaxVideo::CallbackFreeOMXEGLTextures(void *userdata)
+bool COpenMaxVideo::CallbackFreeOMXEGLTextures(EGLDisplay egl_display, EGLContext egl_context, void *userdata)
 {
   COpenMaxVideo *omx = static_cast<COpenMaxVideo*>(userdata);
-  return omx->FreeOMXOutputEGLTextures() == OMX_ErrorNone;
+  return omx->FreeOMXOutputEGLTextures(egl_display, egl_context) == OMX_ErrorNone;
 }
 
 bool COpenMaxVideo::AllocOMXOutputBuffers(void)
@@ -1051,7 +1049,7 @@ bool COpenMaxVideo::FreeOMXOutputBuffers(void)
   return ret;
 }
 
-OMX_ERRORTYPE COpenMaxVideo::AllocOMXOutputEGLTextures(void)
+OMX_ERRORTYPE COpenMaxVideo::AllocOMXOutputEGLTextures(EGLDisplay egl_display, EGLContext egl_context)
 {
   OMX_ERRORTYPE omx_err = OMX_ErrorNone;
   EGLint attrib = EGL_NONE;
@@ -1083,8 +1081,8 @@ OMX_ERRORTYPE COpenMaxVideo::AllocOMXOutputEGLTextures(void)
 
     // create EGLImage from texture
     egl_buffer->egl_image = eglCreateImageKHR(
-      m_egl_display,
-      m_egl_context,
+      egl_display,
+      egl_context,
       EGL_GL_TEXTURE_2D_KHR,
       (EGLClientBuffer)(egl_buffer->texture_id),
       &attrib);
@@ -1110,7 +1108,7 @@ OMX_ERRORTYPE COpenMaxVideo::AllocOMXOutputEGLTextures(void)
   return omx_err;
 }
 
-OMX_ERRORTYPE COpenMaxVideo::FreeOMXOutputEGLTextures(void)
+OMX_ERRORTYPE COpenMaxVideo::FreeOMXOutputEGLTextures(EGLDisplay egl_display, EGLContext egl_context)
 {
   OMX_ERRORTYPE omx_err = OMX_ErrorNone;
 
@@ -1122,7 +1120,7 @@ OMX_ERRORTYPE COpenMaxVideo::FreeOMXOutputEGLTextures(void)
     if (omx_err != OMX_ErrorNone)
       CLog::Log(LOGERROR, "%s::%s m_omx_egl_render.FreeOutputBuffer(%p) omx_err(0x%08x)\n", CLASSNAME, __func__, egl_buffer->omx_buffer, omx_err);
     // destroy egl_image
-    eglDestroyImageKHR(m_egl_display, egl_buffer->egl_image);
+    eglDestroyImageKHR(egl_display, egl_buffer->egl_image);
     // free texture
     glDeleteTextures(1, &egl_buffer->texture_id);
   }
