@@ -72,6 +72,8 @@ namespace PERIPHERALS
   {
     int         iButton;
     unsigned int iDuration;
+    unsigned int iTimestamp;
+    unsigned int iTimestampStart;
   } CecButtonPress;
 
   typedef enum
@@ -161,6 +163,10 @@ namespace PERIPHERALS
     CecButtonPress                    m_currentButton;
     std::queue<CecVolumeChange>       m_volumeChangeQueue;
     unsigned int                      m_lastKeypress;
+    enum { STATE_INITIAL, STATE_INITIAL_PRESSED, STATE_PRESSED, STATE_REPEATING, STATE_REPEATING_RELEASED } m_state;
+    unsigned int                      m_stateStart;
+    int                               m_stateButton;
+    int                               m_stateDuration;
     CecVolumeChange                   m_lastChange;
     int                               m_iExitCode;
     bool                              m_bIsMuted;

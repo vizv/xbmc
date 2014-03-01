@@ -36,6 +36,7 @@
 #include "settings/Settings.h"
 #include "utils/log.h"
 #include "utils/Variant.h"
+#include "settings/AdvancedSettings.h"
 
 #include <libcec/cec.h>
 
@@ -124,6 +125,10 @@ void CPeripheralCecAdapter::ResetMembers(void)
   m_bHasConnectedAudioSystem = false;
   m_strMenuLanguage          = "???";
   m_lastKeypress             = 0;
+  m_state                    = STATE_INITIAL;
+  m_stateStart               = 0;
+  m_stateButton              = 0;
+  m_stateDuration            = 0;
   m_lastChange               = VOLUME_CHANGE_NONE;
   m_iExitCode                = 0;
   m_bIsMuted                 = false; // TODO fetch the correct initial value when system audiostatus is implemented in libCEC
@@ -758,31 +763,50 @@ void CPeripheralCecAdapter::GetNextKey(void)
     {
       m_currentButton = (*it);
       m_buttonQueue.erase(it);
+      CLog::Log(LOGDEBUG, "%s - received  key %2x duration %d timestamp %i (%dms)", __FUNCTION__, m_currentButton.iButton, m_currentButton.iDuration, m_currentButton.iTimestamp, m_currentButton.iTimestamp - m_currentButton.iTimestampStart);
       m_bHasButton = true;
     }
   }
 }
 
-void CPeripheralCecAdapter::PushCecKeypress(const CecButtonPress &key)
+void CPeripheralCecAdapter::PushCecKeypress(const CecButtonPress &okey)
 {
-  CLog::Log(LOGDEBUG, "%s - received key %2x duration %d", __FUNCTION__, key.iButton, key.iDuration);
+  CecButtonPress key = okey;
+  CLog::Log(LOGDEBUG, "%s - received key %2x duration %3d timestamp %i (has %d key %2x dur %d,%d)", __FUNCTION__, key.iButton, key.iDuration, key.iTimestamp, m_bHasButton, m_currentButton.iButton, m_currentButton.iDuration, m_stateDuration);
 
   CSingleLock lock(m_critSection);
+
+  if (m_currentButton.iButton == key.iButton)
+  {
+    m_currentButton.iTimestamp = key.iTimestamp;
+    if (m_stateDuration != 0 && key.iDuration == 0)
+      m_currentButton.iTimestampStart = m_currentButton.iTimestamp;
+  }
+  if (m_currentButton.iButton == key.iButton && m_stateDuration == 0)
+  {
+    key.iTimestampStart = m_currentButton.iTimestampStart;
+  }
+  m_stateDuration = key.iDuration;
+
   if (key.iDuration > 0)
   {
     if (m_currentButton.iButton == key.iButton && m_currentButton.iDuration == 0)
     {
+      //if (!(g_advancedSettings.m_cecSuppress || g_advancedSettings.m_cecDelay || g_advancedSettings.m_cecRepeat || g_advancedSettings.m_cecRelease) || m_bHasButton)
+      {
       // update the duration
       if (m_bHasButton)
         m_currentButton.iDuration = key.iDuration;
       // ignore this one, since it's already been handled by xbmc
       return;
+      }
     }
     // if we received a keypress with a duration set, try to find the same one without a duration set, and replace it
     for (vector<CecButtonPress>::reverse_iterator it = m_buttonQueue.rbegin(); it != m_buttonQueue.rend(); ++it)
     {
       if ((*it).iButton == key.iButton)
       {
+        (*it).iTimestamp = key.iTimestamp;
         if ((*it).iDuration == 0)
         {
           // replace this entry
@@ -802,6 +826,8 @@ void CPeripheralCecAdapter::PushCecKeypress(const cec_keypress &key)
 {
   CecButtonPress xbmcKey;
   xbmcKey.iDuration = key.duration;
+  xbmcKey.iTimestamp = XbmcThreads::SystemClockMillis();
+  xbmcKey.iTimestampStart = xbmcKey.iTimestamp;
 
   switch (key.keycode)
   {
@@ -1058,24 +1084,133 @@ void CPeripheralCecAdapter::PushCecKeypress(const cec_keypress &key)
 int CPeripheralCecAdapter::GetButton(void)
 {
   CSingleLock lock(m_critSection);
+  if (g_advancedSettings.m_cecSuppress || g_advancedSettings.m_cecDelay || g_advancedSettings.m_cecRepeat || g_advancedSettings.m_cecRelease)
+  {
+    static int last_return;
+    if (last_return)
+    {
+      int r = last_return;
+      last_return = 0;
+      return r;
+    }
+    unsigned int now = XbmcThreads::SystemClockMillis();
+    int statetime = now-m_stateStart;
+    bool old_HasButton = m_bHasButton;
+    int  old_iButton = m_currentButton.iButton;
+    int  old_iDuration = m_currentButton.iDuration;
+    if (!m_bHasButton)
+      GetNextKey();
+    bool hasButton = m_bHasButton;
+    int button = m_currentButton.iButton;
+    int loop = 0;
+    int old_state;
+#define NEWSTATE(x) do { m_state = STATE_ ## x; m_stateStart = now; statetime = 0; } while (0)
+
+    do
+    {
+      old_state = m_state;
+      loop++;
+      CLog::Log(LOGDEBUG, "%s - %d:%d %8.3dms %8.3dms has:%d->%d but:%02x->%02x(%02x) dur:%3d->%3d", __FUNCTION__, m_state, loop, now, statetime, old_HasButton, hasButton, old_iButton, button, m_stateButton, old_iDuration, m_currentButton.iDuration);
+      if (hasButton && m_stateButton != button)
+        NEWSTATE(INITIAL);
+      switch (m_state)
+      {
+        case STATE_INITIAL:
+          if (hasButton)
+          {
+            NEWSTATE(INITIAL_PRESSED);
+            m_stateButton = button;
+          }
+          break;
+        case STATE_INITIAL_PRESSED:
+          if (g_advancedSettings.m_cecSuppress && statetime < g_advancedSettings.m_cecSuppress)
+          {
+            if (loop > 1 || !m_currentButton.iDuration)
+              hasButton = false;
+          }
+          else
+          {
+            NEWSTATE(PRESSED);
+          }
+          break;
+        case STATE_PRESSED:
+          if (hasButton && m_currentButton.iDuration > 0)
+          {
+            NEWSTATE(INITIAL);
+            m_stateButton = 0;
+          }
+          else if (g_advancedSettings.m_cecDelay && statetime >= g_advancedSettings.m_cecDelay)
+          {
+            NEWSTATE(REPEATING);
+          }
+          if (!m_currentButton.iDuration)
+            hasButton = false;
+          break;
+        case STATE_REPEATING:
+          if (hasButton && (m_currentButton.iDuration > 0 || m_stateButton != button))
+          {
+            NEWSTATE(REPEATING_RELEASED);
+          }
+          else if (g_advancedSettings.m_cecRepeat && statetime >= g_advancedSettings.m_cecRepeat)
+          {
+            NEWSTATE(REPEATING);
+            hasButton = true;
+          }
+          break;
+        case STATE_REPEATING_RELEASED:
+          if (hasButton && m_currentButton.iDuration == 0 && m_stateButton == button)
+          {
+            NEWSTATE(REPEATING);
+          }
+          else if (statetime >= g_advancedSettings.m_cecRelease)
+          {
+            NEWSTATE(INITIAL);
+          }
+          if (!m_currentButton.iDuration)
+            hasButton = false;
+          break;
+        default:
+          CLog::Log(LOGERROR, "%s - %d: unexpected state", __FUNCTION__, m_state);
+          break;
+      }
+    } while (m_state != old_state);
+    CLog::Log(LOGDEBUG, "%s - %d:%d %8.3dms %8.3dms has:%d->%d but:%02x->%02x(%02x) dur:%3d->%3d X", __FUNCTION__, m_state, loop++, now, statetime, old_HasButton, hasButton, old_iButton, button, m_stateButton, old_iDuration, m_currentButton.iDuration);
+    last_return = hasButton ? button : 0;
+    return last_return;
+  }
+
   if (!m_bHasButton)
     GetNextKey();
 
+  CLog::Log(LOGDEBUG, "%s - has:%d but:%02x dur:%d time:%6d held:%4d", __FUNCTION__, m_bHasButton, m_currentButton.iButton, m_currentButton.iDuration, m_currentButton.iTimestamp, m_currentButton.iTimestamp - m_currentButton.iTimestampStart);
   return m_bHasButton ? m_currentButton.iButton : 0;
 }
 
 unsigned int CPeripheralCecAdapter::GetHoldTime(void)
 {
+  int ret = 0;
   CSingleLock lock(m_critSection);
-  if (!m_bHasButton)
-    GetNextKey();
-
-  return m_bHasButton ? m_currentButton.iDuration : 0;
+  //if (!m_bHasButton)
+  //  GetNextKey();
+  unsigned int now = XbmcThreads::SystemClockMillis();
+  if (m_state == STATE_REPEATING)
+    ret = now - m_stateStart;
+  else
+    ret = m_bHasButton ? m_currentButton.iTimestamp - m_currentButton.iTimestampStart + m_currentButton.iDuration : 0;
+  CLog::Log(LOGDEBUG, "%s - has:%d but:%02x dur:%d time:%6d held:%4d", __FUNCTION__, m_bHasButton, m_currentButton.iButton, m_currentButton.iDuration, m_currentButton.iTimestamp, m_currentButton.iTimestamp - m_currentButton.iTimestampStart);
+  //CLog::Log(LOGDEBUG, "%s - %d:%d %8.3dms %8.3dms ", __FUNCTION__, m_state, 0, now, ret);
+  return ret;
 }
 
 void CPeripheralCecAdapter::ResetButton(void)
 {
   CSingleLock lock(m_critSection);
+
+  unsigned int now = XbmcThreads::SystemClockMillis();
+  int statetime = now-m_stateStart;
+  //CLog::Log(LOGDEBUG, "%s - %d:%d %8.3dms %8.3dms has:%d->%d but:%02x->%02x(%02x) dur:%3d->%3d X", __FUNCTION__, m_state, 0, now, statetime, m_bHasButton, m_bHasButton, m_currentButton.iButton, m_currentButton.iButton, m_stateButton, m_currentButton.iDuration, m_currentButton.iDuration);
+  CLog::Log(LOGDEBUG, "%s - has:%d but:%02x dur:%d time:%6d held:%4d", __FUNCTION__, m_bHasButton, m_currentButton.iButton, m_currentButton.iDuration, m_currentButton.iTimestamp, m_currentButton.iTimestamp - m_currentButton.iTimestampStart);
+
   m_bHasButton = false;
 
   // wait for the key release if the duration isn't 0

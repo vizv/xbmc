@@ -246,6 +246,10 @@ void CAdvancedSettings::Initialize()
   m_tvshowMultiPartEnumRegExp = "^[-_ex]+([0-9]+(?:(?:[a-i]|\\.[1-9])(?![0-9]))?)";
 
   m_remoteDelay = 3;
+  m_cecSuppress = 0;
+  m_cecDelay = 0;
+  m_cecRepeat = 0;
+  m_cecRelease = 0;
   m_controllerDeadzone = 0.2f;
 
   m_playlistAsFolders = true;
@@ -1035,6 +1039,10 @@ void CAdvancedSettings::ParseSettingsFile(const CStdString &file)
   }
 
   XMLUtils::GetInt(pRootElement, "remotedelay", m_remoteDelay, 1, 20);
+  XMLUtils::GetInt(pRootElement, "cecsuppress", m_cecSuppress, 0, 10000);
+  XMLUtils::GetInt(pRootElement, "cecdelay", m_cecDelay, 0, 10000);
+  XMLUtils::GetInt(pRootElement, "cecrepeat", m_cecRepeat, 0, 10000);
+  XMLUtils::GetInt(pRootElement, "cecrelease", m_cecRelease, 0, 10000);
   XMLUtils::GetFloat(pRootElement, "controllerdeadzone", m_controllerDeadzone, 0.0f, 1.0f);
   XMLUtils::GetUInt(pRootElement, "fanartres", m_fanartRes, 0, 1080);
   XMLUtils::GetUInt(pRootElement, "imageres", m_imageRes, 0, 1080);

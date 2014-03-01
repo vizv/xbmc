@@ -234,6 +234,11 @@ class CAdvancedSettings : public ISettingCallback, public ISettingsHandler
     typedef std::vector< std::pair<CStdString, CStdString> > StringMapping;
     StringMapping m_pathSubstitutions;
     int m_remoteDelay; ///< \brief number of remote messages to ignore before repeating
+
+    int m_cecSuppress;///< \brief time during which subsequent presses will be ignored (ms)
+    int m_cecDelay;   ///< \brief time until remote starts repeating (ms)
+    int m_cecRepeat;  ///< \brief interval remote repats at (ms)
+    int m_cecRelease; ///< \brief time before remote is considered released (ms)
     float m_controllerDeadzone;
 
     bool m_playlistAsFolders;
