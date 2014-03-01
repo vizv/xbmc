@@ -43,6 +43,10 @@
 
 using namespace std;
 
+// the size of the audio_render output port buffers
+#define AUDIO_DECODE_OUTPUT_BUFFER (32*1024)
+static const char rounded_up_channels_shift[] = {0,0,1,2,2,3,3,3,3};
+
 static const uint16_t AC3Bitrates[] = {32, 40, 48, 56, 64, 80, 96, 112, 128, 160, 192, 224, 256, 320, 384, 448, 512, 576, 640};
 static const uint16_t AC3FSCod   [] = {48000, 44100, 32000, 0};
 
@@ -493,9 +497,11 @@ bool COMXAudio::Initialize(AEAudioFormat format, OMXClock *clock, CDVDStreamInfo
   m_BitsPerSample = CAEUtil::DataFormatToBits(m_format.m_dataFormat);
   m_BufferLen     = m_BytesPerSec = m_format.m_sampleRate * (16 >> 3) * m_InputChannels;
   m_BufferLen     *= AUDIO_BUFFER_SECONDS;
+  // should be big enough that common formats (e.g. 6 channel DTS) fit in a single packet.
+  // we don't mind less common formats being split (e.g. ape/wma output large frames)
   // the audio_decode output buffer size is 32K, and typically we convert from
-  // 6 channel 32bpp float to 8 channel 16bpp in, so a full 48K input buffer will fit the outbut buffer
-  m_ChunkLen      = 48*1024;
+  // 6 channel 32bpp float to 8 channel 16bpp in, so a full 48K input buffer will fit the output buffer
+  m_ChunkLen = AUDIO_DECODE_OUTPUT_BUFFER * (m_InputChannels * m_BitsPerSample) >> (rounded_up_channels_shift[m_InputChannels] + 4);
 
   m_wave_header.Samples.wSamplesPerBlock    = 0;
   m_wave_header.Format.nChannels            = m_InputChannels;
@@ -866,11 +872,11 @@ bool COMXAudio::ApplyVolume(void)
 //***********************************************************************************************
 unsigned int COMXAudio::AddPackets(const void* data, unsigned int len)
 {
-  return AddPackets(data, len, 0, 0);
+  return AddPackets(data, len, 0, 0, 0);
 }
 
 //***********************************************************************************************
-unsigned int COMXAudio::AddPackets(const void* data, unsigned int len, double dts, double pts)
+unsigned int COMXAudio::AddPackets(const void* data, unsigned int len, double dts, double pts, unsigned int frame_size)
 {
   CSingleLock lock (m_critSection);
 
@@ -917,24 +923,40 @@ unsigned int COMXAudio::AddPackets(const void* data, unsigned int len, double dt
     omx_buffer->nOffset = 0;
     omx_buffer->nFlags  = 0;
 
+    // we want audio_decode output buffer size to be no more than AUDIO_DECODE_OUTPUT_BUFFER.
+    // it will be 16-bit and rounded up to next power of 2 in channels
+    unsigned int max_buffer = AUDIO_DECODE_OUTPUT_BUFFER * (m_InputChannels * m_BitsPerSample) >> (rounded_up_channels_shift[m_InputChannels] + 4);
+
     unsigned int remaining = demuxer_samples-demuxer_samples_sent;
-    unsigned int samples_space = omx_buffer->nAllocLen/pitch;
+    unsigned int samples_space = std::min(max_buffer, omx_buffer->nAllocLen)/pitch;
     unsigned int samples = std::min(remaining, samples_space);
 
     omx_buffer->nFilledLen = samples * pitch;
 
-    if (samples < demuxer_samples && m_BitsPerSample==32 && !(m_Passthrough || m_HWDecode))
+    unsigned int frames = frame_size ? len/frame_size:0;
+    if ((samples < demuxer_samples || frames > 1) && m_BitsPerSample==32 && !(m_Passthrough || m_HWDecode))
     {
-       uint8_t *dst = omx_buffer->pBuffer;
-       uint8_t *src = demuxer_content + demuxer_samples_sent * (m_BitsPerSample >> 3);
-       // we need to extract samples from planar audio, so the copying needs to be done per plane
-       for (int i=0; i<(int)m_InputChannels; i++)
-       {
-         memcpy(dst, src, omx_buffer->nFilledLen / m_InputChannels);
-         dst += omx_buffer->nFilledLen / m_InputChannels;
-         src += demuxer_samples * (m_BitsPerSample >> 3);
-       }
-       assert(dst <= omx_buffer->pBuffer + m_ChunkLen);
+      const unsigned int sample_pitch   = m_BitsPerSample >> 3;
+      const unsigned int frame_samples  = frame_size / pitch;
+      const unsigned int plane_size     = frame_samples * sample_pitch;
+      const unsigned int out_plane_size = samples * sample_pitch;
+      //CLog::Log(LOGDEBUG, "%s::%s samples:%d/%d ps:%d ops:%d fs:%d pitch:%d filled:%d frames=%d", CLASSNAME, __func__, samples, demuxer_samples, plane_size, out_plane_size, frame_size, pitch, omx_buffer->nFilledLen, frames);
+      for (unsigned int sample = 0; sample < samples; )
+      {
+        unsigned int frame = (demuxer_samples_sent + sample) / frame_samples;
+        unsigned int sample_in_frame = (demuxer_samples_sent + sample) - frame * frame_samples;
+        int out_remaining = std::min(std::min(frame_samples - sample_in_frame, samples), samples-sample);
+        uint8_t *src = demuxer_content + frame*frame_size + sample_in_frame * sample_pitch;
+        uint8_t *dst = (uint8_t *)omx_buffer->pBuffer + sample * sample_pitch;
+        for (unsigned int channel = 0; channel < m_InputChannels; channel++)
+        {
+          //CLog::Log(LOGDEBUG, "%s::%s copy(%d,%d,%d) (s:%d f:%d sin:%d c:%d)", CLASSNAME, __func__, dst-(uint8_t *)omx_buffer->pBuffer, src-demuxer_content, out_remaining, sample, frame, sample_in_frame, channel);
+          memcpy(dst, src, out_remaining * sample_pitch);
+          src += plane_size;
+          dst += out_plane_size;
+        }
+        sample += out_remaining;
+      }
     }
     else
     {
