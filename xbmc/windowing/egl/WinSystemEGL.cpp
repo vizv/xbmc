@@ -289,12 +289,13 @@ bool CWinSystemEGL::DestroyWindow()
   if (!m_egl)
     return false;
 
-  m_egl->ReleaseContext(m_display);
-  if (m_surface != EGL_NO_SURFACE)
-    m_egl->DestroySurface(m_surface, m_display);
-
   int quirks;
   m_egl->GetQuirks(&quirks);
+
+  if (!(quirks & EGL_QUIRK_KEEP_CONTEXT))
+    m_egl->ReleaseContext(m_display);
+  if (m_surface != EGL_NO_SURFACE)
+    m_egl->DestroySurface(m_surface, m_display);
   if (quirks & EGL_QUIRK_DESTROY_NATIVE_WINDOW_WITH_SURFACE)
     m_egl->DestroyNativeWindow();
 

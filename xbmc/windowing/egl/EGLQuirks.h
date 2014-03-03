@@ -39,3 +39,8 @@
            size of -1, -1. Work around it for now
 */
 #define EGL_QUIRK_DONT_TRUST_SURFACE_SIZE (1 << 2)
+
+/*! \brief Enable this to avoid releasing the EGL context
+           This avoids a problem with texture creation failing when using "virtual suspend"
+*/
+#define EGL_QUIRK_KEEP_CONTEXT (1 << 3)
