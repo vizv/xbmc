@@ -59,6 +59,7 @@ public:
 
   void SuspendVideoOutput();
   void ResumeVideoOutput();
+  bool IsVideoOutputSuspended() { return m_video_output_suspended; };
 
 private:
   DllBcmHost *m_DllBcmHost;
@@ -69,6 +70,7 @@ private:
   int        m_gpu_mem;
   bool       m_codec_mpg2_enabled;
   bool       m_codec_wvc1_enabled;
+  bool       m_video_output_suspended;
   COMXCore   *m_OMX;
   class DllLibOMXCore;
   CCriticalSection m_critSection;

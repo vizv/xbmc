@@ -24,6 +24,7 @@
 #include "utils/log.h"
 #include "guilib/gui3d.h"
 #include "linux/DllBCM.h"
+#include "linux/RBP.h"
 #include "utils/StringUtils.h"
 #include "settings/Settings.h"
 #include "math.h"
@@ -257,6 +258,9 @@ bool CEGLNativeTypeRaspberryPI::SetNativeResolution(const RESOLUTION_INFO &res)
 {
 #if defined(TARGET_RASPBERRY_PI)
   if(!m_DllBcmHost)
+    return false;
+
+  if (g_RBP.IsVideoOutputSuspended())
     return false;
 
   // necessary for CRBP::ResumeVideoOutput() to work

@@ -34,6 +34,7 @@ CRBP::CRBP()
 {
   m_initialized     = false;
   m_omx_initialized = false;
+  m_video_output_suspended = false;
   m_DllBcmHost      = new DllBcmHost();
   m_OMX             = new COMXCore();
 }
@@ -169,10 +170,12 @@ void CRBP::SuspendVideoOutput()
 {
   CLog::Log(LOGDEBUG, "Raspberry PI suspending video output\n");
   g_Windowing.DestroyWindow();
+  m_video_output_suspended = true;
 }
 
 void CRBP::ResumeVideoOutput()
 {
+  m_video_output_suspended = false;
   CLog::Log(LOGDEBUG, "Raspberry PI resuming video output\n");
   RESOLUTION_INFO res = CDisplaySettings::Get().GetCurrentResolutionInfo();
   g_Windowing.CreateNewWindow("XBMC", true, res, CApplication::OnEvent);
