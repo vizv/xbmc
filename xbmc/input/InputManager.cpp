@@ -23,6 +23,7 @@
 #include "Application.h"
 #include "InputManager.h"
 #include "input/keyboard/IKeyboardHandler.h"
+#include "input/keyboard/KeyboardEasterEgg.h"
 #include "input/Key.h"
 #include "messaging/ApplicationMessenger.h"
 #include "guilib/Geometry.h"
@@ -67,6 +68,17 @@ using EVENTSERVER::CEventServer;
 
 using namespace KODI::MESSAGING;
 using PERIPHERALS::CPeripherals;
+
+CInputManager::CInputManager() :
+  m_keyboardEasterEgg(new KEYBOARD::CKeyboardEasterEgg)
+{
+  RegisterKeyboardHandler(m_keyboardEasterEgg.get());
+}
+
+CInputManager::~CInputManager()
+{
+  UnregisterKeyboardHandler(m_keyboardEasterEgg.get());
+}
 
 CInputManager& CInputManager::GetInstance()
 {

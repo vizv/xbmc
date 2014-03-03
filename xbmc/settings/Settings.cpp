@@ -418,6 +418,9 @@ const std::string CSettings::SETTING_GENERAL_ADDONBROKENFILTER = "general.addonb
 const std::string CSettings::SETTING_SOURCE_VIDEOS = "source.videos";
 const std::string CSettings::SETTING_SOURCE_MUSIC = "source.music";
 const std::string CSettings::SETTING_SOURCE_PICTURES = "source.pictures";
+const std::string CSettings::SETTING_GAMES_ENABLE = "gamesgeneral.enable";
+const std::string CSettings::SETTING_GAMES_ENABLEREWIND = "gamesgeneral.enablerewind";
+const std::string CSettings::SETTING_GAMES_REWINDTIME = "gamesgeneral.rewindtime";
 const std::string CSettings::SETTING_GAMES_CONTROLLERCONFIG = "gamesinput.controllerconfig";
 const std::string CSettings::SETTING_GAMES_TESTRUMBLE = "gamesinput.testrumble";
 const std::string CSettings::SETTING_GAMES_CONTROLLERPOWEROFF = "gamesinput.controllerpoweroff";
@@ -1212,6 +1215,8 @@ void CSettings::InitializeISettingCallbacks()
   m_settingsManager->RegisterCallback(&CWakeOnAccess::GetInstance(), settingSet);
 
   settingSet.clear();
+  settingSet.insert(CSettings::SETTING_GAMES_ENABLEREWIND);
+  settingSet.insert(CSettings::SETTING_GAMES_REWINDTIME);
   settingSet.insert(CSettings::SETTING_GAMES_CONTROLLERCONFIG);
   settingSet.insert(CSettings::SETTING_GAMES_TESTRUMBLE);
   settingSet.insert(CSettings::SETTING_GAMES_EMULATEDCONTROLLERS);

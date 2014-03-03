@@ -56,6 +56,18 @@ namespace XFILE
      */
     static bool GetScriptsAndPlugins(const std::string &content, CFileItemList &items);
 
+    /*! \brief Fetch game clients that can be launched in standalone mode
+    \param items the list to fill with standalone games
+    \return true if more than one item is found, false otherwise.
+    */
+    static bool GetStandaloneGames(ADDON::VECADDONS &addons);
+
+    /*! \brief Fetch game clients that can be launched in standalone mode
+    \param items the list to fill with standalone games
+    \return true if more than one item is found, false otherwise.
+    */
+    static bool GetStandaloneGames(CFileItemList &items);
+
     static void GenerateAddonListing(const CURL &path, const ADDON::VECADDONS& addons, CFileItemList &items, const std::string label);
     static CFileItemPtr FileItemFromAddon(const ADDON::AddonPtr &addon, const std::string& path, bool folder = false);
   

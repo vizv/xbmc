@@ -23,6 +23,7 @@
 #include "JoystickTypes.h"
 #include "RumbleGenerator.h"
 
+#include <memory>
 #include <vector>
 
 #define DEFAULT_CONTROLLER_ID    "game.controller.default"
@@ -34,6 +35,7 @@
 namespace JOYSTICK
 {
   class IKeymapHandler;
+  class IButtonSequence;
 
   /*!
    * \brief Implementation of IInputHandler for Kodi input
@@ -86,5 +88,7 @@ namespace JOYSTICK
     IKeymapHandler* const  m_handler;
 
     CRumbleGenerator m_rumbleGenerator;
+
+    std::unique_ptr<IButtonSequence> m_easterEgg;
   };
 }

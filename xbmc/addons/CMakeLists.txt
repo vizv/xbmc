@@ -11,6 +11,7 @@ set(SOURCES Addon.cpp
             AudioEncoder.cpp
             ContextMenuAddon.cpp
             ContextMenus.cpp
+            GameResource.cpp
             GUIDialogAddonInfo.cpp
             GUIDialogAddonSettings.cpp
             GUIViewStateAddonBrowser.cpp
@@ -49,6 +50,7 @@ set(HEADERS Addon.h
             DllAudioDSP.h
             DllLibCPluff.h
             DllPVRClient.h
+            GameResource.h
             GUIDialogAddonInfo.h
             GUIDialogAddonSettings.h
             GUIViewStateAddonBrowser.h

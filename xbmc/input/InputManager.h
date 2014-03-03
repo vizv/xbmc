@@ -20,6 +20,7 @@
 */
 
 #include <map>
+#include <memory>
 #include <string>
 #include <vector>
 
@@ -46,10 +47,10 @@ namespace KEYBOARD
 class CInputManager : public ISettingCallback
 {
 private:
-  CInputManager() { }
+  CInputManager();
   CInputManager(const CInputManager&);
   CInputManager const& operator=(CInputManager const&);
-  virtual ~CInputManager() { };
+  virtual ~CInputManager();
 
 public:
   /*! \brief static method to get the current instance of the class. Creates a new instance the first time it's called.
@@ -273,4 +274,6 @@ private:
   CCriticalSection     m_actionMutex;
 
   std::vector<KEYBOARD::IKeyboardHandler*> m_keyboardHandlers;
+
+  std::unique_ptr<KEYBOARD::IKeyboardHandler> m_keyboardEasterEgg;
 };
