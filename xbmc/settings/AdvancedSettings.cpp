@@ -373,6 +373,7 @@ void CAdvancedSettings::Initialize()
   // the following setting determines the readRate of a player data
   // as multiply of the default data read rate
   m_readBufferFactor = 1.0f;
+  m_guiPowerOffHDMI = false;
   m_addonPackageFolderSize = 200;
 
   m_jsonOutputCompact = true;
@@ -881,6 +882,8 @@ void CAdvancedSettings::ParseSettingsFile(const CStdString &file)
   XMLUtils::GetFloat(pRootElement,"sleepbeforeflip", m_sleepBeforeFlip, 0.0f, 1.0f);
   XMLUtils::GetBoolean(pRootElement,"virtualshares", m_bVirtualShares);
   XMLUtils::GetUInt(pRootElement, "packagefoldersize", m_addonPackageFolderSize);
+
+  XMLUtils::GetBoolean(pRootElement, "poweroffhdmi", m_guiPowerOffHDMI);
 
   //Tuxbox
   pElement = pRootElement->FirstChildElement("tuxbox");

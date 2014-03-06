@@ -27,6 +27,7 @@
 #include "linux/RBP.h"
 #include "utils/StringUtils.h"
 #include "settings/Settings.h"
+#include "settings/AdvancedSettings.h"
 #include "math.h"
 
 #ifndef __VIDEOCORE4__
@@ -200,8 +201,10 @@ bool CEGLNativeTypeRaspberryPI::DestroyNativeWindow()
   free(m_nativeWindow);
   m_nativeWindow = NULL;
 
-  if(m_DllBcmHost)
+  if(m_DllBcmHost && g_advancedSettings.m_guiPowerOffHDMI)
+  {
     m_DllBcmHost->vc_tv_power_off();
+  }
 
   DLOG("CEGLNativeTypeRaspberryPI::DestroyNativeWindow\n");
   return true;
