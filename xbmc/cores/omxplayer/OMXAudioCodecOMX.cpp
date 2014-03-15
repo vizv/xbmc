@@ -44,6 +44,8 @@ COMXAudioCodecOMX::COMXAudioCodecOMX()
   m_pFrame1 = NULL;
   m_frameSize = 0;
   m_bGotFrame = false;
+  m_bNoConcatenate = false;
+
   m_iSampleFormat = AV_SAMPLE_FMT_NONE;
   m_desiredSampleFormat = AV_SAMPLE_FMT_NONE;
 }
@@ -89,6 +91,10 @@ bool COMXAudioCodecOMX::Open(CDVDStreamInfo &hints)
   m_pCodecContext->block_align = hints.blockalign;
   m_pCodecContext->bit_rate = hints.bitrate;
   m_pCodecContext->bits_per_coded_sample = hints.bitspersample;
+
+  // vorbis has variable sized planar output, so skip concatenation
+  if (hints.codec == AV_CODEC_ID_VORBIS)
+    m_bNoConcatenate = true;
 
   if(m_pCodecContext->bits_per_coded_sample == 0)
     m_pCodecContext->bits_per_coded_sample = 16;
@@ -253,13 +259,16 @@ int COMXAudioCodecOMX::GetData(BYTE** dst, double &dts, double &pts)
   }
   m_iBufferOutputUsed += outputSize;
 
+  if (!m_bNoConcatenate && m_pCodecContext->sample_fmt == AV_SAMPLE_FMT_FLTP && m_frameSize && (int)m_frameSize != outputSize)
+    CLog::Log(LOGERROR, "COMXAudioCodecOMX::GetData Unexpected change of size (%d->%d)", m_frameSize, outputSize);
+  m_frameSize = outputSize;
+
   // if next buffer submitted won't fit then flush it out
-  if (m_iBufferOutputUsed + outputSize > desired_size || (m_frameSize && (int)m_frameSize != outputSize))
+  if (m_iBufferOutputUsed + outputSize > desired_size || m_bNoConcatenate)
   {
      int ret = m_iBufferOutputUsed;
      m_bGotFrame = false;
      m_iBufferOutputUsed = 0;
-     m_frameSize = outputSize;
      dts = m_dts;
      pts = m_pts;
      return ret;

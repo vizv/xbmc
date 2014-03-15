@@ -65,6 +65,7 @@ protected:
 
   bool m_bFirstFrame;
   bool m_bGotFrame;
+  bool m_bNoConcatenate;
   unsigned int  m_frameSize;
   double m_dts, m_pts;
   DllAvCodec m_dllAvCodec;
