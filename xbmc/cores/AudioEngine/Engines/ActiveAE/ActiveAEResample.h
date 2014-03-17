@@ -19,10 +19,6 @@
  *
  */
 
-#ifdef TARGET_RASPBERRY_PI
-#include "ActiveAEResamplePi.h"
-#else
-
 #include "DllAvUtil.h"
 #include "DllSwResample.h"
 #include "cores/AudioEngine/Utils/AEChannelInfo.h"
@@ -66,5 +62,3 @@ protected:
 };
 
 }
-
-#endif
