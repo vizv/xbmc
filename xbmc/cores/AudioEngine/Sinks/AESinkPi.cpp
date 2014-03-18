@@ -110,23 +110,23 @@ bool CAESinkPi::Initialize(AEAudioFormat &format, std::string &device)
       2, //AE_CH_FR
       4, //AE_CH_FC
       3, //AE_CH_LFE
-      5, //AE_CH_BL
-      6, //AE_CH_BR
+      7, //AE_CH_BL
+      8, //AE_CH_BR
       1, //AE_CH_FLOC,
       2, //AE_CH_FROC,
       4, //AE_CH_BC,
-      7, //AE_CH_SL
-      8, //AE_CH_SR
+      5, //AE_CH_SL
+      6, //AE_CH_SR
     };
-    static const unsigned char map_wide[] =
+    static const unsigned char map_back[] =
     {
       0, //AE_CH_RAW ,
       1, //AE_CH_FL
       2, //AE_CH_FR
       4, //AE_CH_FC
       3, //AE_CH_LFE
-      0, //AE_CH_BL
-      0, //AE_CH_BR
+      5, //AE_CH_BL
+      6, //AE_CH_BR
       1, //AE_CH_FLOC,
       2, //AE_CH_FROC,
       4, //AE_CH_BC,
@@ -137,15 +137,15 @@ bool CAESinkPi::Initialize(AEAudioFormat &format, std::string &device)
     // According to CEA-861-D only RL and RR are known. In case of a format having SL and SR channels
     // but no BR BL channels, we use the wide map in order to open only the num of channels really
     // needed.
-    if (format.m_channelLayout.HasChannel(AE_CH_SL) && !format.m_channelLayout.HasChannel(AE_CH_BL))
-      map = map_wide;
+    if (format.m_channelLayout.HasChannel(AE_CH_BL) && !format.m_channelLayout.HasChannel(AE_CH_SL))
+      map = map_back;
 
     char channel_map_str[80] = {};
     for (unsigned int i = 0; i < channels; ++i)
     {
       AEChannel c = format.m_channelLayout[i];
       unsigned int chan = 0;
-      if ((unsigned int)c < sizeof map_wide / sizeof *map_wide)
+      if ((unsigned int)c < sizeof map_normal / sizeof *map_normal)
         chan = map[(unsigned int)c];
       if (chan > 0)
         channel_map |= (chan-1) << (3*i);
@@ -161,7 +161,7 @@ bool CAESinkPi::Initialize(AEAudioFormat &format, std::string &device)
       0x08, // 4.0
       0x0a, // 5.0
       0xff, // 6
-      0x1e, // 7.0
+      0x12, // 7.0
       0xff, // 8
     };
     static const uint8_t cea_map_lfe[] = {
@@ -173,7 +173,7 @@ bool CAESinkPi::Initialize(AEAudioFormat &format, std::string &device)
       0x09, // 4.1
       0x0b, // 5.1
       0xff, // 7
-      0x1f, // 7.1
+      0x13, // 7.1
     };
     uint8_t cea = format.m_channelLayout.HasChannel(AE_CH_LFE) ? cea_map_lfe[channels] : cea_map[channels];
     assert(cea != 0xff);
