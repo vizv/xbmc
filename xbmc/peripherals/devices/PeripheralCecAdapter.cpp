@@ -621,18 +621,28 @@ int CPeripheralCecAdapter::CecCommand(void *cbParam, const cec_command command)
     {
     case CEC_OPCODE_STANDBY:
       /* a device was put in standby mode */
+CLog::Log(LOGNOTICE, "%s - standby %d,%d", __FUNCTION__, adapter->m_configuration.bPowerOffOnStandby, adapter->m_configuration.bShutdownOnStandby);
       if (command.initiator == CECDEVICE_TV &&
           (adapter->m_configuration.bPowerOffOnStandby == 1 || adapter->m_configuration.bShutdownOnStandby == 1) &&
           (!adapter->m_standbySent.IsValid() || CDateTime::GetCurrentDateTime() - adapter->m_standbySent > CDateTimeSpan(0, 0, 0, SCREENSAVER_TIMEOUT)))
       {
+#if 1
+        cec_keypress key;
+        key.duration = 500;
+        key.keycode = CEC_USER_CONTROL_CODE_STOP;
+CLog::Log(LOGNOTICE, "%s - push stop %d", __FUNCTION__, key.keycode);
+        adapter->PushCecKeypress(key);
+#else
         adapter->m_bStarted = false;
         if (adapter->m_configuration.bPowerOffOnStandby == 1)
           CApplicationMessenger::Get().Suspend();
         else if (adapter->m_configuration.bShutdownOnStandby == 1)
           CApplicationMessenger::Get().Shutdown();
+#endif
       }
       break;
     case CEC_OPCODE_SET_MENU_LANGUAGE:
+CLog::Log(LOGNOTICE, "%s - language", __FUNCTION__);
       if (adapter->m_configuration.bUseTVMenuLanguage == 1 && command.initiator == CECDEVICE_TV && command.parameters.size == 3)
       {
         char strNewLanguage[4];
@@ -643,6 +653,7 @@ int CPeripheralCecAdapter::CecCommand(void *cbParam, const cec_command command)
       }
       break;
     case CEC_OPCODE_DECK_CONTROL:
+CLog::Log(LOGNOTICE, "%s - deck control", __FUNCTION__);
       if (command.initiator == CECDEVICE_TV &&
           command.parameters.size == 1 &&
           command.parameters[0] == CEC_DECK_CONTROL_MODE_STOP)
@@ -654,6 +665,7 @@ int CPeripheralCecAdapter::CecCommand(void *cbParam, const cec_command command)
       }
       break;
     case CEC_OPCODE_PLAY:
+CLog::Log(LOGNOTICE, "%s - opcode play %d", __FUNCTION__, command.parameters[0]);
       if (command.initiator == CECDEVICE_TV &&
           command.parameters.size == 1)
       {
@@ -908,6 +920,7 @@ void CPeripheralCecAdapter::PushCecKeypress(const cec_keypress &key)
     PushCecKeypress(xbmcKey);
     break;
   case CEC_USER_CONTROL_CODE_STOP:
+CLog::Log(LOGNOTICE, "%s - pop stop %d", __FUNCTION__, key.keycode);
     xbmcKey.iButton = XINPUT_IR_REMOTE_STOP;
     PushCecKeypress(xbmcKey);
     break;
