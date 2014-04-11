@@ -1431,6 +1431,9 @@ void CAdvancedSettings::SettingOptionsLoggingComponentsFiller(SettingConstPtr se
 #ifdef HAVE_LIBCEC
   list.push_back(std::make_pair(g_localizeStrings.Get(679), LOGCEC));
 #endif
+#ifdef TARGET_RASPBERRY_PI
+  list.push_back(std::make_pair(g_localizeStrings.Get(697), LOGOMXPLAYER));
+#endif
 }
 
 void CAdvancedSettings::setExtraLogLevel(const std::vector<CVariant> &components)
