@@ -2169,6 +2169,12 @@ void CActiveAE::LoadSettings()
 bool CActiveAE::Initialize()
 {
   Create();
+
+#ifdef TARGET_RASPBERRY_PI
+  /* audio normally won't consume full cpu, so let it have prio */
+  SetPriority(GetPriority()+1);
+#endif
+
   Message *reply;
   if (m_controlPort.SendOutMessageSync(CActiveAEControlProtocol::INIT,
                                                  &reply,
