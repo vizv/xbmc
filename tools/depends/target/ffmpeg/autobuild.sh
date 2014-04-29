@@ -127,6 +127,8 @@ mkdir -p "ffmpeg-${VERSION}"
 cd "ffmpeg-${VERSION}" || exit 2
 tar --strip-components=1 -xf $MYDIR/${ARCHIVE}
 
+patch -p1 < ../ffmpeg_Speed_up_wtv_index_creation.patch
+
 CFLAGS="$CFLAGS" CXXFLAGS="$CXXFLAGS" LDFLAGS="$LDFLAGS" \
 ./configure --prefix=$FFMPEG_PREFIX \
 	--extra-version="kodi-${VERSION}" \
