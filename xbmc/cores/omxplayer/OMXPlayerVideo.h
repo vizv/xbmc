@@ -66,6 +66,7 @@ protected:
 
   float                     m_fForcedAspectRatio;
   unsigned                  m_flags;
+  bool                      m_bClose;
 
   CRect                     m_src_rect;
   CRect                     m_dst_rect;

@@ -70,6 +70,7 @@ protected:
   bool                      m_DecoderOpen;
 
   bool                      m_bad_state;
+  bool                      m_bClose;
 
   virtual void OnStartup();
   virtual void OnExit();

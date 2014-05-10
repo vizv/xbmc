@@ -104,6 +104,7 @@ OMXPlayerVideo::OMXPlayerVideo(OMXClock *av_clock,
   m_iCurrentPts = DVD_NOPTS_VALUE;
   m_nextOverlay = DVD_NOPTS_VALUE;
   m_flush = false;
+  m_bClose = false;
   m_history_valid_pts = 0;
 }
 
@@ -118,6 +119,7 @@ bool OMXPlayerVideo::OpenStream(CDVDStreamInfo &hints)
   m_hdmi_clock_sync = (CSettings::Get().GetInt("videoplayer.adjustrefreshrate") != ADJUST_REFRESHRATE_OFF);
   m_started     = false;
   m_flush       = false;
+  m_bClose      = false;
   m_stalled     = m_messageQueue.GetPacketCount(CDVDMsg::DEMUXER_PACKET) == 0;
   m_nextOverlay = DVD_NOPTS_VALUE;
   // force SetVideoRect to be called initially
@@ -161,6 +163,7 @@ bool OMXPlayerVideo::OpenStream(CDVDStreamInfo &hints, COMXVideo *codec)
 bool OMXPlayerVideo::CloseStream(bool bWaitForBuffers)
 {
   // wait until buffers are empty
+  m_bClose = true;
   if (bWaitForBuffers && m_speed > 0) m_messageQueue.WaitUntilEmpty();
 
   m_messageQueue.Abort();
@@ -469,8 +472,8 @@ void OMXPlayerVideo::Process()
 
       while (!m_bStop)
       {
-        // discard if flushing as clocks may be stopped and we'll never submit it
-        if (m_flush)
+        // discard if flushing or closing as clocks may be stopped and we'll never submit it
+        if (m_flush || m_bClose)
            break;
 
         if((int)m_omxVideo.GetFreeSpace() < pPacket->iSize)
