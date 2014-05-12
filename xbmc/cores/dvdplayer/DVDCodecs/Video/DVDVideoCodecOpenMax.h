@@ -41,6 +41,7 @@ public:
   virtual unsigned GetAllowedReferences();
   virtual void SetDropState(bool bDrop);
   virtual const char* GetName(void);
+  virtual bool GetCodecStats(double &pts, int &droppedPics);
   
 protected:
   OpenMaxVideoPtr m_omx_decoder;
