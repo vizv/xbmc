@@ -91,4 +91,9 @@ bool CDVDVideoCodecOpenMax::ClearPicture(DVDVideoPicture* pDvdVideoPicture)
   return m_omx_decoder->ClearPicture(pDvdVideoPicture);
 }
 
+bool CDVDVideoCodecOpenMax::GetCodecStats(double &pts, int &droppedPics)
+{
+  return m_omx_decoder->GetCodecStats(pts, droppedPics);
+}
+
 #endif

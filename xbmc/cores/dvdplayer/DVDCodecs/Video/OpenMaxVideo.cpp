@@ -37,6 +37,7 @@
 #include "ApplicationMessenger.h"
 #include "Application.h"
 #include "threads/Atomics.h"
+#include "guilib/GUIWindowManager.h"
 
 #include <IL/OMX_Core.h>
 #include <IL/OMX_Component.h>
@@ -57,6 +58,7 @@
 
 #define OMX_BUFFERFLAG_PTS_INVALID (1<<28)
 #define OMX_BUFFERFLAG_DROPPED     (1<<29)
+#define OMX_BUFFERFLAG_FIRST_FIELD (1<<30)
 
 COpenMaxVideoBuffer::COpenMaxVideoBuffer(COpenMaxVideo *omv)
     : m_omv(omv), m_refs(0)
@@ -139,8 +141,11 @@ COpenMaxVideo::COpenMaxVideo()
 
   m_deinterlace = false;
   m_deinterlace_request = VS_DEINTERLACEMODE_OFF;
-  m_deinterlace_second_field = false;
   m_startframe = false;
+  m_decoderPts = DVD_NOPTS_VALUE;
+  m_droppedPics = 0;
+  m_decode_frame_number = 1;
+  m_skipDeinterlaceFields = false;
 }
 
 COpenMaxVideo::~COpenMaxVideo()
@@ -369,7 +374,10 @@ void COpenMaxVideo::Dispose()
   m_finished = true;
   pthread_mutex_unlock(&m_omx_output_mutex);
   if (done)
+  {
+    assert(m_dts_queue.empty());
     m_myself.reset();
+  }
 }
 
 void COpenMaxVideo::SetDropState(bool bDrop)
@@ -730,6 +738,7 @@ int COpenMaxVideo::Decode(uint8_t* pData, int iSize, double dts, double pts)
       omx_buffer->nFilledLen = (demuxer_bytes > omx_buffer->nAllocLen) ? omx_buffer->nAllocLen : demuxer_bytes;
       omx_buffer->nTimeStamp = ToOMXTime((uint64_t)(pts == DVD_NOPTS_VALUE) ? 0 : pts);
       omx_buffer->pAppPrivate = omx_buffer;
+      omx_buffer->pMarkData = (OMX_PTR)m_decode_frame_number;
       memcpy(omx_buffer->pBuffer, demuxer_content, omx_buffer->nFilledLen);
 
       demuxer_bytes -= omx_buffer->nFilledLen;
@@ -742,12 +751,18 @@ int COpenMaxVideo::Decode(uint8_t* pData, int iSize, double dts, double pts)
         omx_buffer->nFlags |= OMX_BUFFERFLAG_TIME_UNKNOWN;
       if (pts == DVD_NOPTS_VALUE) // hijack an omx flag to indicate there wasn't a real timestamp - it will be returned with the picture (but otherwise ignored)
         omx_buffer->nFlags |= OMX_BUFFERFLAG_PTS_INVALID;
-      if (m_drop_state) // hijack an omx flag to signal this frame to be dropped - it will be returned with the picture (but otherwise ignored)
+      if (m_drop_state)
+      {
+        // hijack an omx flag to signal this frame to be dropped - it will be returned with the picture (but otherwise ignored)
         omx_buffer->nFlags |= OMX_BUFFERFLAG_DECODEONLY | OMX_BUFFERFLAG_DROPPED;
+        m_droppedPics += m_deinterlace ? 2:1;
+      }
+      // always set this flag on input. It won't be set on second field of interlaced video.
+      omx_buffer->nFlags |= OMX_BUFFERFLAG_FIRST_FIELD;
 
 #if defined(OMX_DEBUG_VERBOSE)
-      CLog::Log(LOGDEBUG, "%s::%s - %-6d dts:%.3f pts:%.3f flags:%x",
-        CLASSNAME, __func__, omx_buffer->nFilledLen, dts == DVD_NOPTS_VALUE ? 0.0 : dts*1e-6, pts == DVD_NOPTS_VALUE ? 0.0 : pts*1e-6, omx_buffer->nFlags);
+      CLog::Log(LOGDEBUG, "%s::%s - %-6d dts:%.3f pts:%.3f flags:%x frame:%d",
+        CLASSNAME, __func__, omx_buffer->nFilledLen, dts == DVD_NOPTS_VALUE ? 0.0 : dts*1e-6, pts == DVD_NOPTS_VALUE ? 0.0 : pts*1e-6, omx_buffer->nFlags, (int)omx_buffer->pMarkData);
 #endif
 
       omx_err = m_omx_decoder.EmptyThisBuffer(omx_buffer);
@@ -758,13 +773,16 @@ int COpenMaxVideo::Decode(uint8_t* pData, int iSize, double dts, double pts)
       }
       if (demuxer_bytes == 0)
       {
+        m_decode_frame_number++;
         m_startframe = true;
 #ifdef DTS_QUEUE
         if (!m_drop_state)
         {
           // only push if we are successful with feeding OMX_EmptyThisBuffer
+          pthread_mutex_lock(&m_omx_output_mutex);
           m_dts_queue.push(dts);
           assert(m_dts_queue.size() < 32);
+          pthread_mutex_unlock(&m_omx_output_mutex);
         }
 #endif
         if (buffer_to_free)
@@ -840,13 +858,18 @@ void COpenMaxVideo::Reset(void)
   SetDropState(true);
   SetDropState(false);
 #ifdef DTS_QUEUE
+  pthread_mutex_lock(&m_omx_output_mutex);
   while (!m_dts_queue.empty())
     m_dts_queue.pop();
+  pthread_mutex_unlock(&m_omx_output_mutex);
 #endif
 
   while (!m_demux_queue.empty())
     m_demux_queue.pop();
   m_startframe = false;
+  m_decoderPts = DVD_NOPTS_VALUE;
+  m_droppedPics = 0;
+  m_decode_frame_number = 1;
 }
 
 
@@ -928,26 +951,17 @@ bool COpenMaxVideo::GetPicture(DVDVideoPicture* pDvdVideoPicture)
       }
     }
 
-#ifdef DTS_QUEUE
-    if (!m_deinterlace_second_field)
-    {
-      assert(!m_dts_queue.empty());
-      pDvdVideoPicture->dts = m_dts_queue.front();
-      m_dts_queue.pop();
-    }
-    if (m_deinterlace)
-      m_deinterlace_second_field = !m_deinterlace_second_field;
-#endif
     // nTimeStamp is in microseconds
+    pDvdVideoPicture->dts = buffer->dts;
     pDvdVideoPicture->pts = FromOMXTime(buffer->omx_buffer->nTimeStamp);
     pDvdVideoPicture->openMaxBuffer->Acquire();
     pDvdVideoPicture->iFlags  = DVP_FLAG_ALLOCATED;
     if (buffer->omx_buffer->nFlags & OMX_BUFFERFLAG_PTS_INVALID)
       pDvdVideoPicture->pts = DVD_NOPTS_VALUE;
 #if defined(OMX_DEBUG_VERBOSE)
-    CLog::Log(LOGINFO, "%s::%s dts:%.3f pts:%.3f flags:%x:%x openMaxBuffer:%p omx_buffer:%p egl_image:%p texture_id:%x", CLASSNAME, __func__,
+    CLog::Log(LOGINFO, "%s::%s dts:%.3f pts:%.3f flags:%x:%x frame:%d openMaxBuffer:%p omx_buffer:%p egl_image:%p texture_id:%x", CLASSNAME, __func__,
         pDvdVideoPicture->dts == DVD_NOPTS_VALUE ? 0.0 : pDvdVideoPicture->dts*1e-6, pDvdVideoPicture->pts == DVD_NOPTS_VALUE ? 0.0 : pDvdVideoPicture->pts*1e-6,
-        pDvdVideoPicture->iFlags, buffer->omx_buffer->nFlags, pDvdVideoPicture->openMaxBuffer, pDvdVideoPicture->openMaxBuffer->omx_buffer, pDvdVideoPicture->openMaxBuffer->egl_image, pDvdVideoPicture->openMaxBuffer->texture_id);
+        pDvdVideoPicture->iFlags, buffer->omx_buffer->nFlags, (int)buffer->omx_buffer->pMarkData, pDvdVideoPicture->openMaxBuffer, pDvdVideoPicture->openMaxBuffer->omx_buffer, pDvdVideoPicture->openMaxBuffer->egl_image, pDvdVideoPicture->openMaxBuffer->texture_id);
 #endif
     assert(!(buffer->omx_buffer->nFlags & (OMX_BUFFERFLAG_DECODEONLY | OMX_BUFFERFLAG_DROPPED)));
   }
@@ -956,6 +970,12 @@ bool COpenMaxVideo::GetPicture(DVDVideoPicture* pDvdVideoPicture)
     CLog::Log(LOGERROR, "%s::%s - called but m_omx_output_ready is empty", CLASSNAME, __func__);
     return false;
   }
+
+  if (pDvdVideoPicture->pts != DVD_NOPTS_VALUE)
+    m_decoderPts = pDvdVideoPicture->pts;
+  else
+    m_decoderPts = pDvdVideoPicture->dts; // xxx is DVD_NOPTS_VALUE better?
+
   return true;
 }
 
@@ -970,25 +990,56 @@ bool COpenMaxVideo::ClearPicture(DVDVideoPicture* pDvdVideoPicture)
   return true;
 }
 
+bool COpenMaxVideo::GetCodecStats(double &pts, int &droppedPics)
+{
+  pts = m_decoderPts;
+  droppedPics = m_droppedPics;
+  m_droppedPics = 0;
+#if defined(OMX_DEBUG_VERBOSE)
+  CLog::Log(LOGDEBUG, "%s::%s - pts:%.0f droppedPics:%d", CLASSNAME, __func__, pts, droppedPics);
+#endif
+  return true;
+}
+
   // DecoderFillBufferDone -- OpenMax output buffer has been filled
 OMX_ERRORTYPE COpenMaxVideo::DecoderFillBufferDone(
   OMX_HANDLETYPE hComponent,
   OMX_BUFFERHEADERTYPE* pBuffer)
 {
   COpenMaxVideoBuffer *buffer = (COpenMaxVideoBuffer*)pBuffer->pAppPrivate;
+  bool skipDeinterlaceFields = m_skipDeinterlaceFields || g_windowManager.HasDialogOnScreen();
 
   #if defined(OMX_DEBUG_VERBOSE)
-  CLog::Log(LOGDEBUG, "%s::%s - %p (%p,%p) buffer_size(%u), pts:%.3f flags:%x",
-    CLASSNAME, __func__, buffer, pBuffer, buffer->omx_buffer, pBuffer->nFilledLen, (double)FromOMXTime(buffer->omx_buffer->nTimeStamp)*1e-6, buffer->omx_buffer->nFlags);
+  CLog::Log(LOGDEBUG, "%s::%s - %p (%p,%p) buffer_size(%u), pts:%.3f flags:%x frame:%d win:%x",
+    CLASSNAME, __func__, buffer, pBuffer, buffer->omx_buffer, pBuffer->nFilledLen, (double)FromOMXTime(buffer->omx_buffer->nTimeStamp)*1e-6, buffer->omx_buffer->nFlags, (int)buffer->omx_buffer->pMarkData, skipDeinterlaceFields);
   #endif
 
   assert(!(buffer->omx_buffer->nFlags & (OMX_BUFFERFLAG_DECODEONLY | OMX_BUFFERFLAG_DROPPED)));
-  // queue output omx buffer to ready list.
-  pthread_mutex_lock(&m_omx_output_mutex);
-  buffer->m_aspect_ratio = m_aspect_ratio;
-  m_omx_output_ready.push(buffer);
-  pthread_mutex_unlock(&m_omx_output_mutex);
 
+
+  // flags have OMX_BUFFERFLAG_FIRST_FIELD set if this is a direct result of a submitted frame,
+  // clear for second field of deinterlaced frame. They are zero when frame is returned due to a flush.
+#ifdef DTS_QUEUE
+  if ((!m_deinterlace || (buffer->omx_buffer->nFlags & OMX_BUFFERFLAG_FIRST_FIELD)) && buffer->omx_buffer->nFlags)
+  {
+    pthread_mutex_lock(&m_omx_output_mutex);
+    assert(!m_dts_queue.empty());
+    buffer->dts = m_dts_queue.front();
+    m_dts_queue.pop();
+    pthread_mutex_unlock(&m_omx_output_mutex);
+  }
+#endif
+  if (m_drop_state || (m_deinterlace && skipDeinterlaceFields && !(buffer->omx_buffer->nFlags & OMX_BUFFERFLAG_FIRST_FIELD)))
+  {
+    ReturnOpenMaxBuffer(buffer);
+  }
+  else
+  {
+    buffer->m_aspect_ratio = m_aspect_ratio;
+    pthread_mutex_lock(&m_omx_output_mutex);
+    m_omx_output_ready.push(buffer);
+    pthread_mutex_unlock(&m_omx_output_mutex);
+  }
   return OMX_ErrorNone;
 }
 
