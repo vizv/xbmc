@@ -57,6 +57,7 @@ public:
   int height;
   float m_aspect_ratio;
   int index;
+  double dts;
 
   // used for egl based rendering if active
   EGLImageKHR egl_image;
@@ -87,6 +88,7 @@ public:
   virtual unsigned GetAllowedReferences() { return 2; }
   virtual void SetDropState(bool bDrop);
   virtual const char* GetName(void) { return (const char*)m_pFormatName; }
+  virtual bool GetCodecStats(double &pts, int &droppedPics);
 
   // OpenMax decoder callback routines.
   OMX_ERRORTYPE DecoderFillBufferDone(OMX_HANDLETYPE hComponent, OMX_BUFFERHEADERTYPE* pBuffer);
@@ -142,10 +144,11 @@ protected:
 
   bool              m_deinterlace;
   EDEINTERLACEMODE  m_deinterlace_request;
-  bool              m_deinterlace_second_field;
-
   bool              m_startframe;
-
+  unsigned int      m_decode_frame_number;
+  double            m_decoderPts;
+  unsigned int      m_droppedPics;
+  bool              m_skipDeinterlaceFields;
   bool PortSettingsChanged();
   bool SendDecoderConfig(uint8_t *extradata, int extrasize);
   bool NaluFormatStartCodes(enum AVCodecID codec, uint8_t *extradata, int extrasize);
