@@ -606,13 +606,18 @@ bool COMXAudio::Initialize(AEAudioFormat format, OMXClock *clock, CDVDStreamInfo
     if (m_InputChannels <= 2)
       stdLayout = AE_CH_LAYOUT_2_0;
 
-    uint64_t m_dst_chan_layout = GetAVChannelLayout(stdLayout);
+
+    CAEChannelInfo resolvedMap = channelMap;
+    resolvedMap.ResolveChannels(stdLayout);
+    uint64_t m_dst_chan_layout = GetAVChannelLayout(resolvedMap);
     uint64_t m_src_chan_layout = GetAVChannelLayout(channelMap);
-    m_OutputChannels = stdLayout.Count();
+
+    m_InputChannels = channelMap.Count();
+    m_OutputChannels = resolvedMap.Count();
 
     int m_dst_channels = m_OutputChannels;
     int m_src_channels = m_InputChannels;
-    SetAudioProps(m_Passthrough, GetChannelMap(stdLayout, m_Passthrough));
+    SetAudioProps(m_Passthrough, GetChannelMap(resolvedMap, m_Passthrough));
 
     CLog::Log(LOGINFO, "%s::%s remap:%p chan:%d->%d norm:%d upmix:%d %llx:%llx", CLASSNAME, __func__, remapLayout, m_src_channels, m_dst_channels, normalize, upmix, m_src_chan_layout, m_dst_chan_layout);
 
