@@ -308,6 +308,20 @@ bool COpenMaxVideo::Open(CDVDStreamInfo &hints, CDVDCodecOptions &options, OpenM
     return false;
   }
 
+  {
+    // as we aren't tunnelled to display, we can save memory by setting extrabuffers to 0
+    OMX_PARAM_U32TYPE extra_buffers;
+    OMX_INIT_STRUCTURE(extra_buffers);
+    extra_buffers.nU32 = 0;
+
+    omx_err = m_omx_decoder.SetParameter(OMX_IndexParamBrcmExtraBuffers, &extra_buffers);
+    if(omx_err != OMX_ErrorNone)
+    {
+      CLog::Log(LOGERROR, "COMXVideo::Open error OMX_IndexParamBrcmExtraBuffers omx_err(0x%08x)\n", omx_err);
+      return false;
+    }
+  }
+
   // request portsettingschanged on aspect ratio change
   OMX_CONFIG_REQUESTCALLBACKTYPE notifications;
   OMX_INIT_STRUCTURE(notifications);
