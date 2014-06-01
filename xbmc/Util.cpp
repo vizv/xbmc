@@ -1982,7 +1982,7 @@ void CUtil::ScanForExternalSubtitles(const std::string& strMovie, std::vector<st
     {
       CFileItemList items;
       
-      CDirectory::GetDirectory(strLookInPaths[step], items, g_advancedSettings.m_subtitlesExtensions, DIR_FLAG_NO_FILE_DIRS);
+      CDirectory::GetDirectory(strLookInPaths[step], items, g_advancedSettings.m_subtitlesExtensions, DIR_FLAG_NO_FILE_DIRS | DIR_FLAG_NO_FILE_INFO);
       
       for (int j = 0; j < items.Size(); j++)
       {
@@ -2062,7 +2062,7 @@ int CUtil::ScanArchiveForSubtitles( const std::string& strArchivePath, const std
   {
    CURL pathToUrl(strArchivePath);
    CURL zipURL = URIUtils::CreateArchivePath("zip", pathToUrl, "");
-   if (!CDirectory::GetDirectory(zipURL, ItemList, "", DIR_FLAG_NO_FILE_DIRS))
+   if (!CDirectory::GetDirectory(zipURL, ItemList, "", DIR_FLAG_NO_FILE_DIRS | DIR_FLAG_NO_FILE_INFO))
     return false;
   }
   else
