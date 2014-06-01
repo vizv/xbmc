@@ -88,20 +88,36 @@ void CActiveAEResample::DeInit()
   }
 }
 
+static int format_to_bits(AVSampleFormat fmt)
+{
+  switch (fmt)
+  {
+  case AV_SAMPLE_FMT_U8:
+  case AV_SAMPLE_FMT_U8P:
+    return 8;
+  case AV_SAMPLE_FMT_S16:
+  case AV_SAMPLE_FMT_S16P:
+    return 16;
+  case AV_SAMPLE_FMT_S32:
+  case AV_SAMPLE_FMT_S32P:
+  case AV_SAMPLE_FMT_FLT:
+  case AV_SAMPLE_FMT_FLTP:
+    return 32;
+  default:
+    assert(0);
+  }
+  return 0;
+}
+
 bool CActiveAEResample::Init(uint64_t dst_chan_layout, int dst_channels, int dst_rate, AVSampleFormat dst_fmt, int dst_bits, int dst_dither, uint64_t src_chan_layout, int src_channels, int src_rate, AVSampleFormat src_fmt, int src_bits, int src_dither, bool upmix, bool normalize, CAEChannelInfo *remapLayout, AEQuality quality)
 {
   LOGTIMEINIT("x");
 
   CLog::Log(LOGINFO, "%s::%s remap:%p chan:%d->%d rate:%d->%d format:%d->%d bits:%d->%d norm:%d upmix:%d", CLASSNAME, __func__, remapLayout, src_channels, dst_channels, src_rate, dst_rate, src_fmt, dst_fmt, src_bits, dst_bits, normalize, upmix);
 
-  if (src_bits == 0)
-  {
-    if (src_fmt == AV_SAMPLE_FMT_U8) src_bits = 8;
-    else if (src_fmt == AV_SAMPLE_FMT_S16) src_bits = 16;
-    else if (src_fmt == AV_SAMPLE_FMT_S32) src_bits = 32;
-    else if (src_fmt == AV_SAMPLE_FMT_FLT) src_bits = 32;
-  }
-  assert(src_bits && dst_bits);
+  // replace passed in number of bits with correct ones
+  src_bits = format_to_bits(src_fmt);
+  dst_bits = format_to_bits(dst_fmt);
 
   m_dst_chan_layout = dst_chan_layout;
   m_dst_channels = dst_channels;
@@ -139,7 +155,7 @@ bool CActiveAEResample::Init(uint64_t dst_chan_layout, int dst_channels, int dst
   // not required for sink stage (remapLayout == true)
   if (!remapLayout && normalize)
   {
-     av_opt_set_double(m_pContext, "rematrix_maxval", 1.0, 0);
+    av_opt_set_double(m_pContext, "rematrix_maxval", 1.0, 0);
   }
 
   if (remapLayout)
@@ -264,7 +280,13 @@ bool CActiveAEResample::Init(uint64_t dst_chan_layout, int dst_channels, int dst
   m_pcm_input.eEndian               = OMX_EndianLittle;
   m_pcm_input.bInterleaved          = OMX_TRUE;
   m_pcm_input.nBitPerSample         = m_src_bits;
-  m_pcm_input.ePCMMode              = m_src_fmt == AV_SAMPLE_FMT_FLT ? (OMX_AUDIO_PCMMODETYPE)0x8000 : OMX_AUDIO_PCMModeLinear;
+  // 0x8000 = float, 0x10000 = planar
+  uint32_t flags = 0;
+  if (m_src_fmt == AV_SAMPLE_FMT_FLT || m_src_fmt == AV_SAMPLE_FMT_FLTP)
+   flags |= 0x8000;
+  if (m_src_fmt >= AV_SAMPLE_FMT_U8P)
+   flags |= 0x10000;
+  m_pcm_input.ePCMMode              = flags == 0 ? OMX_AUDIO_PCMModeLinear : (OMX_AUDIO_PCMMODETYPE)flags;
   m_pcm_input.nChannels             = src_channels;
   m_pcm_input.nSamplingRate         = src_rate;
 
@@ -278,7 +300,12 @@ bool CActiveAEResample::Init(uint64_t dst_chan_layout, int dst_channels, int dst
   m_pcm_output.eEndian               = OMX_EndianLittle;
   m_pcm_output.bInterleaved          = OMX_TRUE;
   m_pcm_output.nBitPerSample         = m_dst_bits;
-  m_pcm_output.ePCMMode              = m_dst_fmt == AV_SAMPLE_FMT_FLT ? (OMX_AUDIO_PCMMODETYPE)0x8000 : OMX_AUDIO_PCMModeLinear;
+  flags = 0;
+  if (m_dst_fmt == AV_SAMPLE_FMT_FLT || m_dst_fmt == AV_SAMPLE_FMT_FLTP)
+   flags |= 0x8000;
+  if (m_dst_fmt >= AV_SAMPLE_FMT_U8P)
+   flags |= 0x10000;
+  m_pcm_output.ePCMMode              = flags == 0 ? OMX_AUDIO_PCMModeLinear : (OMX_AUDIO_PCMMODETYPE)flags;
   m_pcm_output.nChannels             = dst_channels;
   m_pcm_output.nSamplingRate         = dst_rate;
 
@@ -364,8 +391,13 @@ int CActiveAEResample::Resample(uint8_t **dst_buffer, int dst_samples, uint8_t *
     return 0;
   OMX_ERRORTYPE omx_err   = OMX_ErrorNone;
 
-  const int s_pitch = m_pcm_input.nChannels * m_src_bits >> 3;
-  const int d_pitch = m_pcm_output.nChannels * m_dst_bits >> 3;
+  const int s_planes = m_src_fmt >= AV_SAMPLE_FMT_U8P ? m_src_channels : 1;
+  const int d_planes = m_dst_fmt >= AV_SAMPLE_FMT_U8P ? m_dst_channels : 1;
+  const int s_chans  = m_src_fmt >= AV_SAMPLE_FMT_U8P ? 1 : m_src_channels;
+  const int d_chans  = m_dst_fmt >= AV_SAMPLE_FMT_U8P ? 1 : m_dst_channels;
+  const int s_pitch = s_chans * m_src_bits >> 3;
+  const int d_pitch = d_chans * m_dst_bits >> 3;
+
   int sent = 0;
   int received = 0;
   while (sent < src_samples)
@@ -377,19 +409,23 @@ int CActiveAEResample::Resample(uint8_t **dst_buffer, int dst_samples, uint8_t *
     if (omx_buffer == NULL)
       return false;
 
-    const int max_src_samples = BUFFERSIZE / s_pitch;
-    const int max_dst_samples = (long long)(BUFFERSIZE/d_pitch) * m_src_rate / (m_dst_rate + m_src_rate-1);
+    const int s_samplesize = m_src_channels * m_src_bits >> 3;
+    const int d_samplesize = m_dst_channels * m_dst_bits >> 3;
+    const int max_src_samples = BUFFERSIZE / s_samplesize;
+    const int max_dst_samples = (long long)(BUFFERSIZE / d_samplesize) * m_src_rate / (m_dst_rate + m_src_rate-1);
     int send = std::min(std::min(max_dst_samples, max_src_samples), src_samples - sent);
 
     omx_buffer->nOffset = 0;
     omx_buffer->nFlags = OMX_BUFFERFLAG_EOS;
-    omx_buffer->nFilledLen = send * s_pitch;
+    omx_buffer->nFilledLen = send * s_samplesize;
 
     assert(omx_buffer->nFilledLen > 0 && omx_buffer->nFilledLen <= omx_buffer->nAllocLen);
 
     if (omx_buffer->nFilledLen)
     {
-      memcpy(omx_buffer->pBuffer, src_buffer[0] + sent * s_pitch, omx_buffer->nFilledLen);
+      int planesize = omx_buffer->nFilledLen / s_planes;
+      for (int i=0; i < s_planes; i++)
+        memcpy((uint8_t *)omx_buffer->pBuffer + i * planesize, src_buffer[i] + sent * s_pitch, planesize);
       sent += send;
     }
 
@@ -428,8 +464,10 @@ int CActiveAEResample::Resample(uint8_t **dst_buffer, int dst_samples, uint8_t *
 
     if (m_encoded_buffer->nFilledLen)
     {
-      memcpy(dst_buffer[0] + received * d_pitch, m_encoded_buffer->pBuffer, m_encoded_buffer->nFilledLen);
-      received += m_encoded_buffer->nFilledLen / d_pitch;
+      int planesize = m_encoded_buffer->nFilledLen / d_planes;
+      for (int i=0; i < d_planes; i++)
+        memcpy(dst_buffer[i] + received * d_pitch, (uint8_t *)m_encoded_buffer->pBuffer + i * planesize, planesize);
+      received += m_encoded_buffer->nFilledLen / d_samplesize;
     }
   }
   #ifdef DEBUG_VERBOSE
@@ -521,6 +559,7 @@ AVSampleFormat CActiveAEResample::GetAVSampleFormat(AEDataFormat format)
   else if (format == AE_FMT_S16NE)  return AV_SAMPLE_FMT_S16;
   else if (format == AE_FMT_S32NE)  return AV_SAMPLE_FMT_S32;
   else if (format == AE_FMT_S24NE4) return AV_SAMPLE_FMT_S32;
+  else if (format == AE_FMT_S24NE4MSB)return AV_SAMPLE_FMT_S32;
   else if (format == AE_FMT_FLOAT)  return AV_SAMPLE_FMT_FLT;
   else if (format == AE_FMT_DOUBLE) return AV_SAMPLE_FMT_DBL;
 
@@ -528,6 +567,7 @@ AVSampleFormat CActiveAEResample::GetAVSampleFormat(AEDataFormat format)
   else if (format == AE_FMT_S16NEP)  return AV_SAMPLE_FMT_S16P;
   else if (format == AE_FMT_S32NEP)  return AV_SAMPLE_FMT_S32P;
   else if (format == AE_FMT_S24NE4P) return AV_SAMPLE_FMT_S32P;
+  else if (format == AE_FMT_S24NE4MSB)return AV_SAMPLE_FMT_S32;
   else if (format == AE_FMT_FLOATP)  return AV_SAMPLE_FMT_FLTP;
   else if (format == AE_FMT_DOUBLEP) return AV_SAMPLE_FMT_DBLP;
 
@@ -535,29 +575,6 @@ AVSampleFormat CActiveAEResample::GetAVSampleFormat(AEDataFormat format)
     return AV_SAMPLE_FMT_FLTP;
   else
     return AV_SAMPLE_FMT_FLT;
-}
-
-AEDataFormat CActiveAEResample::GetAESampleFormat(AVSampleFormat format, int bits)
-{
-  #ifdef DEBUG_VERBOSE
-  CLog::Log(LOGINFO, "%s::%s", CLASSNAME, __func__);
-  #endif
-  if      (format == AV_SAMPLE_FMT_U8)   return AE_FMT_U8;
-  else if (format == AV_SAMPLE_FMT_S16)  return AE_FMT_S16NE;
-  else if (format == AV_SAMPLE_FMT_S32 && bits == 32)  return AE_FMT_S32NE;
-  else if (format == AV_SAMPLE_FMT_S32 && bits == 24)  return AE_FMT_S24NE4;
-  else if (format == AV_SAMPLE_FMT_FLT)  return AE_FMT_FLOAT;
-  else if (format == AV_SAMPLE_FMT_DBL)  return AE_FMT_DOUBLE;
-
-  else if (format == AV_SAMPLE_FMT_U8P)   return AE_FMT_U8P;
-  else if (format == AV_SAMPLE_FMT_S16P)  return AE_FMT_S16NEP;
-  else if (format == AV_SAMPLE_FMT_S32P && bits == 32)  return AE_FMT_S32NEP;
-  else if (format == AV_SAMPLE_FMT_S32P && bits == 24)  return AE_FMT_S24NE4P;
-  else if (format == AV_SAMPLE_FMT_FLTP)  return AE_FMT_FLOATP;
-  else if (format == AV_SAMPLE_FMT_DBLP)  return AE_FMT_DOUBLEP;
-
-  CLog::Log(LOGERROR, "CActiveAEResample::GetAESampleFormat - format not supported");
-  return AE_FMT_INVALID;
 }
 
 uint64_t CActiveAEResample::GetAVChannel(enum AEChannel aechannel)
