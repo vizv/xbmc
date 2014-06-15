@@ -1600,7 +1600,9 @@ bool CLinuxRendererGLES::RenderCapture(CRenderCapture* capture)
     return false;
 
   // If rendered directly by the hardware
+#ifndef TARGET_RASPBERRY_PI
   if (m_renderMethod & RENDER_BYPASS)
+#endif
   {
     capture->BeginRender();
     capture->EndRender();
