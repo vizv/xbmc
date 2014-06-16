@@ -795,7 +795,7 @@ int COpenMaxVideo::Decode(uint8_t* pData, int iSize, double dts, double pts)
           // only push if we are successful with feeding OMX_EmptyThisBuffer
           pthread_mutex_lock(&m_omx_output_mutex);
           m_dts_queue.push(dts);
-          assert(m_dts_queue.size() < 32);
+          assert(m_dts_queue.size() < 64);
           pthread_mutex_unlock(&m_omx_output_mutex);
         }
 #endif
@@ -1037,9 +1037,12 @@ OMX_ERRORTYPE COpenMaxVideo::DecoderFillBufferDone(
   if ((!m_deinterlace || (buffer->omx_buffer->nFlags & OMX_BUFFERFLAG_FIRST_FIELD)) && buffer->omx_buffer->nFlags)
   {
     pthread_mutex_lock(&m_omx_output_mutex);
-    assert(!m_dts_queue.empty());
-    buffer->dts = m_dts_queue.front();
-    m_dts_queue.pop();
+    if (!m_dts_queue.empty())
+    {
+      buffer->dts = m_dts_queue.front();
+      m_dts_queue.pop();
+    }
+    else assert(0);
     pthread_mutex_unlock(&m_omx_output_mutex);
   }
 #endif
