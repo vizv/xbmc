@@ -37,7 +37,7 @@ class CDVDOverlayCodecCC;
 
 #define VIDEO_PICTURE_QUEUE_SIZE 1
 
-class CDVDPlayerVideo : public CThread, public IDVDStreamPlayer
+class CDVDPlayerVideo : public CThread, public IDVDStreamPlayerVideo
 {
 public:
   CDVDPlayerVideo( CDVDClock* pClock
@@ -66,6 +66,7 @@ public:
   void EnableFullscreen(bool bEnable)               { m_bAllowFullscreen = bEnable; }
 
 #ifdef HAS_VIDEO_PLAYBACK
+  void SetVideoRect(const CRect &SrcRect, const CRect &DestRect) {}
   void GetVideoRect(CRect& SrcRect, CRect& DestRect) const { g_renderManager.GetVideoRect(SrcRect, DestRect); }
   float GetAspectRatio()                            { return g_renderManager.GetAspectRatio(); }
 #endif
@@ -78,10 +79,13 @@ public:
 
   bool IsStalled() const                            { return m_stalled; }
   bool IsEOS()                                      { return false; }
+  bool SubmittedEOS() const                         { return false; }
 
   double GetCurrentPts()                           { return m_iCurrentPts; }
 
   double GetOutputDelay(); /* returns the expected delay, from that a packet is put in queue */
+  int GetDecoderBufferSize() { return 0; }
+  int GetDecoderFreeSpace() { return 0; }
   std::string GetPlayerInfo();
   int GetVideoBitrate();
   std::string GetStereoMode();
