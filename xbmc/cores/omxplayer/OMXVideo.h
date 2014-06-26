@@ -49,7 +49,7 @@ public:
 
   // Required overrides
   bool SendDecoderConfig();
-  bool Open(CDVDStreamInfo &hints, OMXClock *clock, EDEINTERLACEMODE deinterlace = VS_DEINTERLACEMODE_OFF, bool hdmi_clock_sync = false);
+  bool Open(CDVDStreamInfo &hints, OMXClock *clock, EDEINTERLACEMODE deinterlace = VS_DEINTERLACEMODE_OFF, OMX_IMAGEFILTERANAGLYPHTYPE anaglyph = OMX_ImageFilterAnaglyphNone, bool hdmi_clock_sync = false);
   bool PortSettingsChanged();
   void RegisterResolutionUpdateCallBack(void *ctx, ResolutionUpdateCallBackFn callback) { m_res_ctx = ctx; m_res_callback = callback; }
   void Close(void);
@@ -94,6 +94,7 @@ protected:
 
   bool              m_deinterlace;
   EDEINTERLACEMODE  m_deinterlace_request;
+  OMX_IMAGEFILTERANAGLYPHTYPE m_anaglyph;
   bool              m_hdmi_clock_sync;
   ResolutionUpdateCallBackFn m_res_callback;
   void              *m_res_ctx;

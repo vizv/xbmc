@@ -75,6 +75,10 @@ bool CRenderSystemBase::SupportsStereo(RENDER_STEREO_MODE mode) const
     case RENDER_STEREO_MODE_SPLIT_HORIZONTAL:
     case RENDER_STEREO_MODE_SPLIT_VERTICAL:
     case RENDER_STEREO_MODE_MONO:
+#ifdef TARGET_RASPBERRY_PI
+    case RENDER_STEREO_MODE_ANAGLYPH_RED_CYAN:
+    case RENDER_STEREO_MODE_ANAGLYPH_GREEN_MAGENTA:
+#endif
       return true;
     default:
       return false;

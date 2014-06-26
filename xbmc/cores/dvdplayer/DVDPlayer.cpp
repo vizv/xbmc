@@ -562,6 +562,7 @@ CDVDPlayer::CDVDPlayer(IPlayerCallback& callback)
   m_OmxPlayerState.bOmxSentEOFs        = false;
   m_OmxPlayerState.threshold           = 0.2f;
   m_OmxPlayerState.current_deinterlace = CMediaSettings::Get().GetCurrentVideoSettings().m_DeinterlaceMode;
+  m_OmxPlayerState.current_stereomode  = g_graphicsContext.GetStereoMode();
 #ifdef HAS_OMXPLAYER
   m_omxplayer_mode                     = CSettings::Get().GetBool("videoplayer.useomxplayer");
 #else
@@ -1066,14 +1067,20 @@ void CDVDPlayer::OMXDoProcessing()
     float threshold = 0.1f;
     bool audio_fifo_low = false, video_fifo_low = false, audio_fifo_high = false, video_fifo_high = false;
 
-    // if deinterlace setting has changed, we should close and open video
-    if (m_OmxPlayerState.current_deinterlace != CMediaSettings::Get().GetCurrentVideoSettings().m_DeinterlaceMode)
+    RENDER_STEREO_MODE stereomode = g_graphicsContext.GetStereoMode();
+
+    // if deinterlace or stereomode setting has changed, we should close and open video
+    if ((m_OmxPlayerState.current_deinterlace != CMediaSettings::Get().GetCurrentVideoSettings().m_DeinterlaceMode) ||
+        (m_OmxPlayerState.current_stereomode != stereomode &&
+        (m_OmxPlayerState.current_stereomode == RENDER_STEREO_MODE_ANAGLYPH_RED_CYAN || m_OmxPlayerState.current_stereomode == RENDER_STEREO_MODE_ANAGLYPH_GREEN_MAGENTA) !=
+        (stereomode == RENDER_STEREO_MODE_ANAGLYPH_RED_CYAN || stereomode == RENDER_STEREO_MODE_ANAGLYPH_GREEN_MAGENTA)))
     {
       CloseStream(m_CurrentVideo, false);
       OpenStream(m_CurrentVideo, m_CurrentVideo.id, m_CurrentVideo.source);
       if (m_State.canseek)
         m_messenger.Put(new CDVDMsgPlayerSeek(GetTime(), true, true, true, true, true));
       m_OmxPlayerState.current_deinterlace = CMediaSettings::Get().GetCurrentVideoSettings().m_DeinterlaceMode;
+      m_OmxPlayerState.current_stereomode = stereomode;
     }
 
     m_OmxPlayerState.video_fifo = (int)(100.0*(m_dvdPlayerVideo->GetDecoderBufferSize()-m_dvdPlayerVideo->GetDecoderFreeSpace())/m_dvdPlayerVideo->GetDecoderBufferSize());

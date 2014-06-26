@@ -113,6 +113,7 @@ COMXVideo::COMXVideo() : m_video_codec_name("")
   m_extrasize         = 0;
   m_deinterlace       = false;
   m_deinterlace_request = VS_DEINTERLACEMODE_OFF;
+  m_anaglyph          = OMX_ImageFilterAnaglyphNone;
   m_hdmi_clock_sync   = false;
   m_drop_state        = false;
   m_decoded_width     = 0;
@@ -227,9 +228,9 @@ bool COMXVideo::PortSettingsChanged()
   else
     m_deinterlace = interlace.eMode != OMX_InterlaceProgressive;
 
-    CLog::Log(LOGDEBUG, "%s::%s - %dx%d@%.2f interlace:%d deinterlace:%d", CLASSNAME, __func__,
+    CLog::Log(LOGDEBUG, "%s::%s - %dx%d@%.2f interlace:%d deinterlace:%d anaglyph:%d", CLASSNAME, __func__,
       port_image.format.video.nFrameWidth, port_image.format.video.nFrameHeight,
-      port_image.format.video.xFramerate / (float)(1<<16), interlace.eMode, m_deinterlace);
+      port_image.format.video.xFramerate / (float)(1<<16), interlace.eMode, m_deinterlace, m_anaglyph);
 
   // let OMXPlayerVideo know about resolution so it can inform RenderManager
   if (m_res_callback)
@@ -256,7 +257,7 @@ bool COMXVideo::PortSettingsChanged()
   if(!m_omx_sched.Initialize("OMX.broadcom.video_scheduler", OMX_IndexParamVideoInit))
     return false;
 
-  if(m_deinterlace)
+  if(m_deinterlace || m_anaglyph)
   {
     if(!m_omx_image_fx.Initialize("OMX.broadcom.image_fx", OMX_IndexParamImageInit))
       return false;
@@ -296,13 +297,13 @@ bool COMXVideo::PortSettingsChanged()
     }
   }
 
-  if(m_deinterlace)
+  if(m_deinterlace || m_anaglyph)
   {
     bool advanced_deinterlace = port_image.format.video.nFrameWidth * port_image.format.video.nFrameHeight <= 576 * 720;
 
-    if (!advanced_deinterlace)
+    if (m_anaglyph != OMX_ImageFilterAnaglyphNone || !advanced_deinterlace)
     {
-      // Image_fx assumed 3 frames of context. simple deinterlace doesn't require this
+      // Image_fx assumed 3 frames of context. anaglyph and simple deinterlace don't require this
       OMX_PARAM_U32TYPE extra_buffers;
       OMX_INIT_STRUCTURE(extra_buffers);
       extra_buffers.nU32 = -2;
@@ -319,13 +320,21 @@ bool COMXVideo::PortSettingsChanged()
     OMX_INIT_STRUCTURE(image_filter);
 
     image_filter.nPortIndex = m_omx_image_fx.GetOutputPort();
-    image_filter.nNumParams = 1;
-    image_filter.nParams[0] = 3;
-    if (!advanced_deinterlace)
-      image_filter.eImageFilter = OMX_ImageFilterDeInterlaceFast;
+    if (m_anaglyph != OMX_ImageFilterAnaglyphNone)
+    {
+      image_filter.nNumParams = 1;
+      image_filter.nParams[0] = m_anaglyph;
+      image_filter.eImageFilter = OMX_ImageFilterAnaglyph;
+    }
     else
-      image_filter.eImageFilter = OMX_ImageFilterDeInterlaceAdvanced;
-
+    {
+      image_filter.nNumParams = 1;
+      image_filter.nParams[0] = 3;
+      if (!advanced_deinterlace)
+        image_filter.eImageFilter = OMX_ImageFilterDeInterlaceFast;
+      else
+        image_filter.eImageFilter = OMX_ImageFilterDeInterlaceAdvanced;
+    }
     omx_err = m_omx_image_fx.SetConfig(OMX_IndexConfigCommonImageFilterParameters, &image_filter);
     if(omx_err != OMX_ErrorNone)
     {
@@ -334,7 +343,7 @@ bool COMXVideo::PortSettingsChanged()
     }
   }
 
-  if(m_deinterlace)
+  if(m_deinterlace || m_anaglyph)
   {
     m_omx_tunnel_decoder.Initialize(&m_omx_decoder, m_omx_decoder.GetOutputPort(), &m_omx_image_fx, m_omx_image_fx.GetInputPort());
     m_omx_tunnel_image_fx.Initialize(&m_omx_image_fx, m_omx_image_fx.GetOutputPort(), &m_omx_sched, m_omx_sched.GetInputPort());
@@ -361,7 +370,7 @@ bool COMXVideo::PortSettingsChanged()
     return false;
   }
 
-  if(m_deinterlace)
+  if(m_deinterlace || m_anaglyph)
   {
     omx_err = m_omx_tunnel_image_fx.Establish();
     if(omx_err != OMX_ErrorNone)
@@ -403,7 +412,7 @@ bool COMXVideo::PortSettingsChanged()
   return true;
 }
 
-bool COMXVideo::Open(CDVDStreamInfo &hints, OMXClock *clock, EDEINTERLACEMODE deinterlace, bool hdmi_clock_sync)
+bool COMXVideo::Open(CDVDStreamInfo &hints, OMXClock *clock, EDEINTERLACEMODE deinterlace, OMX_IMAGEFILTERANAGLYPHTYPE anaglyph, bool hdmi_clock_sync)
 {
   CSingleLock lock (m_critSection);
   bool vflip = false;
@@ -543,6 +552,7 @@ bool COMXVideo::Open(CDVDStreamInfo &hints, OMXClock *clock, EDEINTERLACEMODE de
     break;
   }
   m_deinterlace_request = deinterlace;
+  m_anaglyph = anaglyph;
 
   if(!m_omx_decoder.Initialize(decoder_name, OMX_IndexParamVideoInit))
     return false;
@@ -754,7 +764,7 @@ void COMXVideo::Close()
   dump_omx_buffer(NULL);
   m_omx_tunnel_clock.Deestablish();
   m_omx_tunnel_decoder.Deestablish();
-  if(m_deinterlace)
+  if(m_deinterlace || m_anaglyph)
     m_omx_tunnel_image_fx.Deestablish();
   m_omx_tunnel_sched.Deestablish();
 
@@ -762,7 +772,7 @@ void COMXVideo::Close()
 
   m_omx_sched.Deinitialize();
   m_omx_decoder.Deinitialize();
-  if(m_deinterlace)
+  if(m_deinterlace || m_anaglyph)
     m_omx_image_fx.Deinitialize();
   m_omx_render.Deinitialize();
 
@@ -775,6 +785,7 @@ void COMXVideo::Close()
 
   m_video_codec_name  = "";
   m_deinterlace       = false;
+  m_anaglyph          = OMX_ImageFilterAnaglyphNone;
   m_av_clock          = NULL;
 
   m_res_ctx           = NULL;
@@ -898,7 +909,7 @@ void COMXVideo::Reset(void)
 
   m_setStartTime = true;
   m_omx_decoder.FlushAll();
-  if(m_deinterlace)
+  if(m_deinterlace || m_anaglyph)
     m_omx_image_fx.FlushAll();
   m_omx_sched.FlushAll();
 }

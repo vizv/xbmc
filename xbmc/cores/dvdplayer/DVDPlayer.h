@@ -41,6 +41,7 @@
 #include "threads/SingleLock.h"
 #include "utils/StreamDetails.h"
 #include "threads/SystemClock.h"
+#include "guilib/StereoscopicsManager.h"
 
 #ifdef HAS_OMXPLAYER
 #include "OMXCore.h"
@@ -547,6 +548,7 @@ protected:
   {
     OMXClock av_clock;              // openmax clock component
     EDEINTERLACEMODE current_deinterlace; // whether deinterlace is currently enabled
+    RENDER_STEREO_MODE current_stereomode; // current stereomode
     bool bOmxWaitVideo;             // whether we need to wait for video to play out on EOS
     bool bOmxWaitAudio;             // whether we need to wait for audio to play out on EOS
     bool bOmxSentEOFs;              // flag if we've send EOFs to audio/video players
