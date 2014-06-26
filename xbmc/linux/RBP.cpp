@@ -75,6 +75,9 @@ bool CRBP::Initialize()
   if (m_gpu_mem < 128)
     setenv("V3D_DOUBLE_BUFFER", "1", 1);
 
+  // in case xbcm was restarted when suspended
+  ResumeVideoOutput();
+
   g_OMXImage.Initialize();
   m_omx_image_init = true;
   return true;
