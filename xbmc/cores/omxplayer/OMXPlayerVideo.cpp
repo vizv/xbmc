@@ -550,7 +550,29 @@ bool OMXPlayerVideo::OpenDecoder()
   else
     m_fForcedAspectRatio = 0.0;
 
-  bool bVideoDecoderOpen = m_omxVideo.Open(m_hints, m_av_clock, CMediaSettings::Get().GetCurrentVideoSettings().m_DeinterlaceMode, m_hdmi_clock_sync);
+
+  unsigned flags = GetStereoModeFlags(GetStereoMode());
+  RENDER_STEREO_MODE video_stereo_mode = (flags & CONF_FLAGS_STEREO_MODE_SBS) ? RENDER_STEREO_MODE_SPLIT_VERTICAL :
+                                         (flags & CONF_FLAGS_STEREO_MODE_TAB) ? RENDER_STEREO_MODE_SPLIT_HORIZONTAL : RENDER_STEREO_MODE_OFF;
+  bool stereo_invert                   = (flags & CONF_FLAGS_STEREO_CADANCE_RIGHT_LEFT) ? true : false;
+  OMX_IMAGEFILTERANAGLYPHTYPE anaglyph = OMX_ImageFilterAnaglyphNone;
+
+  if (g_graphicsContext.GetStereoMode() == RENDER_STEREO_MODE_ANAGLYPH_RED_CYAN)
+  {
+    if (video_stereo_mode == RENDER_STEREO_MODE_SPLIT_VERTICAL)
+      anaglyph = OMX_ImageFilterAnaglyphSBStoRedCyan;
+    else if (video_stereo_mode == RENDER_STEREO_MODE_SPLIT_HORIZONTAL)
+      anaglyph = OMX_ImageFilterAnaglyphTABtoRedCyan;
+  }
+  else if (g_graphicsContext.GetStereoMode() == RENDER_STEREO_MODE_ANAGLYPH_GREEN_MAGENTA)
+  {
+    if (video_stereo_mode == RENDER_STEREO_MODE_SPLIT_VERTICAL)
+      anaglyph = OMX_ImageFilterAnaglyphSBStoGreenMagenta;
+    else if (video_stereo_mode == RENDER_STEREO_MODE_SPLIT_HORIZONTAL)
+      anaglyph = OMX_ImageFilterAnaglyphTABtoGreenMagenta;
+  }
+
+  bool bVideoDecoderOpen = m_omxVideo.Open(m_hints, m_av_clock, CMediaSettings::Get().GetCurrentVideoSettings().m_DeinterlaceMode, anaglyph, m_hdmi_clock_sync);
   m_omxVideo.RegisterResolutionUpdateCallBack((void *)this, ResolutionUpdateCallBack);
 
   if(!bVideoDecoderOpen)
@@ -695,6 +717,10 @@ void OMXPlayerVideo::SetVideoRect(const CRect &InSrcRect, const CRect &InDestRec
       video_stereo_mode = RENDER_STEREO_MODE_OFF;
       display_stereo_mode = RENDER_STEREO_MODE_OFF;
     }
+    else if (display_stereo_mode == RENDER_STEREO_MODE_ANAGLYPH_RED_CYAN || display_stereo_mode == RENDER_STEREO_MODE_ANAGLYPH_GREEN_MAGENTA)
+    {
+      SrcRect.x2 *= 2.0f;
+    }
     else if (stereo_invert)
     {
       SrcRect.x1 += m_hints.width / 2;
@@ -710,6 +736,10 @@ void OMXPlayerVideo::SetVideoRect(const CRect &InSrcRect, const CRect &InDestRec
       DestRect.y2 *= 2.0f;
       video_stereo_mode = RENDER_STEREO_MODE_OFF;
       display_stereo_mode = RENDER_STEREO_MODE_OFF;
+    }
+    else if (display_stereo_mode == RENDER_STEREO_MODE_ANAGLYPH_RED_CYAN || display_stereo_mode == RENDER_STEREO_MODE_ANAGLYPH_GREEN_MAGENTA)
+    {
+      SrcRect.y2 *= 2.0f;
     }
     else if (stereo_invert)
     {

@@ -1502,6 +1502,8 @@ void COMXPlayer::Process()
     SetCaching(CACHESTATE_FLUSH);
 
   EDEINTERLACEMODE current_deinterlace = CMediaSettings::Get().GetCurrentVideoSettings().m_DeinterlaceMode;
+  RENDER_STEREO_MODE current_stereomode = g_graphicsContext.GetStereoMode();
+
   float current_sharpness = CMediaSettings::Get().GetCurrentVideoSettings().m_Sharpness;
   SetSharpness(current_sharpness);
 
@@ -1524,8 +1526,13 @@ void COMXPlayer::Process()
       float threshold = 0.1f;
       bool audio_fifo_low = false, video_fifo_low = false, audio_fifo_high = false, video_fifo_high = false;
 
-      // if deinterlace setting has changed, we should close and open video
-      if (current_deinterlace != CMediaSettings::Get().GetCurrentVideoSettings().m_DeinterlaceMode)
+      // if deinterlace or stereomode setting has changed, we should close and open video
+      RENDER_STEREO_MODE stereomode = g_graphicsContext.GetStereoMode();
+
+      if ((current_deinterlace != CMediaSettings::Get().GetCurrentVideoSettings().m_DeinterlaceMode) ||
+          (current_stereomode != stereomode &&
+          (current_stereomode == RENDER_STEREO_MODE_ANAGLYPH_RED_CYAN || current_stereomode == RENDER_STEREO_MODE_ANAGLYPH_GREEN_MAGENTA) !=
+          (stereomode == RENDER_STEREO_MODE_ANAGLYPH_RED_CYAN || stereomode == RENDER_STEREO_MODE_ANAGLYPH_GREEN_MAGENTA)))
       {
         int iStream = m_CurrentVideo.id, source = m_CurrentVideo.source;
         CloseVideoStream(false);
@@ -1533,6 +1540,7 @@ void COMXPlayer::Process()
         if (m_State.canseek)
           m_messenger.Put(new CDVDMsgPlayerSeek(GetTime(), true, true, true, true, true));
         current_deinterlace = CMediaSettings::Get().GetCurrentVideoSettings().m_DeinterlaceMode;
+        current_stereomode = stereomode;
       }
 
       // if sharpness setting has changed, we should update it
