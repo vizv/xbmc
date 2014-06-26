@@ -80,6 +80,9 @@ bool CRBP::Initialize()
   if (!m_gui_resolution_limit)
     m_gui_resolution_limit = m_gpu_mem < 128 ? 720:1080;
 
+  // in case xbcm was restarted when suspended
+  ResumeVideoOutput();
+
   g_OMXImage.Initialize();
   m_omx_image_init = true;
   return true;
