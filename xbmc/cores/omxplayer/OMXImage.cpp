@@ -49,6 +49,33 @@
 #define EXIF_TAG_ORIENTATION    0x0112
 
 
+// A helper for restricting threads calling GPU functions to limit memory use
+static XbmcThreads::ConditionVariable g_count_cond;
+static CCriticalSection               g_count_lock;
+static int g_count_val;
+
+static void limit_calls_enter(int &count, int allowed)
+{
+  //printf("%s  in=%d\n", __func__, m_count_val);
+  CSingleLock lock(g_count_lock);
+  while (count >= allowed)
+  {
+    g_count_cond.wait(lock);
+  }
+  count++;
+  //printf("%s out=%d\n", __func__, m_count_val);
+}
+
+static void limit_calls_leave(int &count)
+{
+  //printf("%s  in=%d\n", __func__, m_count_val);
+  CSingleLock lock(g_count_lock);
+  count--;
+  g_count_cond.notifyAll();
+  //printf("%s out=%d\n", __func__, m_count_val);
+}
+
+
 #ifdef CLASSNAME
 #undef CLASSNAME
 #endif
@@ -903,6 +930,7 @@ bool COMXImageFile::ReadFile(const std::string& inputFile)
 
 COMXImageDec::COMXImageDec()
 {
+  limit_calls_enter(g_count_val, 3);
   m_decoded_buffer = NULL;
   OMX_INIT_STRUCTURE(m_decoded_format);
   m_success = false;
@@ -914,6 +942,7 @@ COMXImageDec::~COMXImageDec()
 
   OMX_INIT_STRUCTURE(m_decoded_format);
   m_decoded_buffer = NULL;
+  limit_calls_leave(g_count_val);
 }
 
 void COMXImageDec::Close()
@@ -1198,6 +1227,7 @@ bool COMXImageDec::Decode(const uint8_t *demuxer_content, unsigned demuxer_bytes
 
 COMXImageEnc::COMXImageEnc()
 {
+  limit_calls_enter(g_count_val, 3);
   CSingleLock lock(m_OMXSection);
   OMX_INIT_STRUCTURE(m_encoded_format);
   m_encoded_buffer = NULL;
@@ -1212,6 +1242,7 @@ COMXImageEnc::~COMXImageEnc()
   m_encoded_buffer = NULL;
   if(m_omx_encoder.IsInitialized())
     m_omx_encoder.Deinitialize();
+  limit_calls_leave(g_count_val);
 }
 
 bool COMXImageEnc::Encode(unsigned char *buffer, int size, unsigned width, unsigned height, unsigned int pitch)
@@ -1424,6 +1455,7 @@ bool COMXImageEnc::CreateThumbnailFromSurface(unsigned char* buffer, unsigned in
 
 COMXImageReEnc::COMXImageReEnc()
 {
+  limit_calls_enter(g_count_val, 3);
   m_encoded_buffer = NULL;
   m_pDestBuffer = NULL;
   m_nDestAllocSize = 0;
@@ -1437,6 +1469,7 @@ COMXImageReEnc::~COMXImageReEnc()
     free (m_pDestBuffer);
   m_pDestBuffer = NULL;
   m_nDestAllocSize = 0;
+  limit_calls_leave(g_count_val);
 }
 
 void COMXImageReEnc::Close()
@@ -1897,12 +1930,14 @@ bool COMXImageReEnc::ReEncode(COMXImageFile &srcFile, unsigned int maxWidth, uns
 
 COMXTexture::COMXTexture()
 {
+  limit_calls_enter(g_count_val, 3);
   m_success = false;
 }
 
 COMXTexture::~COMXTexture()
 {
   Close();
+  limit_calls_leave(g_count_val);
 }
 
 void COMXTexture::Close()
