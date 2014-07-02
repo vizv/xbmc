@@ -345,6 +345,10 @@
 #include "utils/AMLUtils.h"
 #endif
 
+#if defined(TARGET_RASPBERRY_PI)
+#include "linux/RBP.h"
+#endif
+
 #include "cores/FFmpeg.h"
 
 using namespace std;
@@ -5179,6 +5183,11 @@ void CApplication::ProcessSlow()
   if (!m_pPlayer->IsPlayingVideo())
     g_largeTextureManager.CleanupUnusedImages();
 
+#ifdef TARGET_RASPBERRY_PI
+  if (g_RBP.GetGpuMemFree() < 64)
+    g_TextureManager.FreeUnusedTextures();
+  else
+#endif
   g_TextureManager.FreeUnusedTextures(5000);
 
 #ifdef HAS_DVD_DRIVE
