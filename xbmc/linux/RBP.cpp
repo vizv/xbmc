@@ -83,6 +83,16 @@ bool CRBP::Initialize()
   return true;
 }
 
+int CRBP::GetGpuMemFree()
+{
+  int reloc_mem = 0;
+  char response[80] = "";
+
+  if (vc_gencmd(response, sizeof response, "get_mem reloc") == 0)
+    vc_gencmd_number_property(response, "reloc", &reloc_mem);
+  return reloc_mem;
+}
+
 void CRBP::LogFirmwareVerison()
 {
   char  response[1024];
