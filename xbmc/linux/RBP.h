@@ -50,6 +50,7 @@ public:
   void Deinitialize();
   int GetArmMem() { return m_arm_mem; }
   int GetGpuMem() { return m_gpu_mem; }
+  int GetGpuMemFree();
   bool GetCodecMpg2() { return m_codec_mpg2_enabled; }
   bool GetCodecWvc1() { return m_codec_wvc1_enabled; }
   void GetDisplaySize(int &width, int &height);
