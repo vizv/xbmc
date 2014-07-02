@@ -740,6 +740,9 @@
           </dependencies>
           <level>2</level>
           <default>true</default>
+          <updates>
+            <update type="change" />
+          </updates>
           <control type="toggle" />
         </setting>
         <setting id="videoplayer.usevideotoolbox" type="boolean" label="13432" help="36162">
