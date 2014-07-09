@@ -1325,6 +1325,9 @@ void CLinuxRendererGLES::RenderSoftware(int index, int field)
 void CLinuxRendererGLES::RenderOpenMax(int index, int field)
 {
 #if defined(HAVE_LIBOPENMAX)
+#if 1
+  m_buffers[index].openMaxBuffer->Render();
+#else
   GLuint textureId = m_buffers[index].openMaxBuffer->texture_id;
 
   glDisable(GL_DEPTH_TEST);
@@ -1387,6 +1390,7 @@ void CLinuxRendererGLES::RenderOpenMax(int index, int field)
 
   glDisable(m_textureTarget);
   VerifyGLState();
+#endif
 #endif
 }
 

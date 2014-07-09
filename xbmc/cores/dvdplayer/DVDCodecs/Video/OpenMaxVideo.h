@@ -21,12 +21,10 @@
 
 #if defined(HAVE_LIBOPENMAX)
 
-#include "system_gl.h"
-#include <EGL/egl.h>
-#include <EGL/eglext.h>
-
-#include "linux/OMXCore.h"
-#include "linux/OMXClock.h"
+#include <interface/mmal/mmal.h>
+#include <interface/mmal/util/mmal_util.h>
+#include <interface/mmal/util/mmal_default_components.h>
+#include <interface/mmal/util/mmal_util_params.h>
 
 #include "cores/dvdplayer/DVDStreamInfo.h"
 #include "DVDVideoCodec.h"
@@ -35,9 +33,11 @@
 
 #include <queue>
 #include <semaphore.h>
+#include <boost/shared_ptr.hpp>
+#include "utils/StdString.h"
 
 typedef struct omx_demux_packet {
-  OMX_U8 *buff;
+  uint8_t *buff;
   int size;
   double dts;
   double pts;
@@ -52,20 +52,18 @@ public:
   COpenMaxVideoBuffer(COpenMaxVideo *omv);
   virtual ~COpenMaxVideoBuffer();
 
-  OMX_BUFFERHEADERTYPE *omx_buffer;
+  MMAL_BUFFER_HEADER_T *mmal_buffer;
   int width;
   int height;
   float m_aspect_ratio;
   int index;
   double dts;
 
-  // used for egl based rendering if active
-  EGLImageKHR egl_image;
-  GLuint texture_id;
   // reference counting
   COpenMaxVideoBuffer* Acquire();
   long                 Release();
-  void                 Sync();
+  void                 Render();
+  //void                 Sync();
 
   COpenMaxVideo *m_omv;
   long m_refs;
@@ -91,22 +89,19 @@ public:
   virtual bool GetCodecStats(double &pts, int &droppedPics);
 
   // OpenMax decoder callback routines.
-  OMX_ERRORTYPE DecoderFillBufferDone(OMX_HANDLETYPE hComponent, OMX_BUFFERHEADERTYPE* pBuffer);
   void ReleaseOpenMaxBuffer(COpenMaxVideoBuffer *buffer);
+  void Render(COpenMaxVideoBuffer *buffer, int index);
+  // MMAL decoder callback routines.
+  void dec_output_port_cb(MMAL_PORT_T *port, MMAL_BUFFER_HEADER_T *buffer);
+  void vout_input_port_cb(MMAL_PORT_T *port, MMAL_BUFFER_HEADER_T *buffer);
+  int m_decode_count;
+  int m_decode_callbacks;
+  int m_vout_count;
+  int m_vout_callbacks;
 
 protected:
   void QueryCodec(void);
-  OMX_ERRORTYPE PrimeFillBuffers(void);
-  OMX_ERRORTYPE AllocOMXInputBuffers(void);
-  OMX_ERRORTYPE FreeOMXInputBuffers(void);
-  bool AllocOMXOutputBuffers(void);
-  bool FreeOMXOutputBuffers(void);
-  static bool CallbackAllocOMXEGLTextures(EGLDisplay egl_display, EGLContext egl_context, void*);
-  OMX_ERRORTYPE AllocOMXOutputEGLTextures(EGLDisplay egl_display, EGLContext egl_context);
-  static bool CallbackFreeOMXEGLTextures(EGLDisplay egl_display, EGLContext egl_context, void*);
-  OMX_ERRORTYPE FreeOMXOutputEGLTextures(EGLDisplay egl_display, EGLContext egl_context);
-  OMX_ERRORTYPE StopDecoder(void);
-  OMX_ERRORTYPE ReturnOpenMaxBuffer(COpenMaxVideoBuffer *buffer);
+  void ReturnOpenMaxBuffer(COpenMaxVideoBuffer *buffer);
 
   // Video format
   bool              m_drop_state;
@@ -116,8 +111,6 @@ protected:
   bool              m_finished;
   float             m_aspect_ratio;
   bool              m_forced_aspect_ratio;
-
-  bool m_port_settings_changed;
   const char        *m_pFormatName;
   OpenMaxVideoPtr   m_myself;
 
@@ -134,24 +127,40 @@ protected:
   bool Initialize( const CStdString &decoder_name);
 
   // Components
-  COMXCoreComponent m_omx_decoder;
-  COMXCoreComponent m_omx_image_fx;
-  COMXCoreComponent m_omx_egl_render;
-
-  COMXCoreTunel     m_omx_tunnel_decoder;
-  COMXCoreTunel     m_omx_tunnel_image_fx;
-  OMX_VIDEO_CODINGTYPE m_codingType;
-
-  bool              m_deinterlace;
+  bool              m_deinterlace_enabled;
   EDEINTERLACEMODE  m_deinterlace_request;
   bool              m_startframe;
   unsigned int      m_decode_frame_number;
   double            m_decoderPts;
   unsigned int      m_droppedPics;
   bool              m_skipDeinterlaceFields;
-  bool PortSettingsChanged();
-  bool SendDecoderConfig(uint8_t *extradata, int extrasize);
-  bool NaluFormatStartCodes(enum AVCodecID codec, uint8_t *extradata, int extrasize);
+
+
+  MMAL_COMPONENT_T *m_dec;
+  MMAL_PORT_T *m_dec_input;
+  MMAL_PORT_T *m_dec_output;
+  MMAL_POOL_T *m_dec_input_pool;
+  MMAL_QUEUE_T *m_decoded;
+
+  MMAL_COMPONENT_T *m_vout;
+  MMAL_PORT_T *m_vout_input;
+  MMAL_POOL_T *m_vout_input_pool;
+
+  MMAL_ES_FORMAT_T *m_format;
+
+  MMAL_COMPONENT_T *m_deinterlace;
+  MMAL_PORT_T *m_deinterlace_input;
+  MMAL_PORT_T *m_deinterlace_output;
+  MMAL_POOL_T *m_deinterlace_input_pool;
+  MMAL_QUEUE_T *m_deinterlaced;
+  MMAL_FOURCC_T m_codingType;
+
+  pthread_mutex_t m_mutex;
+  pthread_cond_t m_cond;
+  pthread_t m_worker;
+
+  pthread_t m_deinterlace_worker;
+  int change_output_format();
 };
 
 // defined(HAVE_LIBOPENMAX)
