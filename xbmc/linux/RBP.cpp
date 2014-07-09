@@ -22,6 +22,7 @@
 #if defined(TARGET_RASPBERRY_PI)
 
 #include "settings/AdvancedSettings.h"
+#include "settings/Settings.h"
 #include "utils/log.h"
 
 #include "cores/omxplayer/OMXImage.h"
@@ -78,6 +79,9 @@ bool CRBP::Initialize()
 
   if (g_advancedSettings.m_cacheMemBufferSize == ~0)
     g_advancedSettings.m_cacheMemBufferSize = m_arm_mem < 256 ? 1024 * 1024 * 2 : 1024 * 1024 * 20;
+
+  if (!CSettings::Get().GetInt("videoscreen.limitgui"))
+    CSettings::Get().SetInt("videoscreen.limitgui", m_gpu_mem < 128 ? 720:1080);
 
   g_OMXImage.Initialize();
   m_omx_image_init = true;
