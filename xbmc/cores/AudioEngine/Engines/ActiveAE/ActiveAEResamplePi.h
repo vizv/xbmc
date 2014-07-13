@@ -57,6 +57,7 @@ protected:
   bool                 m_Initialized;
   AVSampleFormat m_last_src_fmt, m_last_dst_fmt;
   int m_last_src_channels, m_last_dst_channels;
+  OMX_BUFFERHEADERTYPE *m_encoded_buffer;
 };
 
 }
