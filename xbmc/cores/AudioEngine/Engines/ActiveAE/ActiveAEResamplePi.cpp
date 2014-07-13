@@ -67,6 +67,7 @@ CActiveAEResample::CActiveAEResample()
   m_last_dst_fmt = AV_SAMPLE_FMT_NONE;
   m_last_src_channels = 0;
   m_last_dst_channels = 0;
+  m_encoded_buffer = NULL;
 }
 
 CActiveAEResample::~CActiveAEResample()
@@ -384,6 +385,14 @@ bool CActiveAEResample::Init(uint64_t dst_chan_layout, int dst_channels, int dst
   return true;
 }
 
+
+static void copy_planes(uint8_t **dst_buffer, int d_pitch, int d_planes, int d_samplesize, int offset, uint8_t *src_buffer, int src_samples)
+{
+  int planesize = src_samples * d_samplesize / d_planes;
+  for (int i=0; i < d_planes; i++)
+    memcpy(dst_buffer[i] + offset * d_pitch, src_buffer + i * planesize, planesize);
+}
+
 int CActiveAEResample::Resample(uint8_t **dst_buffer, int dst_samples, uint8_t **src_buffer, int src_samples, double ratio)
 {
   #ifdef DEBUG_VERBOSE
@@ -400,21 +409,35 @@ int CActiveAEResample::Resample(uint8_t **dst_buffer, int dst_samples, uint8_t *
   const int s_pitch = s_chans * m_src_bits >> 3;
   const int d_pitch = d_chans * m_dst_bits >> 3;
 
+  const int s_samplesize = m_src_channels * m_src_bits >> 3;
+  const int d_samplesize = m_dst_channels * m_dst_bits >> 3;
+  const int max_src_samples = BUFFERSIZE / s_samplesize;
+  const int max_dst_samples = (long long)(BUFFERSIZE / d_samplesize) * m_src_rate / (m_dst_rate + m_src_rate-1);
+
   int sent = 0;
   int received = 0;
+
+  if (m_encoded_buffer && m_encoded_buffer->nFilledLen)
+  {
+    int samples_available = m_encoded_buffer->nFilledLen / d_samplesize - m_encoded_buffer->nOffset;
+    int samples = std::min(samples_available, dst_samples - received);
+    copy_planes(dst_buffer, d_pitch, d_planes, d_samplesize, received, (uint8_t *)m_encoded_buffer->pBuffer + m_encoded_buffer->nOffset * d_pitch, samples);
+    received += samples;
+    samples_available -= samples;
+    if (samples_available > 0)
+      m_encoded_buffer->nOffset += samples;
+    else
+      m_encoded_buffer = NULL;
+  }
+  assert(!m_encoded_buffer);
   while (sent < src_samples)
   {
     OMX_BUFFERHEADERTYPE *omx_buffer = NULL;
-    OMX_BUFFERHEADERTYPE *m_encoded_buffer = NULL;
 
     omx_buffer = m_omx_mixer.GetInputBuffer(1000);
     if (omx_buffer == NULL)
       return false;
 
-    const int s_samplesize = m_src_channels * m_src_bits >> 3;
-    const int d_samplesize = m_dst_channels * m_dst_bits >> 3;
-    const int max_src_samples = BUFFERSIZE / s_samplesize;
-    const int max_dst_samples = (long long)(BUFFERSIZE / d_samplesize) * m_src_rate / (m_dst_rate + m_src_rate-1);
     int send = std::min(std::min(max_dst_samples, max_src_samples), src_samples - sent);
 
     omx_buffer->nOffset = 0;
@@ -466,22 +489,28 @@ int CActiveAEResample::Resample(uint8_t **dst_buffer, int dst_samples, uint8_t *
 
     if (m_encoded_buffer->nFilledLen)
     {
-      int planesize = m_encoded_buffer->nFilledLen / d_planes;
-      for (int i=0; i < d_planes; i++)
-        memcpy(dst_buffer[i] + received * d_pitch, (uint8_t *)m_encoded_buffer->pBuffer + i * planesize, planesize);
-      received += m_encoded_buffer->nFilledLen / d_samplesize;
+      int samples_available = m_encoded_buffer->nFilledLen / d_samplesize;
+      int samples = std::min(samples_available, dst_samples - received);
+      copy_planes(dst_buffer, d_pitch, d_planes, d_samplesize, received, (uint8_t *)m_encoded_buffer->pBuffer, samples);
+      received += samples;
+      samples_available -= samples;
+      if (samples_available > 0)
+        m_encoded_buffer->nOffset += samples;
+      else
+        m_encoded_buffer = NULL;
     }
   }
   #ifdef DEBUG_VERBOSE
   CLog::Log(LOGINFO, "%s::%s format:%d->%d rate:%d->%d chan:%d->%d samples %d->%d (%f) %d =%d", CLASSNAME, __func__,
     (int)m_src_fmt, (int)m_dst_fmt, m_src_rate, m_dst_rate, m_src_channels, m_dst_channels, src_samples, dst_samples, ratio, m_Initialized, received);
   #endif
+  assert(received <= dst_samples);
   return received;
 }
 
 int64_t CActiveAEResample::GetDelay(int64_t base)
 {
-  int ret = 0;
+  int ret = m_dst_rate ? 1000 * GetBufferedSamples() / m_dst_rate : 0;
   #ifdef DEBUG_VERBOSE
   CLog::Log(LOGINFO, "%s::%s = %d", CLASSNAME, __func__, ret);
   #endif
@@ -490,11 +519,16 @@ int64_t CActiveAEResample::GetDelay(int64_t base)
 
 int CActiveAEResample::GetBufferedSamples()
 {
-  int ret = 0;
+  int samples = 0;
+  if (m_encoded_buffer)
+  {
+    const int d_samplesize = m_dst_channels * m_dst_bits >> 3;
+    samples = m_encoded_buffer->nFilledLen / d_samplesize - m_encoded_buffer->nOffset;
+  }
   #ifdef DEBUG_VERBOSE
-  CLog::Log(LOGINFO, "%s::%s = %d", CLASSNAME, __func__, ret);
+  CLog::Log(LOGINFO, "%s::%s = %d", CLASSNAME, __func__, samples);
   #endif
-  return ret;
+  return samples;
 }
 
 int CActiveAEResample::CalcDstSampleCount(int src_samples, int dst_rate, int src_rate)
