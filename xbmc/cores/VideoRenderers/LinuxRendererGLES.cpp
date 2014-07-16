@@ -512,6 +512,12 @@ void CLinuxRendererGLES::RenderUpdate(bool clear, DWORD flags, DWORD alpha)
     return;
   }
 
+  if (m_renderMethod & RENDER_OMXEGL)
+  {
+    if (m_RenderUpdateCallBackFn)
+      (*m_RenderUpdateCallBackFn)(m_RenderUpdateCallBackCtx, m_sourceRect, m_destRect);
+  }
+
   // this needs to be checked after texture validation
   if (!m_bImageReady) return;
 
