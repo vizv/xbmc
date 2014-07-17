@@ -1060,8 +1060,8 @@ void COpenMaxVideo::SetVideoRect(const CRect& InSrcRect, const CRect& InDestRect
     }
     else if (stereo_invert)
     {
-      SrcRect.x1 += m_hints.width / 2;
-      SrcRect.x2 += m_hints.width / 2;
+      SrcRect.x1 += m_decoded_width / 2;
+      SrcRect.x2 += m_decoded_width / 2;
     }
     break;
 
@@ -1080,8 +1080,8 @@ void COpenMaxVideo::SetVideoRect(const CRect& InSrcRect, const CRect& InDestRect
     }
     else if (stereo_invert)
     {
-      SrcRect.y1 += m_hints.height / 2;
-      SrcRect.y2 += m_hints.height / 2;
+      SrcRect.y1 += m_decoded_height / 2;
+      SrcRect.y2 += m_decoded_height / 2;
     }
     break;
 
