@@ -42,6 +42,7 @@ struct DVDVideoPicture;
 #define ERRORBUFFSIZE 30
 
 class CWinRenderer;
+class COMXRenderer;
 class CLinuxRenderer;
 class CLinuxRendererGL;
 class CLinuxRendererGLES;
@@ -146,6 +147,8 @@ public:
 
 #ifdef HAS_GL
   CLinuxRendererGL    *m_pRenderer;
+#elif defined(TARGET_RASPBERRY_PI)
+  COMXRenderer        *m_pRenderer;
 #elif HAS_GLES == 2
   CLinuxRendererGLES  *m_pRenderer;
 #elif defined(HAS_DX)

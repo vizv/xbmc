@@ -41,6 +41,8 @@
 
 #if defined(HAS_GL)
   #include "LinuxRendererGL.h"
+#elif defined(TARGET_RASPBERRY_PI)
+  #include "OMXRenderer.h"
 #elif HAS_GLES == 2
   #include "LinuxRendererGLES.h"
 #elif defined(HAS_DX)
@@ -420,6 +422,8 @@ unsigned int CXBMCRenderManager::PreInit()
   {
 #if defined(HAS_GL)
     m_pRenderer = new CLinuxRendererGL();
+#elif defined(TARGET_RASPBERRY_PI)
+    m_pRenderer = new COMXRenderer();
 #elif HAS_GLES == 2
     m_pRenderer = new CLinuxRendererGLES();
 #elif defined(HAS_DX)
