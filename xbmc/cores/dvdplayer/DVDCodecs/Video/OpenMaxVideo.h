@@ -65,8 +65,6 @@ public:
   COpenMaxVideoBuffer* Acquire();
   long                 Release();
   void                 Render();
-  //void                 Sync();
-
   COpenMaxVideo *m_omv;
   long m_refs;
 private:
@@ -97,10 +95,6 @@ public:
   // MMAL decoder callback routines.
   void dec_output_port_cb(MMAL_PORT_T *port, MMAL_BUFFER_HEADER_T *buffer);
   void vout_input_port_cb(MMAL_PORT_T *port, MMAL_BUFFER_HEADER_T *buffer);
-  int m_decode_count;
-  int m_decode_callbacks;
-  int m_vout_count;
-  int m_vout_callbacks;
 
 protected:
   void QueryCodec(void);

@@ -37,11 +37,17 @@
 #include "utils/SystemInfo.h"
 #include "windowing/WindowingFactory.h"
 #include "cores/FFmpeg.h"
+#include "cores/dvdplayer/DVDCodecs/Video/OpenMaxVideo.h"
 
 #define CLASSNAME "COMXRenderer"
 
 COMXRenderer::COMXRenderer()
 {
+  m_src_rect.SetRect(0, 0, 0, 0);
+  m_dst_rect.SetRect(0, 0, 0, 0);
+  m_video_stereo_mode = RENDER_STEREO_MODE_OFF;
+  m_display_stereo_mode = RENDER_STEREO_MODE_OFF;
+  m_StereoInvert = false;
 }
 
 COMXRenderer::~COMXRenderer()
@@ -51,11 +57,10 @@ COMXRenderer::~COMXRenderer()
 
 void COMXRenderer::AddProcessor(COpenMaxVideoBuffer *openMaxBuffer, int index)
 {
-  CLog::Log(LOGNOTICE, "%s::%s - %p %i", CLASSNAME, __func__, openMaxBuffer, index);
-  //YUVBUFFER &buf = m_buffers[index];
-  //COpenMaxVideoBuffer *pic = openMaxBuffer->Acquire();
-  //SAFE_RELEASE(buf.openMaxBuffer);
-  //buf.openMaxBuffer = pic;
+  CLog::Log(LOGNOTICE, "%s::%s - %p (%p) %i", CLASSNAME, __func__, openMaxBuffer, openMaxBuffer->mmal_buffer, index);
+  //openMaxBuffer->Acquire();
+  openMaxBuffer->Render();
+  //openMaxBuffer->Release();
 }
 
 bool COMXRenderer::Configure(unsigned int width, unsigned int height, unsigned int d_width, unsigned int d_height, float fps, unsigned flags, ERenderFormat format, unsigned extended_format, unsigned int orientation)
@@ -85,52 +90,11 @@ bool COMXRenderer::Configure(unsigned int width, unsigned int height, unsigned i
   return true;
 }
 
-int COMXRenderer::NextYV12Texture()
-{
-  if(m_NumYV12Buffers)
-    return (m_iYV12RenderBuffer + 1) % m_NumYV12Buffers;
-  else
-    return -1;
-}
-
-bool COMXRenderer::AddVideoPicture(DVDVideoPicture* picture, int index)
-{
-  int source = index;
-  if(source < 0 || NextYV12Texture() < 0)
-    return false;
-
-  CLog::Log(LOGNOTICE, "%s::%s - %p %i", CLASSNAME, __func__, picture, index);
-/*  DXVABuffer *buf = (DXVABuffer*)m_VideoBuffers[source];
-  buf->id = m_processor->Add(picture);*/
-  return true;
-}
-
 int COMXRenderer::GetImage(YV12Image *image, int source, bool readonly)
 {
   CLog::Log(LOGNOTICE, "%s::%s - %p %d %d", CLASSNAME, __func__, image, source, readonly);
-  /* take next available buffer */
-  if( source == AUTOSOURCE )
-    source = NextYV12Texture();
-
-  if( source < 0 || NextYV12Texture() < 0)
-    return -1;
-
-  //YUVBuffer *buf = (YUVBuffer*)m_VideoBuffers[source];
-
-  image->cshift_x = 1;
-  image->cshift_y = 1;
-  image->height = m_sourceHeight;
-  image->width = m_sourceWidth;
-  image->flags = 0;
-  image->bpp = 1;
-
-  for(int i=0;i<3;i++)
-  {
-    //image->stride[i] = buf->planes[i].rect.Pitch;
-    //image->plane[i]  = (BYTE*)buf->planes[i].rect.pBits;
-  }
-
-  return source;
+  assert(source != AUTOSOURCE);
+  return 0;
 }
 
 void COMXRenderer::ReleaseImage(int source, bool preserve)
@@ -161,27 +125,23 @@ void COMXRenderer::RenderUpdate(bool clear, DWORD flags, DWORD alpha)
 
   ManageDisplay();
 
-  Render(flags);
+  CRect old = g_graphicsContext.GetScissors();
+
+  g_graphicsContext.BeginPaint();
+  g_graphicsContext.SetScissors(m_destRect);
+
+  glEnable(GL_BLEND);
+  glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+  glClearColor(0, 0, 0, 0);
+  glClear(GL_COLOR_BUFFER_BIT);
+
+  g_graphicsContext.SetScissors(old);
+  g_graphicsContext.EndPaint();
 }
 
 void COMXRenderer::FlipPage(int source)
 {
-  if(source == AUTOSOURCE)
-    source = NextYV12Texture();
-
-  //if (m_VideoBuffers[m_iYV12RenderBuffer] != NULL)
-  //  m_VideoBuffers[m_iYV12RenderBuffer]->StartDecode();
-
-  if( source >= 0 && source < m_NumYV12Buffers )
-    m_iYV12RenderBuffer = source;
-  else
-    m_iYV12RenderBuffer = 0;
-
   CLog::Log(LOGNOTICE, "%s::%s - %d", CLASSNAME, __func__, source);
-
-  //if (m_VideoBuffers[m_iYV12RenderBuffer] != NULL)
-  //  m_VideoBuffers[m_iYV12RenderBuffer]->StartRender();
-
 }
 
 unsigned int COMXRenderer::PreInit()
@@ -209,18 +169,11 @@ void COMXRenderer::UnInit()
   CLog::Log(LOGNOTICE, "%s::%s", CLASSNAME, __func__);
 
   m_bConfigured = false;
-  m_NumYV12Buffers = 0;
 }
-
-void COMXRenderer::Render(DWORD flags)
-{
-  CLog::Log(LOGNOTICE, "%s::%s - %x", CLASSNAME, __func__, flags);
-}
-
 
 bool COMXRenderer::RenderCapture(CRenderCapture* capture)
 {
-  if (!m_bConfigured || m_NumYV12Buffers == 0)
+  if (!m_bConfigured)
     return false;
 
   bool succeeded = false;
@@ -277,6 +230,155 @@ EINTERLACEMETHOD COMXRenderer::AutoInterlaceMethod()
 unsigned int COMXRenderer::GetProcessorSize()
 {
   return 3;//m_processor->Size();
+}
+
+void COMXRenderer::SetVideoRect(const CRect& InSrcRect, const CRect& InDestRect)
+{
+  // we get called twice a frame for left/right. Can ignore the rights.
+  if (g_graphicsContext.GetStereoView() == RENDER_STEREO_VIEW_RIGHT)
+    return;
+
+  std::string  stereo_mode;
+
+  switch(CMediaSettings::Get().GetCurrentVideoSettings().m_StereoMode)
+  {
+    case RENDER_STEREO_MODE_SPLIT_VERTICAL:   stereo_mode = "left_right"; break;
+    case RENDER_STEREO_MODE_SPLIT_HORIZONTAL: stereo_mode = "top_bottom"; break;
+    default:                                  stereo_mode = m_hints.stereo_mode; break;
+  }
+
+  if (CMediaSettings::Get().GetCurrentVideoSettings().m_StereoInvert)
+    stereo_mode = RenderManager::GetStereoModeInvert(stereo_mode);
+
+  CRect SrcRect = InSrcRect, DestRect = InDestRect;
+  unsigned flags = RenderManager::GetStereoModeFlags(stereo_mode);
+  RENDER_STEREO_MODE video_stereo_mode = (flags & CONF_FLAGS_STEREO_MODE_SBS) ? RENDER_STEREO_MODE_SPLIT_VERTICAL :
+                                         (flags & CONF_FLAGS_STEREO_MODE_TAB) ? RENDER_STEREO_MODE_SPLIT_HORIZONTAL : RENDER_STEREO_MODE_OFF;
+  bool stereo_invert                   = (flags & CONF_FLAGS_STEREO_CADANCE_RIGHT_LEFT) ? true : false;
+  RENDER_STEREO_MODE display_stereo_mode = g_graphicsContext.GetStereoMode();
+
+  // fix up transposed video
+  if (m_hints.orientation == 90 || m_hints.orientation == 270)
+  {
+    float diff = (DestRect.Height() - DestRect.Width()) * 0.5f;
+    DestRect.x1 -= diff;
+    DestRect.x2 += diff;
+    DestRect.y1 += diff;
+    DestRect.y2 -= diff;
+  }
+
+  // check if destination rect or video view mode has changed
+  if (!(m_dst_rect != DestRect) && !(m_src_rect != SrcRect) && m_video_stereo_mode == video_stereo_mode && m_display_stereo_mode == display_stereo_mode && m_StereoInvert == stereo_invert)
+    return;
+
+  CLog::Log(LOGDEBUG, "%s::%s %d,%d,%d,%d -> %d,%d,%d,%d (%d,%d,%d,%d,%s)", CLASSNAME, __func__,
+      (int)SrcRect.x1, (int)SrcRect.y1, (int)SrcRect.x2, (int)SrcRect.y2,
+      (int)DestRect.x1, (int)DestRect.y1, (int)DestRect.x2, (int)DestRect.y2,
+      video_stereo_mode, display_stereo_mode, CMediaSettings::Get().GetCurrentVideoSettings().m_StereoInvert, g_graphicsContext.GetStereoView(), stereo_mode.c_str());
+
+  m_src_rect = SrcRect;
+  m_dst_rect = DestRect;
+  m_video_stereo_mode = video_stereo_mode;
+  m_display_stereo_mode = display_stereo_mode;
+  m_StereoInvert = stereo_invert;
+
+  // might need to scale up m_dst_rect to display size as video decodes
+  // to separate video plane that is at display size.
+  RESOLUTION res = g_graphicsContext.GetVideoResolution();
+  CRect gui(0, 0, CDisplaySettings::Get().GetResolutionInfo(res).iWidth, CDisplaySettings::Get().GetResolutionInfo(res).iHeight);
+  CRect display(0, 0, CDisplaySettings::Get().GetResolutionInfo(res).iScreenWidth, CDisplaySettings::Get().GetResolutionInfo(res).iScreenHeight);
+
+  switch (video_stereo_mode)
+  {
+  case RENDER_STEREO_MODE_SPLIT_VERTICAL:
+    // optimisation - use simpler display mode in common case of unscaled 3d with same display mode
+    if (video_stereo_mode == display_stereo_mode && DestRect.x1 == 0.0f && DestRect.x2 * 2.0f == gui.Width() && !stereo_invert)
+    {
+      SrcRect.x2 *= 2.0f;
+      DestRect.x2 *= 2.0f;
+      video_stereo_mode = RENDER_STEREO_MODE_OFF;
+      display_stereo_mode = RENDER_STEREO_MODE_OFF;
+    }
+    else if (display_stereo_mode == RENDER_STEREO_MODE_ANAGLYPH_RED_CYAN || display_stereo_mode == RENDER_STEREO_MODE_ANAGLYPH_GREEN_MAGENTA)
+    {
+      SrcRect.x2 *= 2.0f;
+    }
+    else if (stereo_invert)
+    {
+      SrcRect.x1 += m_sourceWidth / 2;
+      SrcRect.x2 += m_sourceWidth / 2;
+    }
+    break;
+
+  case RENDER_STEREO_MODE_SPLIT_HORIZONTAL:
+    // optimisation - use simpler display mode in common case of unscaled 3d with same display mode
+    if (video_stereo_mode == display_stereo_mode && DestRect.y1 == 0.0f && DestRect.y2 * 2.0f == gui.Height() && !stereo_invert)
+    {
+      SrcRect.y2 *= 2.0f;
+      DestRect.y2 *= 2.0f;
+      video_stereo_mode = RENDER_STEREO_MODE_OFF;
+      display_stereo_mode = RENDER_STEREO_MODE_OFF;
+    }
+    else if (display_stereo_mode == RENDER_STEREO_MODE_ANAGLYPH_RED_CYAN || display_stereo_mode == RENDER_STEREO_MODE_ANAGLYPH_GREEN_MAGENTA)
+    {
+      SrcRect.y2 *= 2.0f;
+    }
+    else if (stereo_invert)
+    {
+      SrcRect.y1 += m_sourceHeight / 2;
+      SrcRect.y2 += m_sourceHeight / 2;
+    }
+    break;
+
+  default: break;
+  }
+
+  if (gui != display)
+  {
+    float xscale = display.Width()  / gui.Width();
+    float yscale = display.Height() / gui.Height();
+    DestRect.x1 *= xscale;
+    DestRect.x2 *= xscale;
+    DestRect.y1 *= yscale;
+    DestRect.y2 *= yscale;
+  }
+
+  MMAL_DISPLAYREGION_T region;
+  memset(&region, 0, sizeof region);
+
+  region.set                 = MMAL_DISPLAY_SET_DEST_RECT|MMAL_DISPLAY_SET_SRC_RECT|MMAL_DISPLAY_SET_FULLSCREEN|MMAL_DISPLAY_SET_NOASPECT|MMAL_DISPLAY_SET_MODE;
+  region.dest_rect.x         = lrintf(DestRect.x1);
+  region.dest_rect.y         = lrintf(DestRect.y1);
+  region.dest_rect.width     = lrintf(DestRect.Width());
+  region.dest_rect.height    = lrintf(DestRect.Height());
+
+  region.src_rect.x          = lrintf(SrcRect.x1);
+  region.src_rect.y          = lrintf(SrcRect.y1);
+  region.src_rect.width      = lrintf(SrcRect.Width());
+  region.src_rect.height     = lrintf(SrcRect.Height());
+
+  region.fullscreen = MMAL_FALSE;
+  region.noaspect = MMAL_TRUE;
+
+  if (video_stereo_mode == RENDER_STEREO_MODE_SPLIT_HORIZONTAL && display_stereo_mode == RENDER_STEREO_MODE_SPLIT_HORIZONTAL)
+    region.mode = MMAL_DISPLAY_MODE_LETTERBOX;//OMX_DISPLAY_MODE_STEREO_TOP_TO_TOP;
+  else if (video_stereo_mode == RENDER_STEREO_MODE_SPLIT_HORIZONTAL && display_stereo_mode == RENDER_STEREO_MODE_SPLIT_VERTICAL)
+    region.mode = MMAL_DISPLAY_MODE_LETTERBOX;//OMX_DISPLAY_MODE_STEREO_TOP_TO_LEFT;
+  else if (video_stereo_mode == RENDER_STEREO_MODE_SPLIT_VERTICAL && display_stereo_mode == RENDER_STEREO_MODE_SPLIT_HORIZONTAL)
+    region.mode = MMAL_DISPLAY_MODE_LETTERBOX;//OMX_DISPLAY_MODE_STEREO_LEFT_TO_TOP;
+  else if (video_stereo_mode == RENDER_STEREO_MODE_SPLIT_VERTICAL && display_stereo_mode == RENDER_STEREO_MODE_SPLIT_VERTICAL)
+    region.mode = MMAL_DISPLAY_MODE_LETTERBOX;//OMX_DISPLAY_MODE_STEREO_LEFT_TO_LEFT;
+  else
+    region.mode = MMAL_DISPLAY_MODE_LETTERBOX;
+
+#if 0
+  MMAL_STATUS_T status = mmal_util_set_display_region(m_vout_input, &region);
+  if (status != MMAL_SUCCESS)
+    CLog::Log(LOGERROR, "%s::%s Failed to set display region (status=%x %s)", CLASSNAME, __func__, status, mmal_status_to_string(status));
+#endif
+  CLog::Log(LOGDEBUG, "%s::%s %d,%d,%d,%d -> %d,%d,%d,%d mode:%d", CLASSNAME, __func__,
+      region.src_rect.x, region.src_rect.y, region.src_rect.width, region.src_rect.height,
+      region.dest_rect.x, region.dest_rect.y, region.dest_rect.width, region.dest_rect.height, region.mode);
 }
 
 #endif

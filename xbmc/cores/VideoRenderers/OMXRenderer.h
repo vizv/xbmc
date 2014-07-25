@@ -28,43 +28,21 @@
 #include "BaseRenderer.h"
 #include "RenderCapture.h"
 #include "settings/VideoSettings.h"
-#include "cores/VideoRenderers/RenderFlags.h"
-#include "cores/VideoRenderers/RenderFormats.h"
+#include "cores/dvdplayer/DVDStreamInfo.h"
+#include "guilib/Geometry.h"
 
-#define ALIGN(value, alignment) (((value)+((alignment)-1))&~((alignment)-1))
-#define CLAMP(a, min, max) ((a) > (max) ? (max) : ( (a) < (min) ? (min) : a ))
+#include <interface/mmal/mmal.h>
+#include <interface/mmal/util/mmal_util.h>
+#include <interface/mmal/util/mmal_default_components.h>
+#include <interface/mmal/util/mmal_util_params.h>
+
 
 #define AUTOSOURCE -1
-
-#define IMAGE_FLAG_WRITING   0x01 /* image is in use after a call to GetImage, caller may be reading or writing */
-#define IMAGE_FLAG_READING   0x02 /* image is in use after a call to GetImage, caller is only reading */
-#define IMAGE_FLAG_DYNAMIC   0x04 /* image was allocated due to a call to GetImage */
-#define IMAGE_FLAG_RESERVED  0x08 /* image is reserved, must be asked for specifically used to preserve images */
-
-#define IMAGE_FLAG_INUSE (IMAGE_FLAG_WRITING | IMAGE_FLAG_READING | IMAGE_FLAG_RESERVED)
 
 class CBaseTexture;
 class COpenMaxVideoBuffer;
 
 struct DVDVideoPicture;
-
-struct DRAWRECT
-{
-  float left;
-  float top;
-  float right;
-  float bottom;
-};
-
-
-#define PLANE_Y 0
-#define PLANE_U 1
-#define PLANE_V 2
-#define PLANE_UV 1
-
-#define FIELD_FULL 0
-#define FIELD_TOP 1
-#define FIELD_BOT 2
 
 class COMXRenderer : public CBaseRenderer
 {
@@ -81,7 +59,6 @@ public:
   virtual bool         Configure(unsigned int width, unsigned int height, unsigned int d_width, unsigned int d_height, float fps, unsigned flags, ERenderFormat format, unsigned extended_format, unsigned int orientation);
   virtual int          GetImage(YV12Image *image, int source = AUTOSOURCE, bool readonly = false);
   virtual void         ReleaseImage(int source, bool preserve = false);
-  virtual bool         AddVideoPicture(DVDVideoPicture* picture, int index);
   virtual void         FlipPage(int source);
   virtual unsigned int PreInit();
   virtual void         UnInit();
@@ -104,11 +81,6 @@ public:
   virtual unsigned int GetMaxBufferSize() { return NUM_BUFFERS; }
 
 protected:
-  virtual void Render(DWORD flags);
-  int          NextYV12Texture();
-
-  int  m_iYV12RenderBuffer;
-  int  m_NumYV12Buffers;
   std::vector<ERenderFormat> m_formats;
 
   bool                 m_bConfigured;
@@ -116,6 +88,17 @@ protected:
   unsigned int         m_destWidth;
   unsigned int         m_destHeight;
   int                  m_neededBuffers;
+
+
+  CDVDStreamInfo    m_hints;
+  CRect                     m_src_rect;
+  CRect                     m_dst_rect;
+  RENDER_STEREO_MODE        m_video_stereo_mode;
+  RENDER_STEREO_MODE        m_display_stereo_mode;
+  bool                      m_StereoInvert;
+
+  virtual void SetVideoRect(const CRect& SrcRect, const CRect& DestRect);
+
 };
 
 #else

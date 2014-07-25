@@ -84,7 +84,7 @@ COpenMaxVideoBuffer* COpenMaxVideoBuffer::Acquire()
 void COpenMaxVideoBuffer::Render()
 {
   #if defined(OMX_DEBUG_VERBOSE)
-  CLog::Log(LOGDEBUG, "%s::%s %p (%p) index:%d dec %d/%d vout %d/%d", CLASSNAME, __func__, this, mmal_buffer, index, m_omv->m_decode_count, m_omv->m_decode_callbacks, m_omv->m_vout_count, m_omv->m_vout_callbacks);
+  CLog::Log(LOGDEBUG, "%s::%s %p (%p) index:%d", CLASSNAME, __func__, this, mmal_buffer, index);
   #endif
 
   m_omv->Render(this, index++);
@@ -93,26 +93,15 @@ void COpenMaxVideoBuffer::Render()
 long COpenMaxVideoBuffer::Release()
 {
   long count = AtomicDecrement(&m_refs);
+#if defined(OMX_DEBUG_VERBOSE)
+CLog::Log(LOGDEBUG, "%s::%s %p (%p) ref:%ld", CLASSNAME, __func__, this, mmal_buffer, count);
+#endif
   if (count == 0)
   {
     m_omv->ReleaseOpenMaxBuffer(this);
   }
-
-  #if defined(OMX_DEBUG_VERBOSE)
-  CLog::Log(LOGDEBUG, "%s::%s %p (%p) ref:%ld", CLASSNAME, __func__, this, mmal_buffer, count);
-  #endif
   return count;
 }
-
-#if 0
-void COpenMaxVideoBuffer::Sync()
-{
-  #if defined(OMX_DEBUG_VERBOSE)
-  CLog::Log(LOGDEBUG, "%s::%s %p ref:%ld", CLASSNAME, __func__, this, m_refs);
-  #endif
-  Release();
-}
-#endif
 
 #undef CLASSNAME
 #define CLASSNAME "COpenMaxVideo"
@@ -127,7 +116,6 @@ COpenMaxVideo::COpenMaxVideo()
   m_drop_state = false;
   m_decoded_width = 0;
   m_decoded_height = 0;
-  m_egl_buffer_count = 0;
 
   m_finished = false;
   m_pFormatName = "omx-xxxx";
@@ -158,11 +146,6 @@ COpenMaxVideo::COpenMaxVideo()
   m_deinterlace_input_pool = NULL;
   m_deinterlaced = NULL;
   m_codingType = 0;
-
-  m_decode_count = 0;
-  m_decode_callbacks = 0;
-  m_vout_count = 0;
-  m_vout_callbacks = 0;
 
   m_src_rect.SetRect(0, 0, 0, 0);
   m_dst_rect.SetRect(0, 0, 0, 0);
@@ -269,7 +252,6 @@ void COpenMaxVideo::dec_output_port_cb(MMAL_PORT_T *port, MMAL_BUFFER_HEADER_T *
     if (buffer->length > 0)
     {
       //assert(buffer->user_data == NULL);
-      m_decode_callbacks++;
       COpenMaxVideoBuffer *omvb = new COpenMaxVideoBuffer(this);
       omvb->mmal_buffer = buffer;
       buffer->user_data = (void *)omvb;
@@ -288,9 +270,8 @@ void COpenMaxVideo::dec_output_port_cb(MMAL_PORT_T *port, MMAL_BUFFER_HEADER_T *
       #endif
 
 #if defined(OMX_DEBUG_VERBOSE)
-      CLog::Log(LOGDEBUG, "%s::%s - %p (%p) buffer_size(%u) dts:%.3f pts:%.3f flags:%x:%x frame:%d dec %d/%d vout %d/%d",
-        CLASSNAME, __func__, buffer, omvb, buffer->length, omvb->dts*1e-6, buffer->pts*1e-6, buffer->flags, buffer->type->video.flags, (int)buffer->user_data,
-        m_decode_count, m_decode_callbacks, m_vout_count, m_vout_callbacks);
+      CLog::Log(LOGDEBUG, "%s::%s - %p (%p) buffer_size(%u) dts:%.3f pts:%.3f flags:%x:%x frame:%d",
+        CLASSNAME, __func__, buffer, omvb, buffer->length, omvb->dts*1e-6, buffer->pts*1e-6, buffer->flags, buffer->type->video.flags, (int)buffer->user_data);
 #endif
 
       if (m_drop_state)
@@ -344,7 +325,6 @@ void COpenMaxVideo::vout_input_port_cb(MMAL_PORT_T *port, MMAL_BUFFER_HEADER_T *
   #if defined(OMX_DEBUG_VERBOSE)
   CLog::Log(LOGDEBUG, "%s::%s port:%p buffer %p (%p), len %d cmd:%x", CLASSNAME, __func__, port, buffer, omvb, buffer->length, buffer->cmd);
   #endif
-  m_vout_callbacks++;
   omvb->Release();
 }
 
@@ -486,8 +466,6 @@ bool COpenMaxVideo::Open(CDVDStreamInfo &hints, CDVDCodecOptions &options, OpenM
   m_decoded_height = hints.height;
   m_forced_aspect_ratio = hints.forced_aspect;
   m_aspect_ratio = hints.aspect;
-
-  m_egl_buffer_count = 4;
 
   switch (hints.codec)
   {
@@ -758,7 +736,7 @@ int COpenMaxVideo::Decode(uint8_t* pData, int iSize, double dts, double pts)
           // only push if we are successful with feeding OMX_EmptyThisBuffer
           pthread_mutex_lock(&m_omx_output_mutex);
           m_dts_queue.push(dts);
-          assert(m_dts_queue.size() < 100);
+          //assert(m_dts_queue.size() < 100);
           pthread_mutex_unlock(&m_omx_output_mutex);
         }
 #endif
@@ -773,10 +751,8 @@ int COpenMaxVideo::Decode(uint8_t* pData, int iSize, double dts, double pts)
           {
             mmal_buffer_header_reset(buffer);
             buffer->cmd = 0;
-            m_decode_count++;
             #if defined(OMX_DEBUG_VERBOSE)
-            CLog::Log(LOGDEBUG, "%s::%s Send buffer %p from pool to decoder output port %p dec %d/%d vout %d/%d", CLASSNAME, __func__, buffer, m_dec_output,
-              m_decode_count, m_decode_callbacks, m_vout_count, m_vout_callbacks);
+            CLog::Log(LOGDEBUG, "%s::%s Send buffer %p from pool to decoder output port %p", CLASSNAME, __func__, buffer, m_dec_output);
             #endif
             status = mmal_port_send_buffer(m_dec_output, buffer);
             if (status != MMAL_SUCCESS)
@@ -851,7 +827,6 @@ void COpenMaxVideo::Render(COpenMaxVideoBuffer *omvb, int index)
 
   if (index == 0)
   {
-    m_vout_count++;
     omvb->Acquire();
     mmal_port_send_buffer(m_vout_input, omvb->mmal_buffer);
   }
@@ -862,11 +837,9 @@ void COpenMaxVideo::Render(COpenMaxVideoBuffer *omvb, int index)
   {
     mmal_buffer_header_reset(buffer);
     buffer->cmd = 0;
-    m_decode_count++;
     #if defined(OMX_DEBUG_VERBOSE)
-    CLog::Log(LOGDEBUG, "%s::%s Send buffer %p from pool to decoder output port %p demux_queue(%d) dts_queue(%d) ready_queue(%d) busy_queue(%d) dec %d/%d vout %d/%d", CLASSNAME, __func__, buffer, m_dec_output,
-      m_demux_queue.size(), m_dts_queue.size(), m_omx_output_ready.size(), m_omx_output_busy.size(),
-      m_decode_count, m_decode_callbacks, m_vout_count, m_vout_callbacks);
+    CLog::Log(LOGDEBUG, "%s::%s Send buffer %p from pool to decoder output port %p demux_queue(%d) dts_queue(%d) ready_queue(%d) busy_queue(%d)", CLASSNAME, __func__, buffer, m_dec_output,
+      m_demux_queue.size(), m_dts_queue.size(), m_omx_output_ready.size(), m_omx_output_busy.size());
     #endif
     status = mmal_port_send_buffer(m_dec_output, buffer);
     if (status != MMAL_SUCCESS)
