@@ -150,7 +150,6 @@ protected:
   MMAL_POOL_T *m_vout_input_pool;
 
   MMAL_ES_FORMAT_T *m_format;
-  MMAL_ES_FORMAT_T *m_format_init;
   bool              m_format_changed;
 
   MMAL_COMPONENT_T *m_deinterlace;
