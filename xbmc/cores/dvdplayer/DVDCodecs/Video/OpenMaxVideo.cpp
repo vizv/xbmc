@@ -122,7 +122,6 @@ COpenMaxVideo::COpenMaxVideo()
 
   m_deinterlace_enabled = false;
   m_deinterlace_request = VS_DEINTERLACEMODE_OFF;
-  m_startframe = false;
   m_decoderPts = DVD_NOPTS_VALUE;
   m_droppedPics = 0;
   m_decode_frame_number = 1;
@@ -141,11 +140,6 @@ COpenMaxVideo::COpenMaxVideo()
   m_format = NULL;
   m_format_changed = false;
 
-  m_deinterlace = NULL;
-  m_deinterlace_input = NULL;
-  m_deinterlace_output = NULL;
-  m_deinterlace_input_pool = NULL;
-  m_deinterlaced = NULL;
   m_codingType = 0;
 
   m_src_rect.SetRect(0, 0, 0, 0);
@@ -153,10 +147,6 @@ COpenMaxVideo::COpenMaxVideo()
   m_video_stereo_mode = RENDER_STEREO_MODE_OFF;
   m_display_stereo_mode = RENDER_STEREO_MODE_OFF;
   m_StereoInvert = false;
-
-  pthread_mutex_init(&m_mutex, NULL);
-  pthread_cond_init(&m_cond, NULL);
-
 }
 
 COpenMaxVideo::~COpenMaxVideo()
@@ -175,10 +165,6 @@ COpenMaxVideo::~COpenMaxVideo()
 #endif
 
   pthread_mutex_destroy(&m_omx_output_mutex);
-
-
-  pthread_cond_destroy(&m_cond);
-  pthread_mutex_destroy(&m_mutex);
 
   if (m_dec) {
     mmal_component_disable(m_dec);
@@ -207,9 +193,6 @@ COpenMaxVideo::~COpenMaxVideo()
 
   if (m_vout)
     mmal_component_release(m_vout);
-
-  if (m_deinterlace)
-    mmal_component_release(m_deinterlace);
 
   if (m_dec)
     mmal_component_release(m_dec);
@@ -609,8 +592,6 @@ bool COpenMaxVideo::Open(CDVDStreamInfo &hints, CDVDCodecOptions &options, OpenM
   // todo: deinterlace
 
   /* Create video renderer */
-  /* FIXME: Should we move this to format change of deinterlace plugin?
-   * */
   status = mmal_component_create(MMAL_COMPONENT_DEFAULT_VIDEO_RENDERER, &m_vout);
   if(status != MMAL_SUCCESS)
   {
@@ -660,7 +641,6 @@ bool COpenMaxVideo::Open(CDVDStreamInfo &hints, CDVDCodecOptions &options, OpenM
   }
 
   m_drop_state = false;
-  m_startframe = false;
 
   return true;
 }
@@ -772,7 +752,6 @@ int COpenMaxVideo::Decode(uint8_t* pData, int iSize, double dts, double pts)
       if (demuxer_bytes == 0)
       {
         m_decode_frame_number++;
-        m_startframe = true;
 #ifdef DTS_QUEUE
         if (!m_drop_state)
         {
@@ -839,7 +818,6 @@ void COpenMaxVideo::Reset(void)
 
   while (!m_demux_queue.empty())
     m_demux_queue.pop();
-  m_startframe = false;
   m_decoderPts = DVD_NOPTS_VALUE;
   m_droppedPics = 0;
   m_decode_frame_number = 1;

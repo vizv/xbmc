@@ -132,7 +132,6 @@ protected:
   // Components
   bool              m_deinterlace_enabled;
   EDEINTERLACEMODE  m_deinterlace_request;
-  bool              m_startframe;
   unsigned int      m_decode_frame_number;
   double            m_decoderPts;
   unsigned int      m_droppedPics;
@@ -152,18 +151,7 @@ protected:
   MMAL_ES_FORMAT_T *m_format;
   bool              m_format_changed;
 
-  MMAL_COMPONENT_T *m_deinterlace;
-  MMAL_PORT_T *m_deinterlace_input;
-  MMAL_PORT_T *m_deinterlace_output;
-  MMAL_POOL_T *m_deinterlace_input_pool;
-  MMAL_QUEUE_T *m_deinterlaced;
   MMAL_FOURCC_T m_codingType;
-
-  pthread_mutex_t m_mutex;
-  pthread_cond_t m_cond;
-  pthread_t m_worker;
-
-  pthread_t m_deinterlace_worker;
   int change_output_format();
 };
 
