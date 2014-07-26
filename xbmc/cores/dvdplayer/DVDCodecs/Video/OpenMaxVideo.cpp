@@ -367,8 +367,9 @@ int COpenMaxVideo::change_output_format()
     goto out;
   }
 
-  m_dec_output->buffer_num = 40;
-  m_dec_output->buffer_size = m_dec_output->buffer_size_min;
+  //m_dec_output->buffer_num = 40;
+  printf("m_dec_output->buffer_num=%d size=%d\n", m_dec_output->buffer_num, m_dec_output->buffer_size);
+  //m_dec_output->buffer_size = m_dec_output->buffer_size_min;
   status = mmal_port_enable(m_dec_output, dec_output_port_cb_static);
   if (status != MMAL_SUCCESS)
   {
@@ -402,7 +403,8 @@ int COpenMaxVideo::change_output_format()
   m_vout_input = m_vout->input[0];
   m_vout_input->userdata = (struct MMAL_PORT_USERDATA_T *)this;
   mmal_format_full_copy(m_vout_input->format, m_format);
-  m_vout_input->buffer_num = m_dec_output->buffer_num;
+  //m_vout_input->buffer_num = 40;
+  printf("m_vout_input->buffer_num=%d\n", m_vout_input->buffer_num);
   status = mmal_port_format_commit(m_vout_input);
   if (status != MMAL_SUCCESS)
   {
@@ -434,6 +436,37 @@ int COpenMaxVideo::change_output_format()
     ret = EXIT_FAILURE;
     goto out;
   }
+
+
+  status = mmal_port_disable(m_vout_input);
+  if (status != MMAL_SUCCESS)
+  {
+    CLog::Log(LOGERROR, "%s::%s Failed to disable decoder output port (status=%x %s)", CLASSNAME, __func__, status, mmal_status_to_string(status));
+    ret = -1;
+    goto out;
+  }
+
+  mmal_format_full_copy(m_vout_input->format, m_format);
+  status = mmal_port_format_commit(m_vout_input);
+  if (status != MMAL_SUCCESS)
+  {
+    CLog::Log(LOGERROR, "%s::%s Failed to commit output format (status=%x %s)", CLASSNAME, __func__, status, mmal_status_to_string(status));
+    ret = -1;
+    goto out;
+  }
+
+  //m_vout_input->buffer_num = 40;
+  printf("m_vout_input->buffer_num=%d\n", m_vout_input->buffer_num);
+  m_vout_input->buffer_size = m_vout_input->buffer_size_min;
+  status = mmal_port_enable(m_vout_input, dec_output_port_cb_static);
+  if (status != MMAL_SUCCESS)
+  {
+    CLog::Log(LOGERROR, "%s::%s Failed to enable output port (status=%x %s)", CLASSNAME, __func__, status, mmal_status_to_string(status));
+    ret = -1;
+    goto out;
+  }
+
+
 
 out:
     return ret;
