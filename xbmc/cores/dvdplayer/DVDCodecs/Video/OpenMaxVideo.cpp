@@ -139,6 +139,7 @@ COpenMaxVideo::COpenMaxVideo()
   m_vout_input_pool = NULL;
 
   m_format = NULL;
+  m_format_init = NULL;
 
   m_deinterlace = NULL;
   m_deinterlace_input = NULL;
@@ -215,6 +216,9 @@ COpenMaxVideo::~COpenMaxVideo()
 
   if (m_format)
     mmal_format_free(m_format);
+
+  if (m_format_init)
+    mmal_format_free(m_format_init);
 }
 
 static void dec_control_port_cb(MMAL_PORT_T *port, MMAL_BUFFER_HEADER_T *buffer)
