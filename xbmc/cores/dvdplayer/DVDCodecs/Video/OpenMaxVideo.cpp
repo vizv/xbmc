@@ -139,6 +139,7 @@ COpenMaxVideo::COpenMaxVideo()
   m_vout_input_pool = NULL;
 
   m_format = NULL;
+  m_format_changed = false;
 
   m_deinterlace = NULL;
   m_deinterlace_input = NULL;
@@ -293,10 +294,9 @@ void COpenMaxVideo::dec_output_port_cb(MMAL_PORT_T *port, MMAL_BUFFER_HEADER_T *
   else if (buffer->cmd == MMAL_EVENT_FORMAT_CHANGED)
   {
     MMAL_EVENT_FORMAT_CHANGED_T *fmt = mmal_event_format_changed_get(buffer);
-    MMAL_ES_FORMAT_T *format = mmal_format_alloc();
-    mmal_format_full_copy(format, fmt->format);
-    format->encoding = MMAL_ENCODING_OPAQUE;
-    m_format = format;
+    mmal_format_full_copy(m_format, fmt->format);
+    m_format->encoding = MMAL_ENCODING_OPAQUE;
+    m_format_changed = true;
     if (m_format->es->video.par.num && m_format->es->video.par.den)
       m_aspect_ratio = (float)(m_format->es->video.par.num * m_format->es->video.width) / (m_format->es->video.par.den * m_format->es->video.height);
     m_decoded_width = m_format->es->video.width;
@@ -367,8 +367,6 @@ int COpenMaxVideo::change_output_format()
     goto out;
   }
 
-  m_dec_output->buffer_num = 40;
-  m_dec_output->buffer_size = m_dec_output->buffer_size_min;
   status = mmal_port_enable(m_dec_output, dec_output_port_cb_static);
   if (status != MMAL_SUCCESS)
   {
@@ -377,61 +375,28 @@ int COpenMaxVideo::change_output_format()
     goto out;
   }
 
-  // todo: deinterlace
-
-  /* Create video renderer */
-  /* FIXME: Should we move this to format change of deinterlace plugin?
-   * */
-  status = mmal_component_create(MMAL_COMPONENT_DEFAULT_VIDEO_RENDERER, &m_vout);
-  if(status != MMAL_SUCCESS)
+  status = mmal_port_disable(m_vout_input);
+  if (status != MMAL_SUCCESS)
   {
-    CLog::Log(LOGERROR, "%s::%s Failed to create vout component (status=%x %s)", CLASSNAME, __func__, status, mmal_status_to_string(status));
+    CLog::Log(LOGERROR, "%s::%s Failed to disable vout input port (status=%x %s)", CLASSNAME, __func__, status, mmal_status_to_string(status));
     ret = -1;
     goto out;
   }
 
-  m_vout->control->userdata = (struct MMAL_PORT_USERDATA_T *)this;
-  status = mmal_port_enable(m_vout->control, vout_control_port_cb);
-  if(status != MMAL_SUCCESS)
-  {
-    CLog::Log(LOGERROR, "%s::%s Failed to enable vout control port (status=%x %s)", CLASSNAME, __func__, status, mmal_status_to_string(status));
-    ret = -1;
-    goto out;
-  }
-
-  m_vout_input = m_vout->input[0];
-  m_vout_input->userdata = (struct MMAL_PORT_USERDATA_T *)this;
   mmal_format_full_copy(m_vout_input->format, m_format);
-  m_vout_input->buffer_num = m_dec_output->buffer_num;
   status = mmal_port_format_commit(m_vout_input);
   if (status != MMAL_SUCCESS)
   {
-    CLog::Log(LOGERROR, "%s::%s Failed to commit vout input format (status=%x %s)", CLASSNAME, __func__, status, mmal_status_to_string(status));
+    CLog::Log(LOGERROR, "%s::%s Failed to commit vout input (status=%x %s)", CLASSNAME, __func__, status, mmal_status_to_string(status));
     ret = -1;
     goto out;
   }
 
-  status = mmal_port_enable(m_vout_input, vout_input_port_cb_static);
-  if(status != MMAL_SUCCESS)
+  status = mmal_port_enable(m_vout_input, dec_output_port_cb_static);
+  if (status != MMAL_SUCCESS)
   {
-    CLog::Log(LOGERROR, "%s::%s Failed to vout enable input port (status=%x %s)", CLASSNAME, __func__, status, mmal_status_to_string(status));
+    CLog::Log(LOGERROR, "%s::%s Failed to enable vout input (status=%x %s)", CLASSNAME, __func__, status, mmal_status_to_string(status));
     ret = -1;
-    goto out;
-  }
-
-  status = mmal_component_enable(m_vout);
-  if(status != MMAL_SUCCESS)
-  {
-    CLog::Log(LOGERROR, "%s::%s Failed to enable vout component (status=%x %s)", CLASSNAME, __func__, status, mmal_status_to_string(status));
-    ret = -1;
-    goto out;
-  }
-
-  m_vout_input_pool = mmal_pool_create_with_allocator(m_vout_input->buffer_num, m_vout_input->buffer_size, m_vout_input, pool_allocator_alloc, pool_allocator_free);
-  if(!m_vout_input_pool)
-  {
-    CLog::Log(LOGERROR, "%s::%s Failed to create pool for vout input port (status=%x %s)", CLASSNAME, __func__, status, mmal_status_to_string(status));
-    ret = EXIT_FAILURE;
     goto out;
   }
 
@@ -531,6 +496,15 @@ bool COpenMaxVideo::Open(CDVDStreamInfo &hints, CDVDCodecOptions &options, OpenM
   }
 
   // initialize mmal.
+
+  m_format = mmal_format_alloc();
+  m_format->encoding = MMAL_ENCODING_OPAQUE;
+  m_format->type = MMAL_ES_TYPE_VIDEO;
+  m_format->es->video.width = m_hints.width;
+  m_format->es->video.height = m_hints.height;
+  m_format->es->video.crop.width = m_hints.width;
+  m_format->es->video.crop.height = m_hints.height;
+
   status = mmal_component_create(MMAL_COMPONENT_DEFAULT_VIDEO_DECODER, &m_dec);
   if (status != MMAL_SUCCESS)
   {
@@ -595,6 +569,8 @@ bool COpenMaxVideo::Open(CDVDStreamInfo &hints, CDVDCodecOptions &options, OpenM
   m_dec_output = m_dec->output[0];
   m_dec_output->userdata = (struct MMAL_PORT_USERDATA_T *)this;
 
+  m_dec_output->buffer_num = 40;
+  m_dec_output->buffer_size = m_dec_output->buffer_size_min;
   status = mmal_port_enable(m_dec_output, dec_output_port_cb_static);
   if (status != MMAL_SUCCESS)
   {
@@ -740,26 +716,93 @@ int COpenMaxVideo::Decode(uint8_t* pData, int iSize, double dts, double pts)
           pthread_mutex_unlock(&m_omx_output_mutex);
         }
 #endif
-        if (m_format && !m_vout_input_pool)
+        if (m_format_changed)
         {
+          m_format_changed = false;
+
+          if (!m_vout_input_pool)
+          {
+            int ret = 0;
+            // todo: deinterlace
+
+            /* Create video renderer */
+            /* FIXME: Should we move this to format change of deinterlace plugin?
+             * */
+            status = mmal_component_create(MMAL_COMPONENT_DEFAULT_VIDEO_RENDERER, &m_vout);
+            if(status != MMAL_SUCCESS)
+            {
+              CLog::Log(LOGERROR, "%s::%s Failed to create vout component (status=%x %s)", CLASSNAME, __func__, status, mmal_status_to_string(status));
+              ret = -1;
+              goto out;
+            }
+
+            m_vout->control->userdata = (struct MMAL_PORT_USERDATA_T *)this;
+            status = mmal_port_enable(m_vout->control, vout_control_port_cb);
+            if(status != MMAL_SUCCESS)
+            {
+              CLog::Log(LOGERROR, "%s::%s Failed to enable vout control port (status=%x %s)", CLASSNAME, __func__, status, mmal_status_to_string(status));
+              ret = -1;
+              goto out;
+            }
+
+            m_vout_input = m_vout->input[0];
+            m_vout_input->userdata = (struct MMAL_PORT_USERDATA_T *)this;
+            mmal_format_full_copy(m_vout_input->format, m_format);
+            m_vout_input->buffer_num = 40;
+            status = mmal_port_format_commit(m_vout_input);
+            if (status != MMAL_SUCCESS)
+            {
+              CLog::Log(LOGERROR, "%s::%s Failed to commit vout input format (status=%x %s)", CLASSNAME, __func__, status, mmal_status_to_string(status));
+              ret = -1;
+              goto out;
+            }
+
+            status = mmal_port_enable(m_vout_input, vout_input_port_cb_static);
+            if(status != MMAL_SUCCESS)
+            {
+              CLog::Log(LOGERROR, "%s::%s Failed to vout enable input port (status=%x %s)", CLASSNAME, __func__, status, mmal_status_to_string(status));
+              ret = -1;
+              goto out;
+            }
+
+            status = mmal_component_enable(m_vout);
+            if(status != MMAL_SUCCESS)
+            {
+              CLog::Log(LOGERROR, "%s::%s Failed to enable vout component (status=%x %s)", CLASSNAME, __func__, status, mmal_status_to_string(status));
+              ret = -1;
+              goto out;
+            }
+
+            m_vout_input_pool = mmal_pool_create_with_allocator(m_vout_input->buffer_num, m_vout_input->buffer_size, m_vout_input, pool_allocator_alloc, pool_allocator_free);
+            if(!m_vout_input_pool)
+            {
+              CLog::Log(LOGERROR, "%s::%s Failed to create pool for vout input port (status=%x %s)", CLASSNAME, __func__, status, mmal_status_to_string(status));
+              ret = EXIT_FAILURE;
+              goto out;
+            }
+
+            while (buffer = mmal_queue_get(m_vout_input_pool->queue), buffer)
+            {
+              mmal_buffer_header_reset(buffer);
+              buffer->cmd = 0;
+              #if defined(OMX_DEBUG_VERBOSE)
+              CLog::Log(LOGDEBUG, "%s::%s Send buffer %p from pool to decoder output port %p", CLASSNAME, __func__, buffer, m_dec_output);
+              #endif
+              status = mmal_port_send_buffer(m_dec_output, buffer);
+              if (status != MMAL_SUCCESS)
+              {
+                CLog::Log(LOGERROR, "%s::%s - Failed send buffer to decoder output port (status=0%x %s)", CLASSNAME, __func__, status, mmal_status_to_string(status));
+                return VC_ERROR;
+              }
+            }
+          out:
+            if (ret != 0)
+              return VC_ERROR;
+          }
           if (change_output_format() < 0)
           {
             CLog::Log(LOGERROR, "%s::%s - change_output_format() failed", CLASSNAME, __func__);
             return VC_ERROR;
-          }
-          while (buffer = mmal_queue_get(m_vout_input_pool->queue), buffer)
-          {
-            mmal_buffer_header_reset(buffer);
-            buffer->cmd = 0;
-            #if defined(OMX_DEBUG_VERBOSE)
-            CLog::Log(LOGDEBUG, "%s::%s Send buffer %p from pool to decoder output port %p", CLASSNAME, __func__, buffer, m_dec_output);
-            #endif
-            status = mmal_port_send_buffer(m_dec_output, buffer);
-            if (status != MMAL_SUCCESS)
-            {
-              CLog::Log(LOGERROR, "%s::%s - Failed send buffer to decoder output port (status=0%x %s)", CLASSNAME, __func__, status, mmal_status_to_string(status));
-              return VC_ERROR;
-            }
           }
         }
       }
