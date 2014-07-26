@@ -298,7 +298,7 @@ void COpenMaxVideo::dec_output_port_cb(MMAL_PORT_T *port, MMAL_BUFFER_HEADER_T *
     format->encoding = MMAL_ENCODING_OPAQUE;
     m_format = format;
     if (m_format->es->video.par.num && m_format->es->video.par.den)
-      m_aspect_ratio = (float)m_format->es->video.par.num / m_format->es->video.par.den;
+      m_aspect_ratio = (float)(m_format->es->video.par.num * m_format->es->video.width) / (m_format->es->video.par.den * m_format->es->video.height);
     m_decoded_width = m_format->es->video.width;
     m_decoded_height = m_format->es->video.height;
     CLog::Log(LOGDEBUG, "%s::%s format changed: %dx%d %.2f", CLASSNAME, __func__, m_decoded_width, m_decoded_height, m_aspect_ratio);
@@ -895,6 +895,7 @@ bool COpenMaxVideo::GetPicture(DVDVideoPicture* pDvdVideoPicture)
     pDvdVideoPicture->iHeight = buffer->height ? buffer->height : m_decoded_height;
     pDvdVideoPicture->iDisplayWidth  = pDvdVideoPicture->iWidth;
     pDvdVideoPicture->iDisplayHeight = pDvdVideoPicture->iHeight;
+    //CLog::Log(LOGDEBUG, "%s::%s -  %dx%d %dx%d %dx%d %dx%d %d,%d %f,%f", CLASSNAME, __func__, pDvdVideoPicture->iWidth, pDvdVideoPicture->iHeight, pDvdVideoPicture->iDisplayWidth, pDvdVideoPicture->iDisplayHeight, m_decoded_width, m_decoded_height, buffer->width, buffer->height, m_forced_aspect_ratio, m_hints.forced_aspect, buffer->m_aspect_ratio, m_hints.aspect);
 
     if (buffer->m_aspect_ratio > 0.0 && !m_forced_aspect_ratio)
     {

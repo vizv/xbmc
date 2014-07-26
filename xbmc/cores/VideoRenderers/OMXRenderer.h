@@ -76,29 +76,26 @@ public:
 
   void                 RenderUpdate(bool clear, DWORD flags = 0, DWORD alpha = 255);
 
-  virtual unsigned int GetProcessorSize();
-  virtual void         SetBufferSize(int numBuffers) { m_neededBuffers = numBuffers; }
+  virtual void         SetBufferSize(int numBuffers) { m_NumYV12Buffers = numBuffers; }
   virtual unsigned int GetMaxBufferSize() { return NUM_BUFFERS; }
+  virtual unsigned int GetProcessorSize();
 
 protected:
+  int m_iYV12RenderBuffer;
+  int m_NumYV12Buffers;
+
   std::vector<ERenderFormat> m_formats;
 
+  COpenMaxVideoBuffer *m_buffers[NUM_BUFFERS];
   bool                 m_bConfigured;
   unsigned int         m_extended_format;
   unsigned int         m_destWidth;
   unsigned int         m_destHeight;
   int                  m_neededBuffers;
 
-
   CDVDStreamInfo    m_hints;
-  CRect                     m_src_rect;
-  CRect                     m_dst_rect;
-  RENDER_STEREO_MODE        m_video_stereo_mode;
-  RENDER_STEREO_MODE        m_display_stereo_mode;
-  bool                      m_StereoInvert;
 
-  virtual void SetVideoRect(const CRect& SrcRect, const CRect& DestRect);
-
+  int  NextYV12Texture();
 };
 
 #else
