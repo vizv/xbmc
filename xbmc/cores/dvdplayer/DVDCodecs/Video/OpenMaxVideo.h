@@ -151,6 +151,7 @@ protected:
 
   MMAL_ES_FORMAT_T *m_format;
   MMAL_ES_FORMAT_T *m_format_init;
+  bool              m_format_changed;
 
   MMAL_COMPONENT_T *m_deinterlace;
   MMAL_PORT_T *m_deinterlace_input;
