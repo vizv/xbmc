@@ -46,6 +46,37 @@ struct DVDVideoPicture;
 
 class COMXRenderer : public CBaseRenderer
 {
+  struct YUVPLANE
+  {
+    CRect  rect;
+
+    float  width;
+    float  height;
+
+    unsigned texwidth;
+    unsigned texheight;
+
+    //pixels per texel
+    unsigned pixpertex_x;
+    unsigned pixpertex_y;
+
+    unsigned flipindex;
+  };
+
+  typedef YUVPLANE           YUVPLANES[MAX_PLANES];
+  typedef YUVPLANES          YUVFIELDS[MAX_FIELDS];
+
+  struct YUVBUFFER
+    {
+      YUVBUFFER();
+     ~YUVBUFFER();
+
+      YUVFIELDS fields;
+      YV12Image image;
+      unsigned  flipindex; /* used to decide if this has been uploaded */
+
+      COpenMaxVideoBuffer *openMaxBuffer;
+    };
 public:
   COMXRenderer();
   ~COMXRenderer();
@@ -86,7 +117,7 @@ protected:
 
   std::vector<ERenderFormat> m_formats;
 
-  COpenMaxVideoBuffer *m_buffers[NUM_BUFFERS];
+  YUVBUFFER            m_buffers[NUM_BUFFERS];
   bool                 m_bConfigured;
   unsigned int         m_extended_format;
   unsigned int         m_destWidth;

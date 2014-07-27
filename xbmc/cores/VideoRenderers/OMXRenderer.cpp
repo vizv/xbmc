@@ -41,12 +41,23 @@
 
 #define CLASSNAME "COMXRenderer"
 
+COMXRenderer::YUVBUFFER::YUVBUFFER()
+{
+  memset(&fields, 0, sizeof(fields));
+  memset(&image , 0, sizeof(image));
+  flipindex = 0;
+  openMaxBuffer = NULL;
+}
+
+COMXRenderer::YUVBUFFER::~YUVBUFFER()
+{
+}
+
+
 COMXRenderer::COMXRenderer()
 {
   m_iYV12RenderBuffer = 0;
   m_NumYV12Buffers = 0;
-  for (int i = 0 ; i<NUM_BUFFERS; i++)
-    m_buffers[i] = NULL;
 }
 
 COMXRenderer::~COMXRenderer()
@@ -58,9 +69,10 @@ void COMXRenderer::AddProcessor(COpenMaxVideoBuffer *openMaxBuffer, int index)
 {
   CLog::Log(LOGNOTICE, "%s::%s - %p (%p) %i", CLASSNAME, __func__, openMaxBuffer, openMaxBuffer->mmal_buffer, index);
 
-  openMaxBuffer->Acquire();
-  SAFE_RELEASE(m_buffers[index]);
-  m_buffers[index] = openMaxBuffer;
+  YUVBUFFER &buf = m_buffers[index];
+  COpenMaxVideoBuffer *pic = openMaxBuffer->Acquire();
+  SAFE_RELEASE(buf.openMaxBuffer);
+  buf.openMaxBuffer = pic;
 }
 
 bool COMXRenderer::Configure(unsigned int width, unsigned int height, unsigned int d_width, unsigned int d_height, float fps, unsigned flags, ERenderFormat format, unsigned extended_format, unsigned int orientation)
@@ -101,8 +113,34 @@ int COMXRenderer::NextYV12Texture()
 int COMXRenderer::GetImage(YV12Image *image, int source, bool readonly)
 {
   CLog::Log(LOGNOTICE, "%s::%s - %p %d %d", CLASSNAME, __func__, image, source, readonly);
-  assert(source != AUTOSOURCE);
-  return 0;
+  if (!image) return -1;
+
+  /* take next available buffer */
+  if( source == AUTOSOURCE )
+   source = NextYV12Texture();
+
+  assert(m_format != RENDER_FMT_BYPASS);
+  if (m_format == RENDER_FMT_OMXEGL)
+  {
+    return source;
+  }
+
+  YV12Image &im = m_buffers[source].image;
+
+  // copy the image - should be operator of YV12Image
+  for (int p=0;p<MAX_PLANES;p++)
+  {
+    image->plane[p]  = im.plane[p];
+    image->stride[p] = im.stride[p];
+  }
+  image->width    = im.width;
+  image->height   = im.height;
+  image->flags    = im.flags;
+  image->cshift_x = im.cshift_x;
+  image->cshift_y = im.cshift_y;
+  image->bpp      = 1;
+
+  return source;
 }
 
 void COMXRenderer::ReleaseImage(int source, bool preserve)
@@ -151,13 +189,14 @@ void COMXRenderer::RenderUpdate(bool clear, DWORD flags, DWORD alpha)
   if (m_format == RENDER_FMT_BYPASS)
     return;
 
-  if (m_buffers[m_iYV12RenderBuffer])
+  if (m_buffers[m_iYV12RenderBuffer].openMaxBuffer)
   {
-    m_buffers[m_iYV12RenderBuffer]->Render();
+    m_buffers[m_iYV12RenderBuffer].openMaxBuffer->Render();
   }
   else
   {
-    assert(0);
+    //assert(0);
+    printf("Render %dx%d %p,%p,%p\n", m_buffers[m_iYV12RenderBuffer].image.width, m_buffers[m_iYV12RenderBuffer].image.height, m_buffers[m_iYV12RenderBuffer].image.plane[0], m_buffers[m_iYV12RenderBuffer].image.plane[1], m_buffers[m_iYV12RenderBuffer].image.plane[2]);
   }
 }
 
@@ -182,6 +221,7 @@ unsigned int COMXRenderer::PreInit()
   CLog::Log(LOGNOTICE, "%s::%s", CLASSNAME, __func__);
 
   m_formats.clear();
+  m_formats.push_back(RENDER_FMT_YUV420P);
   m_formats.push_back(RENDER_FMT_OMXEGL);
   m_formats.push_back(RENDER_FMT_BYPASS);
 
@@ -258,7 +298,10 @@ EINTERLACEMETHOD COMXRenderer::AutoInterlaceMethod()
 
 unsigned int COMXRenderer::GetProcessorSize()
 {
-  return 1;
+  if (m_format == RENDER_FMT_OMXEGL)
+    return 1;
+  else
+    return 0;
 }
 
 #endif
