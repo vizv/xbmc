@@ -110,6 +110,7 @@ public:
   virtual void         SetBufferSize(int numBuffers) { m_NumYV12Buffers = numBuffers; }
   virtual unsigned int GetMaxBufferSize() { return NUM_BUFFERS; }
   virtual unsigned int GetProcessorSize();
+  virtual void SetVideoRect(const CRect& SrcRect, const CRect& DestRect);
 
   void vout_input_port_cb(MMAL_PORT_T *port, MMAL_BUFFER_HEADER_T *buffer);
 protected:
@@ -124,6 +125,12 @@ protected:
   unsigned int         m_destWidth;
   unsigned int         m_destHeight;
   int                  m_neededBuffers;
+
+  CRect                     m_src_rect;
+  CRect                     m_dst_rect;
+  RENDER_STEREO_MODE        m_video_stereo_mode;
+  RENDER_STEREO_MODE        m_display_stereo_mode;
+  bool                      m_StereoInvert;
 
   CDVDStreamInfo    m_hints;
 

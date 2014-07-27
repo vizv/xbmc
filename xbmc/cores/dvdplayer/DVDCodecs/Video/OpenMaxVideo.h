@@ -89,7 +89,6 @@ public:
   virtual void SetDropState(bool bDrop);
   virtual const char* GetName(void) { return (const char*)m_pFormatName; }
   virtual bool GetCodecStats(double &pts, int &droppedPics);
-  virtual void SetVideoRect(const CRect& SrcRect, const CRect& DestRect);
 
   // OpenMax decoder callback routines.
   void ReleaseOpenMaxBuffer(COpenMaxVideoBuffer *buffer);
@@ -129,11 +128,6 @@ protected:
   bool Initialize( const CStdString &decoder_name);
 
   CDVDStreamInfo    m_hints;
-  CRect                     m_src_rect;
-  CRect                     m_dst_rect;
-  RENDER_STEREO_MODE        m_video_stereo_mode;
-  RENDER_STEREO_MODE        m_display_stereo_mode;
-  bool                      m_StereoInvert;
   // Components
   bool              m_deinterlace_enabled;
   EDEINTERLACEMODE  m_deinterlace_request;
