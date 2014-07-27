@@ -106,6 +106,7 @@ public:
 protected:
   void QueryCodec(void);
   void ReturnOpenMaxBuffer(COpenMaxVideoBuffer *buffer);
+  bool init_vout();
 
   // Video format
   bool              m_drop_state;
@@ -149,11 +150,11 @@ protected:
   MMAL_PORT_T *m_dec_input;
   MMAL_PORT_T *m_dec_output;
   MMAL_POOL_T *m_dec_input_pool;
+  MMAL_POOL_T *m_dec_output_pool;
   MMAL_QUEUE_T *m_decoded;
 
   MMAL_COMPONENT_T *m_vout;
   MMAL_PORT_T *m_vout_input;
-  MMAL_POOL_T *m_vout_input_pool;
 
   MMAL_ES_FORMAT_T *m_format;
   bool              m_format_changed;
