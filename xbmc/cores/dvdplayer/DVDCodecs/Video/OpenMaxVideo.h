@@ -48,7 +48,6 @@ typedef struct omx_demux_packet {
 class COpenMaxVideo;
 typedef boost::shared_ptr<COpenMaxVideo> OpenMaxVideoPtr;
 
-enum { OMV_FLAGS_PORTS_SETTNGS_CHANGED = 1 << 0 };
 // an omx egl video frame
 class COpenMaxVideoBuffer
 {
@@ -66,9 +65,10 @@ public:
   // reference counting
   COpenMaxVideoBuffer* Acquire();
   long                 Release();
-  MMAL_ES_FORMAT_T    *GetFormat();
+  MMAL_ES_FORMAT_T    *GetFormat() { return m_es_format; }
   COpenMaxVideo *m_omv;
   long m_refs;
+  MMAL_ES_FORMAT_T *m_es_format;
 private:
 };
 
@@ -98,7 +98,7 @@ public:
   void dec_output_port_cb(MMAL_PORT_T *port, MMAL_BUFFER_HEADER_T *buffer);
   uint32_t          m_changed_count;
   uint32_t          m_changed_count_dec;
-  MMAL_ES_FORMAT_T *GetFormat() { return m_format; }
+  MMAL_ES_FORMAT_T *GetFormat() { return m_es_format; }
 
 protected:
   void QueryCodec(void);
@@ -120,7 +120,7 @@ protected:
 
   // OpenMax output buffers (video frames)
   pthread_mutex_t   m_omx_output_mutex;
-  std::vector<COpenMaxVideoBuffer*> m_omx_output_busy;
+  int m_omx_output_busy;
   std::queue<COpenMaxVideoBuffer*> m_omx_output_ready;
   std::vector<COpenMaxVideoBuffer*> m_omx_output_buffers;
 
@@ -144,7 +144,7 @@ protected:
   MMAL_POOL_T *m_dec_output_pool;
   MMAL_QUEUE_T *m_decoded;
 
-  MMAL_ES_FORMAT_T *m_format;
+  MMAL_ES_FORMAT_T *m_es_format;
 
   MMAL_FOURCC_T m_codingType;
   int change_dec_output_format();

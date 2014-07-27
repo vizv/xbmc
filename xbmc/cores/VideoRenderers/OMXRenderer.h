@@ -36,7 +36,6 @@
 #include <interface/mmal/util/mmal_default_components.h>
 #include <interface/mmal/util/mmal_util_params.h>
 
-
 #define AUTOSOURCE -1
 
 class CBaseTexture;
@@ -49,18 +48,8 @@ class COMXRenderer : public CBaseRenderer
   struct YUVPLANE
   {
     CRect  rect;
-
     float  width;
     float  height;
-
-    unsigned texwidth;
-    unsigned texheight;
-
-    //pixels per texel
-    unsigned pixpertex_x;
-    unsigned pixpertex_y;
-
-    unsigned flipindex;
   };
 
   typedef YUVPLANE           YUVPLANES[MAX_PLANES];
@@ -94,6 +83,7 @@ public:
   virtual unsigned int PreInit();
   virtual void         UnInit();
   virtual void         Reset(); /* resets renderer after seek for example */
+  virtual void         Flush();
   virtual bool         IsConfigured() { return m_bConfigured; }
   virtual void         AddProcessor(COpenMaxVideoBuffer *openMaxVideoBuffer, int index);
   virtual std::vector<ERenderFormat> SupportedFormats() { return m_formats; }

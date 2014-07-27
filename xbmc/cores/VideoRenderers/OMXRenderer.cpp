@@ -23,10 +23,7 @@
 #include "Util.h"
 #include "OMXRenderer.h"
 #include "cores/dvdplayer/DVDCodecs/Video/DVDVideoCodec.h"
-#include "dialogs/GUIDialogKaiToast.h"
 #include "filesystem/File.h"
-#include "guilib/LocalizeStrings.h"
-#include "guilib/Texture.h"
 #include "settings/AdvancedSettings.h"
 #include "settings/DisplaySettings.h"
 #include "settings/MediaSettings.h"
@@ -34,9 +31,7 @@
 #include "threads/SingleLock.h"
 #include "utils/log.h"
 #include "utils/MathUtils.h"
-#include "utils/SystemInfo.h"
 #include "windowing/WindowingFactory.h"
-#include "cores/FFmpeg.h"
 #include "cores/dvdplayer/DVDCodecs/Video/OpenMaxVideo.h"
 
 #define CLASSNAME "COMXRenderer"
@@ -45,12 +40,12 @@ COMXRenderer::YUVBUFFER::YUVBUFFER()
 {
   memset(&fields, 0, sizeof(fields));
   memset(&image , 0, sizeof(image));
-  flipindex = 0;
   openMaxBuffer = NULL;
 }
 
 COMXRenderer::YUVBUFFER::~YUVBUFFER()
 {
+  CLog::Log(LOGERROR, "%s::%s Delete %p", CLASSNAME, __func__, openMaxBuffer);
 }
 
 
@@ -154,6 +149,7 @@ bool COMXRenderer::change_vout_input_format(MMAL_ES_FORMAT_T *m_format)
 
 COMXRenderer::COMXRenderer()
 {
+  CLog::Log(LOGDEBUG, "%s::%s", CLASSNAME, __func__);
   m_iYV12RenderBuffer = 0;
   m_NumYV12Buffers = 0;
 
@@ -170,12 +166,13 @@ COMXRenderer::COMXRenderer()
 
 COMXRenderer::~COMXRenderer()
 {
+  CLog::Log(LOGDEBUG, "%s::%s", CLASSNAME, __func__);
   UnInit();
 }
 
 void COMXRenderer::AddProcessor(COpenMaxVideoBuffer *openMaxBuffer, int index)
 {
-  CLog::Log(LOGNOTICE, "%s::%s - %p (%p) %i", CLASSNAME, __func__, openMaxBuffer, openMaxBuffer->mmal_buffer, index);
+  CLog::Log(LOGDEBUG, "%s::%s - %p (%p) %i", CLASSNAME, __func__, openMaxBuffer, openMaxBuffer->mmal_buffer, index);
 
   YUVBUFFER &buf = m_buffers[index];
   COpenMaxVideoBuffer *pic = openMaxBuffer->Acquire();
@@ -191,7 +188,7 @@ bool COMXRenderer::Configure(unsigned int width, unsigned int height, unsigned i
     m_sourceWidth       = width;
     m_sourceHeight      = height;
   }
-  CLog::Log(LOGNOTICE, "%s::%s - %dx%d->%dx%d@%.2f flags:%x format:%d ext:%x orient:%d", CLASSNAME, __func__, width, height, d_width, d_height, fps, flags, format, extended_format, orientation);
+  CLog::Log(LOGDEBUG, "%s::%s - %dx%d->%dx%d@%.2f flags:%x format:%d ext:%x orient:%d", CLASSNAME, __func__, width, height, d_width, d_height, fps, flags, format, extended_format, orientation);
 
   m_fps = fps;
   m_iFlags = flags;
@@ -217,7 +214,7 @@ int COMXRenderer::NextYV12Texture()
 
 int COMXRenderer::GetImage(YV12Image *image, int source, bool readonly)
 {
-  CLog::Log(LOGNOTICE, "%s::%s - %p %d %d", CLASSNAME, __func__, image, source, readonly);
+  CLog::Log(LOGDEBUG, "%s::%s - %p %d %d", CLASSNAME, __func__, image, source, readonly);
   if (!image) return -1;
 
   /* take next available buffer */
@@ -250,25 +247,30 @@ int COMXRenderer::GetImage(YV12Image *image, int source, bool readonly)
 
 void COMXRenderer::ReleaseImage(int source, bool preserve)
 {
-  CLog::Log(LOGNOTICE, "%s::%s - %d %d", CLASSNAME, __func__, source, preserve);
+  CLog::Log(LOGDEBUG, "%s::%s - %d %d", CLASSNAME, __func__, source, preserve);
   // no need to release anything here since we're using system memory
 }
 
 void COMXRenderer::Reset()
 {
-  CLog::Log(LOGNOTICE, "%s::%s", CLASSNAME, __func__);
+  CLog::Log(LOGDEBUG, "%s::%s", CLASSNAME, __func__);
+}
+
+void COMXRenderer::Flush()
+{
+  CLog::Log(LOGDEBUG, "%s::%s", CLASSNAME, __func__);
 }
 
 void COMXRenderer::Update()
 {
-  CLog::Log(LOGNOTICE, "%s::%s", CLASSNAME, __func__);
+  CLog::Log(LOGDEBUG, "%s::%s", CLASSNAME, __func__);
   if (!m_bConfigured) return;
   ManageDisplay();
 }
 
 void COMXRenderer::RenderUpdate(bool clear, DWORD flags, DWORD alpha)
 {
-  CLog::Log(LOGNOTICE, "%s::%s - %d %x %d", CLASSNAME, __func__, clear, flags, alpha);
+  CLog::Log(LOGDEBUG, "%s::%s - %d %x %d", CLASSNAME, __func__, clear, flags, alpha);
 
   if (!m_bConfigured) return;
 
@@ -294,20 +296,23 @@ void COMXRenderer::RenderUpdate(bool clear, DWORD flags, DWORD alpha)
   if (m_format == RENDER_FMT_BYPASS)
     return;
 
-  if (m_buffers[m_iYV12RenderBuffer].openMaxBuffer)
+  COpenMaxVideoBuffer *omvb = m_buffers[m_iYV12RenderBuffer].openMaxBuffer;
+  if (omvb)
   {
-    COpenMaxVideoBuffer *omvb = m_buffers[m_iYV12RenderBuffer].openMaxBuffer;
-    //CLog::Log(LOGDEBUG, "%s::%s %p (%p) index:%d frame:%d(%d)", CLASSNAME, __func__, omvb, omvb->mmal_buffer, index, m_changed_count_vout, omvb->m_changed_count);
+    CLog::Log(LOGDEBUG, "%s::%s %p (%p) index:%d frame:%d(%d)", CLASSNAME, __func__, omvb, omvb->mmal_buffer, m_iYV12RenderBuffer, m_changed_count_vout, omvb->m_changed_count);
     assert(omvb);
+
+    omvb->Acquire();
+
     if (!m_vout && init_vout(omvb->GetFormat()))
-      return;
+       return;
 
     if (m_changed_count_vout != omvb->m_changed_count)
     {
-      m_changed_count_vout = omvb->m_changed_count;
+      CLog::Log(LOGDEBUG, "%s::%s format changed frame:%d(%d)", CLASSNAME, __func__, m_changed_count_vout, omvb->m_changed_count);
       change_vout_input_format(omvb->GetFormat());
+      m_changed_count_vout = omvb->m_changed_count;
     }
-    omvb->Acquire();
     mmal_port_send_buffer(m_vout_input, omvb->mmal_buffer);
   }
   else
@@ -319,7 +324,7 @@ void COMXRenderer::RenderUpdate(bool clear, DWORD flags, DWORD alpha)
 
 void COMXRenderer::FlipPage(int source)
 {
-  CLog::Log(LOGNOTICE, "%s::%s - %d", CLASSNAME, __func__, source);
+  CLog::Log(LOGDEBUG, "%s::%s - %d", CLASSNAME, __func__, source);
   if( source >= 0 && source < m_NumYV12Buffers )
     m_iYV12RenderBuffer = source;
   else
@@ -335,7 +340,7 @@ unsigned int COMXRenderer::PreInit()
   if ( m_resolution == RES_WINDOW )
     m_resolution = RES_DESKTOP;
 
-  CLog::Log(LOGNOTICE, "%s::%s", CLASSNAME, __func__);
+  CLog::Log(LOGDEBUG, "%s::%s", CLASSNAME, __func__);
 
   m_formats.clear();
   m_formats.push_back(RENDER_FMT_YUV420P);
@@ -352,7 +357,7 @@ unsigned int COMXRenderer::PreInit()
 void COMXRenderer::UnInit()
 {
   CSingleLock lock(g_graphicsContext);
-  CLog::Log(LOGNOTICE, "%s::%s", CLASSNAME, __func__);
+  CLog::Log(LOGDEBUG, "%s::%s", CLASSNAME, __func__);
 
   if (m_vout)
   {
@@ -372,6 +377,15 @@ void COMXRenderer::UnInit()
     m_vout = NULL;
   }
 
+  for (int i=0; i<NUM_BUFFERS; i++)
+  {
+    YUVBUFFER &buf = m_buffers[i];
+    if (buf.openMaxBuffer)
+    {
+      CLog::Log(LOGERROR, "%s::%s Delete %p", CLASSNAME, __func__, buf.openMaxBuffer);
+      SAFE_RELEASE(buf.openMaxBuffer);
+    }
+  }
   m_bConfigured = false;
 }
 
@@ -382,7 +396,7 @@ bool COMXRenderer::RenderCapture(CRenderCapture* capture)
 
   bool succeeded = false;
 
-  CLog::Log(LOGNOTICE, "%s::%s - %p", CLASSNAME, __func__, capture);
+  CLog::Log(LOGDEBUG, "%s::%s - %p", CLASSNAME, __func__, capture);
 
   return succeeded;
 }

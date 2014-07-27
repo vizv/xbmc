@@ -46,7 +46,6 @@
 
 #define DTS_QUEUE
 
-#define DEFAULT_TIMEOUT 1000
 #ifdef _DEBUG
 #define OMX_DEBUG_VERBOSE
 #endif
@@ -64,10 +63,12 @@ COpenMaxVideoBuffer::COpenMaxVideoBuffer(COpenMaxVideo *omv)
   m_aspect_ratio = 0.0f;
   m_changed_count = 0;
   dts = DVD_NOPTS_VALUE;
+  m_es_format = mmal_format_alloc();
 }
 
 COpenMaxVideoBuffer::~COpenMaxVideoBuffer()
 {
+  mmal_format_free(m_es_format);
   CLog::Log(LOGDEBUG, "%s::%s %p", CLASSNAME, __func__, this);
 }
 
@@ -80,11 +81,6 @@ COpenMaxVideoBuffer* COpenMaxVideoBuffer::Acquire()
   #endif
   (void)count;
   return this;
-}
-
-MMAL_ES_FORMAT_T *COpenMaxVideoBuffer::GetFormat()
-{
-  return m_omv->GetFormat();
 }
 
 long COpenMaxVideoBuffer::Release()
@@ -131,12 +127,13 @@ COpenMaxVideo::COpenMaxVideo()
   m_dec_input_pool = NULL;
   m_dec_output_pool = NULL;
 
-  m_format = NULL;
+  m_es_format = NULL;
 
   m_codingType = 0;
 
   m_changed_count = 0;
   m_changed_count_dec = 0;
+  m_omx_output_busy = 0;
 }
 
 COpenMaxVideo::~COpenMaxVideo()
@@ -177,8 +174,8 @@ COpenMaxVideo::~COpenMaxVideo()
   if (m_dec)
     mmal_component_release(m_dec);
 
-  if (m_format)
-    mmal_format_free(m_format);
+  if (m_es_format)
+    mmal_format_free(m_es_format);
 }
 
 static void dec_control_port_cb(MMAL_PORT_T *port, MMAL_BUFFER_HEADER_T *buffer)
@@ -215,36 +212,38 @@ void COpenMaxVideo::dec_output_port_cb(MMAL_PORT_T *port, MMAL_BUFFER_HEADER_T *
   {
     if (buffer->length > 0)
     {
-      //assert(buffer->user_data == NULL);
-      COpenMaxVideoBuffer *omvb = new COpenMaxVideoBuffer(this);
-      omvb->mmal_buffer = buffer;
-      buffer->user_data = (void *)omvb;
-      omvb->m_changed_count = m_changed_count;
-
       assert(!(buffer->flags & MMAL_BUFFER_HEADER_FLAG_DECODEONLY));
-
+      double dts = DVD_NOPTS_VALUE;
       #ifdef DTS_QUEUE
       pthread_mutex_lock(&m_omx_output_mutex);
       if (!m_dts_queue.empty())
       {
-        omvb->dts = m_dts_queue.front();
+        dts = m_dts_queue.front();
         m_dts_queue.pop();
       }
       else assert(0);
       pthread_mutex_unlock(&m_omx_output_mutex);
       #endif
 
-#if defined(OMX_DEBUG_VERBOSE)
-      CLog::Log(LOGDEBUG, "%s::%s - %p (%p) buffer_size(%u) dts:%.3f pts:%.3f flags:%x:%x frame:%d",
-        CLASSNAME, __func__, buffer, omvb, buffer->length, omvb->dts*1e-6, buffer->pts*1e-6, buffer->flags, buffer->type->video.flags, omvb->m_changed_count);
-#endif
-
+static int count;
+      //if (++count > 5 || m_drop_state)
       if (m_drop_state)
       {
-        CLog::Log(LOGDEBUG, "%s::%s - dropping %p (%p) (drop:%d)", CLASSNAME, __func__, omvb, buffer, m_drop_state);
+        CLog::Log(LOGDEBUG, "%s::%s - dropping %p (drop:%d)", CLASSNAME, __func__, buffer, m_drop_state);
       }
       else
       {
+        COpenMaxVideoBuffer *omvb = new COpenMaxVideoBuffer(this);
+        m_omx_output_busy++;
+#if defined(OMX_DEBUG_VERBOSE)
+      CLog::Log(LOGDEBUG, "%s::%s - %p (%p) buffer_size(%u) dts:%.3f pts:%.3f flags:%x:%x frame:%d",
+        CLASSNAME, __func__, buffer, omvb, buffer->length, dts*1e-6, buffer->pts*1e-6, buffer->flags, buffer->type->video.flags, omvb->m_changed_count);
+#endif
+        omvb->mmal_buffer = buffer;
+        buffer->user_data = (void *)omvb;
+        mmal_format_full_copy(omvb->m_es_format, m_es_format);
+        omvb->m_changed_count = m_changed_count;
+        omvb->dts = dts;
         omvb->width = m_decoded_width;
         omvb->height = m_decoded_height;
         omvb->m_aspect_ratio = m_aspect_ratio;
@@ -258,14 +257,14 @@ void COpenMaxVideo::dec_output_port_cb(MMAL_PORT_T *port, MMAL_BUFFER_HEADER_T *
   else if (buffer->cmd == MMAL_EVENT_FORMAT_CHANGED)
   {
     MMAL_EVENT_FORMAT_CHANGED_T *fmt = mmal_event_format_changed_get(buffer);
-    mmal_format_full_copy(m_format, fmt->format);
-    m_format->encoding = MMAL_ENCODING_OPAQUE;
+    mmal_format_full_copy(m_es_format, fmt->format);
+    m_es_format->encoding = MMAL_ENCODING_OPAQUE;
     m_changed_count++;
 
-    if (m_format->es->video.par.num && m_format->es->video.par.den)
-      m_aspect_ratio = (float)(m_format->es->video.par.num * m_format->es->video.width) / (m_format->es->video.par.den * m_format->es->video.height);
-    m_decoded_width = m_format->es->video.width;
-    m_decoded_height = m_format->es->video.height;
+    if (m_es_format->es->video.par.num && m_es_format->es->video.par.den)
+      m_aspect_ratio = (float)(m_es_format->es->video.par.num * m_es_format->es->video.width) / (m_es_format->es->video.par.den * m_es_format->es->video.height);
+    m_decoded_width = m_es_format->es->video.width;
+    m_decoded_height = m_es_format->es->video.height;
     CLog::Log(LOGDEBUG, "%s::%s format changed: %dx%d %.2f frame:%d", CLASSNAME, __func__, m_decoded_width, m_decoded_height, m_aspect_ratio, m_changed_count);
   }
   if (!kept)
@@ -301,7 +300,7 @@ int COpenMaxVideo::change_dec_output_format()
     goto out;
   }
 
-  mmal_format_full_copy(m_dec_output->format, m_format);
+  mmal_format_full_copy(m_dec_output->format, m_es_format);
   status = mmal_port_format_commit(m_dec_output);
   if (status != MMAL_SUCCESS)
   {
@@ -479,20 +478,20 @@ bool COpenMaxVideo::Open(CDVDStreamInfo &hints, CDVDCodecOptions &options, OpenM
 
 
   // set up initial decoded frame format - will likely change from this
-  m_format = mmal_format_alloc();
-  mmal_format_full_copy(m_format, m_dec_output->format);
+  m_es_format = mmal_format_alloc();
+  mmal_format_full_copy(m_es_format, m_dec_output->format);
 
-  m_format->encoding = MMAL_ENCODING_OPAQUE;
-  m_format->type = MMAL_ES_TYPE_VIDEO;
+  m_es_format->encoding = MMAL_ENCODING_OPAQUE;
+  m_es_format->type = MMAL_ES_TYPE_VIDEO;
   if (m_hints.width && m_hints.height)
   {
-    m_format->es->video.width = m_hints.width;
-    m_format->es->video.height = m_hints.height;
-    m_format->es->video.crop.width = m_hints.width;
-    m_format->es->video.crop.height = m_hints.height;
+    m_es_format->es->video.width = m_hints.width;
+    m_es_format->es->video.height = m_hints.height;
+    m_es_format->es->video.crop.width = m_hints.width;
+    m_es_format->es->video.crop.height = m_hints.height;
   }
 
-  mmal_format_full_copy(m_dec_output->format, m_format);
+  mmal_format_full_copy(m_dec_output->format, m_es_format);
   status = mmal_port_format_commit(m_dec_output);
   if (status != MMAL_SUCCESS)
   {
@@ -536,16 +535,16 @@ bool COpenMaxVideo::Open(CDVDStreamInfo &hints, CDVDCodecOptions &options, OpenM
 
 void COpenMaxVideo::Dispose()
 {
-  #if defined(OMX_DEBUG_VERBOSE)
-  CLog::Log(LOGDEBUG, "%s::%s", CLASSNAME, __func__);
-  #endif
   // we are happy to exit, but let last shared pointer being deleted trigger the destructor
   bool done = false;
   pthread_mutex_lock(&m_omx_output_mutex);
-  if (m_omx_output_busy.empty())
+  if (!m_omx_output_busy)
     done = true;
   m_finished = true;
   pthread_mutex_unlock(&m_omx_output_mutex);
+  #if defined(OMX_DEBUG_VERBOSE)
+  CLog::Log(LOGDEBUG, "%s::%s dts_queue(%d) ready_queue(%d) busy_queue(%d) done:%d", CLASSNAME, __func__, m_dts_queue.size(), m_omx_output_ready.size(), m_omx_output_busy, done);
+  #endif
   if (done)
   {
     assert(m_dts_queue.empty());
@@ -586,7 +585,7 @@ int COpenMaxVideo::Decode(uint8_t* pData, int iSize, double dts, double pts)
 {
   #if defined(OMX_DEBUG_VERBOSE)
   //CLog::Log(LOGDEBUG, "%s::%s - %-8p %-6d dts:%.3f pts:%.3f demux_queue(%d) dts_queue(%d) ready_queue(%d) busy_queue(%d)",
-  //   CLASSNAME, __func__, pData, iSize, dts == DVD_NOPTS_VALUE ? 0.0 : dts*1e-6, pts == DVD_NOPTS_VALUE ? 0.0 : pts*1e-6, m_demux_queue.size(), m_dts_queue.size(), m_omx_output_ready.size(), m_omx_output_busy.size());
+  //   CLASSNAME, __func__, pData, iSize, dts == DVD_NOPTS_VALUE ? 0.0 : dts*1e-6, pts == DVD_NOPTS_VALUE ? 0.0 : pts*1e-6, m_demux_queue.size(), m_dts_queue.size(), m_omx_output_ready.size(), m_omx_output_busy);
   #endif
 
   unsigned int demuxer_bytes = iSize;
@@ -629,7 +628,7 @@ int COpenMaxVideo::Decode(uint8_t* pData, int iSize, double dts, double pts)
 
       #if defined(OMX_DEBUG_VERBOSE)
       CLog::Log(LOGDEBUG, "%s::%s - %-8p %-6d dts:%.3f pts:%.3f flags:%x demux_queue(%d) dts_queue(%d) ready_queue(%d) busy_queue(%d)",
-         CLASSNAME, __func__, buffer, iSize, dts == DVD_NOPTS_VALUE ? 0.0 : dts*1e-6, pts == DVD_NOPTS_VALUE ? 0.0 : pts*1e-6, buffer->flags, m_demux_queue.size(), m_dts_queue.size(), m_omx_output_ready.size(), m_omx_output_busy.size());
+         CLASSNAME, __func__, buffer, iSize, dts == DVD_NOPTS_VALUE ? 0.0 : dts*1e-6, pts == DVD_NOPTS_VALUE ? 0.0 : pts*1e-6, buffer->flags, m_demux_queue.size(), m_dts_queue.size(), m_omx_output_ready.size(), m_omx_output_busy);
       #endif
       status = mmal_port_send_buffer(m_dec_input, buffer);
       if (status != MMAL_SUCCESS)
@@ -704,18 +703,14 @@ void COpenMaxVideo::Reset(void)
 void COpenMaxVideo::ReturnOpenMaxBuffer(COpenMaxVideoBuffer *buffer)
 {
 #if defined(OMX_DEBUG_VERBOSE)
-  CLog::Log(LOGDEBUG, "%s::%s %p (%d)", CLASSNAME, __func__, buffer, m_omx_output_busy.size());
+  CLog::Log(LOGDEBUG, "%s::%s %p (%d)", CLASSNAME, __func__, buffer, m_omx_output_busy);
 #endif
 
-  bool done = buffer->mmal_buffer->flags & OMX_BUFFERFLAG_EOS;
-  if (!done)
-  {
-    mmal_buffer_header_release(buffer->mmal_buffer);
+  mmal_buffer_header_release(buffer->mmal_buffer);
 
 #if defined(OMX_DEBUG_VERBOSE)
-    CLog::Log(LOGDEBUG, "%s::%s FillThisBuffer(%p) %p->%ld", CLASSNAME, __func__, buffer, buffer->mmal_buffer, buffer->m_refs);
+  CLog::Log(LOGDEBUG, "%s::%s FillThisBuffer(%p) %p->%ld", CLASSNAME, __func__, buffer, buffer->mmal_buffer, buffer->m_refs);
 #endif
-  }
 }
 
 void COpenMaxVideo::Recycle(MMAL_BUFFER_HEADER_T *buffer)
@@ -729,7 +724,7 @@ void COpenMaxVideo::Recycle(MMAL_BUFFER_HEADER_T *buffer)
   buffer->cmd = 0;
   #if defined(OMX_DEBUG_VERBOSE)
   CLog::Log(LOGDEBUG, "%s::%s Send buffer %p from pool to decoder output port %p demux_queue(%d) dts_queue(%d) ready_queue(%d) busy_queue(%d)", CLASSNAME, __func__, buffer, m_dec_output,
-    m_demux_queue.size(), m_dts_queue.size(), m_omx_output_ready.size(), m_omx_output_busy.size());
+    m_demux_queue.size(), m_dts_queue.size(), m_omx_output_ready.size(), m_omx_output_busy);
   #endif
   status = mmal_port_send_buffer(m_dec_output, buffer);
   if (status != MMAL_SUCCESS)
@@ -743,25 +738,26 @@ void COpenMaxVideo::ReleaseOpenMaxBuffer(COpenMaxVideoBuffer *buffer)
 {
   // remove from busy list
   pthread_mutex_lock(&m_omx_output_mutex);
-  m_omx_output_busy.erase(std::remove(m_omx_output_busy.begin(), m_omx_output_busy.end(), buffer), m_omx_output_busy.end());
+  assert(m_omx_output_busy > 0);
+  m_omx_output_busy--;
   pthread_mutex_unlock(&m_omx_output_mutex);
   ReturnOpenMaxBuffer(buffer);
   bool done = false;
   pthread_mutex_lock(&m_omx_output_mutex);
-  if (m_finished && m_omx_output_busy.empty())
+  if (m_finished && !m_omx_output_busy)
     done = true;
   pthread_mutex_unlock(&m_omx_output_mutex);
   if (done)
     m_myself.reset();
   #if defined(OMX_DEBUG_VERBOSE)
-  CLog::Log(LOGDEBUG, "%s::%s %p (%p)", CLASSNAME, __func__, buffer, buffer->mmal_buffer);
+  CLog::Log(LOGDEBUG, "%s::%s %p (%p) dts_queue(%d) ready_queue(%d) busy_queue(%d) done:%d", CLASSNAME, __func__, buffer, buffer->mmal_buffer, m_dts_queue.size(), m_omx_output_ready.size(), m_omx_output_busy, done);
   #endif
   delete buffer;
 }
 
 bool COpenMaxVideo::GetPicture(DVDVideoPicture* pDvdVideoPicture)
 {
-  //CLog::Log(LOGDEBUG, "%s::%s - m_omx_output_busy.size()=%d m_omx_output_ready.size()=%d", CLASSNAME, __func__, m_omx_output_busy.size(), m_omx_output_ready.size());
+  //CLog::Log(LOGDEBUG, "%s::%s - m_omx_output_busy=%d m_omx_output_ready.size()=%d", CLASSNAME, __func__, m_omx_output_busy, m_omx_output_ready.size());
   //CLog::Log(LOGDEBUG, "%s::%s -  full: buffers:%d", CLASSNAME, __func__, m_omx_output_ready.size());
 
   if (!m_omx_output_ready.empty())
@@ -771,7 +767,6 @@ bool COpenMaxVideo::GetPicture(DVDVideoPicture* pDvdVideoPicture)
     pthread_mutex_lock(&m_omx_output_mutex);
     buffer = m_omx_output_ready.front();
     m_omx_output_ready.pop();
-    m_omx_output_busy.push_back(buffer);
     pthread_mutex_unlock(&m_omx_output_mutex);
 
     assert(buffer->mmal_buffer);
@@ -831,7 +826,6 @@ bool COpenMaxVideo::ClearPicture(DVDVideoPicture* pDvdVideoPicture)
   if (pDvdVideoPicture->format == RENDER_FMT_OMXEGL)
   {
     pDvdVideoPicture->openMaxBuffer->Release();
-    //delete pDvdVideoPicture->openMaxBuffer;
   }
   memset(pDvdVideoPicture, 0, sizeof *pDvdVideoPicture);
   return true;
