@@ -193,7 +193,7 @@ bool CDVDPlayerVideo::OpenStream( CDVDStreamInfo &hint )
   if(hint.flags & AV_DISPOSITION_ATTACHED_PIC)
     return false;
 
-  CLog::Log(LOGNOTICE, "Creating video codec with codec id: %i", hint.codec);
+  CLog::Log(LOGNOTICE, "Creating video codec with codec id: %i %dx%d", hint.codec, hint.width, hint.height);
   CDVDVideoCodec* codec = CDVDFactoryCodec::CreateVideoCodec(hint, surfaces, formats);
   if(!codec)
   {

@@ -1123,6 +1123,9 @@ CDemuxStream* CDVDDemuxFFmpeg::AddStream(int iId)
           st->iFpsScale = 0;
         }
 
+
+        CLog::Log(LOGNOTICE, "AddStream: %dx%d", pStream->codec->width, pStream->codec->height);
+
         st->iWidth = pStream->codec->width;
         st->iHeight = pStream->codec->height;
         st->fAspect = SelectAspect(pStream, &st->bForcedAspect) * pStream->codec->width / pStream->codec->height;

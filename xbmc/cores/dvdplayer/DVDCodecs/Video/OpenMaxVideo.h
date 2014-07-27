@@ -47,6 +47,8 @@ typedef struct omx_demux_packet {
 
 class COpenMaxVideo;
 typedef boost::shared_ptr<COpenMaxVideo> OpenMaxVideoPtr;
+
+enum { OMV_FLAGS_PORTS_SETTNGS_CHANGED = 1 << 0 };
 // an omx egl video frame
 class COpenMaxVideoBuffer
 {
@@ -60,7 +62,7 @@ public:
   float m_aspect_ratio;
   int index;
   double dts;
-
+  uint32_t m_changed_count;
   // reference counting
   COpenMaxVideoBuffer* Acquire();
   long                 Release();
@@ -92,9 +94,14 @@ public:
   // OpenMax decoder callback routines.
   void ReleaseOpenMaxBuffer(COpenMaxVideoBuffer *buffer);
   void Render(COpenMaxVideoBuffer *buffer, int index);
+  void Recycle(MMAL_BUFFER_HEADER_T *buffer);
+
   // MMAL decoder callback routines.
   void dec_output_port_cb(MMAL_PORT_T *port, MMAL_BUFFER_HEADER_T *buffer);
   void vout_input_port_cb(MMAL_PORT_T *port, MMAL_BUFFER_HEADER_T *buffer);
+  uint32_t          m_changed_count;
+  uint32_t          m_changed_count_vout;
+  uint32_t          m_changed_count_dec;
 
 protected:
   void QueryCodec(void);
@@ -152,7 +159,8 @@ protected:
   bool              m_format_changed;
 
   MMAL_FOURCC_T m_codingType;
-  int change_output_format();
+  int change_dec_output_format();
+  int change_vout_input_format();
 };
 
 // defined(HAVE_LIBOPENMAX)

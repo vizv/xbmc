@@ -2827,7 +2827,7 @@ bool CDVDPlayer::OpenStream(CCurrentStream& current, int iStream, int source, bo
   CDemuxStream* stream = NULL;
   CDVDStreamInfo hint;
 
-  CLog::Log(LOGNOTICE, "Opening stream: %i source: %i", iStream, source);
+  CLog::Log(LOGNOTICE, "Opening stream: %i source: %i %dx%d", iStream, source, current.hint.width, current.hint.height);
 
   if(STREAM_SOURCE_MASK(source) == STREAM_SOURCE_DEMUX_SUB)
   {
@@ -2881,7 +2881,10 @@ bool CDVDPlayer::OpenStream(CCurrentStream& current, int iStream, int source, bo
       return false;
     stream->SetDiscard(AVDISCARD_NONE);
 
+    const CDemuxStreamVideo *v = static_cast<const CDemuxStreamVideo*>(stream);
+    CLog::Log(LOGNOTICE, "Opening stream2: %dx%d", v->iWidth, v->iHeight);
     hint.Assign(*stream, true);
+    CLog::Log(LOGNOTICE, "Opening stream3: %dx%d", hint.width, hint.height);
 
     if(m_pInputStream && m_pInputStream->IsStreamType(DVDSTREAM_TYPE_DVD))
       hint.filename = "dvd";
