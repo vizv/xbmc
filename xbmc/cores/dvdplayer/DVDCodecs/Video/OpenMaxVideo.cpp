@@ -82,13 +82,9 @@ COpenMaxVideoBuffer* COpenMaxVideoBuffer::Acquire()
   return this;
 }
 
-void COpenMaxVideoBuffer::Render()
+MMAL_ES_FORMAT_T *COpenMaxVideoBuffer::GetFormat()
 {
-  #if defined(OMX_DEBUG_VERBOSE)
-  CLog::Log(LOGDEBUG, "%s::%s %p (%p) index:%d", CLASSNAME, __func__, this, mmal_buffer, index);
-  #endif
-
-  m_omv->Render(this, index++);
+  return m_omv->GetFormat();
 }
 
 long COpenMaxVideoBuffer::Release()
@@ -133,9 +129,6 @@ COpenMaxVideo::COpenMaxVideo()
   m_dec_input = NULL;
   m_dec_output = NULL;
   m_dec_input_pool = NULL;
-
-  m_vout = NULL;
-  m_vout_input = NULL;
   m_dec_output_pool = NULL;
 
   m_format = NULL;
@@ -150,7 +143,6 @@ COpenMaxVideo::COpenMaxVideo()
 
   m_changed_count = 0;
   m_changed_count_dec = 0;
-  m_changed_count_vout = 0;
 }
 
 COpenMaxVideo::~COpenMaxVideo()
@@ -181,22 +173,11 @@ COpenMaxVideo::~COpenMaxVideo()
   if (m_dec_output)
     mmal_port_disable(m_dec_output);
 
-  if (m_vout) {
-    mmal_component_disable(m_vout);
-    mmal_port_disable(m_vout->control);
-  }
-
-  if (m_vout_input)
-    mmal_port_disable(m_vout_input);
-
   if (m_dec_input_pool)
     mmal_pool_destroy(m_dec_input_pool);
 
   if (m_dec_output_pool)
     mmal_pool_destroy(m_dec_output_pool);
-
-  if (m_vout)
-    mmal_component_release(m_vout);
 
   if (m_dec)
     mmal_component_release(m_dec);
@@ -302,27 +283,6 @@ static void dec_output_port_cb_static(MMAL_PORT_T *port, MMAL_BUFFER_HEADER_T *b
   omx->dec_output_port_cb(port, buffer);
 }
 
-static void vout_control_port_cb(MMAL_PORT_T *port, MMAL_BUFFER_HEADER_T *buffer)
-{
-  mmal_buffer_header_release(buffer);
-}
-
-void COpenMaxVideo::vout_input_port_cb(MMAL_PORT_T *port, MMAL_BUFFER_HEADER_T *buffer)
-{
-  COpenMaxVideoBuffer *omvb = (COpenMaxVideoBuffer *)buffer->user_data;
-
-  #if defined(OMX_DEBUG_VERBOSE)
-  CLog::Log(LOGDEBUG, "%s::%s port:%p buffer %p (%p), len %d cmd:%x", CLASSNAME, __func__, port, buffer, omvb, buffer->length, buffer->cmd);
-  #endif
-  omvb->Release();
-}
-
-static void vout_input_port_cb_static(MMAL_PORT_T *port, MMAL_BUFFER_HEADER_T *buffer)
-{
-  COpenMaxVideo *omx = reinterpret_cast<COpenMaxVideo*>(port->userdata);
-  omx->vout_input_port_cb(port, buffer);
-}
-
 static void* pool_allocator_alloc(void *context, uint32_t size)
 {
   return mmal_port_payload_alloc((MMAL_PORT_T *)context, size);
@@ -332,7 +292,6 @@ static void pool_allocator_free(void *context, void *mem)
 {
   mmal_port_payload_free((MMAL_PORT_T *)context, (uint8_t *)mem);
 }
-
 
 int COpenMaxVideo::change_dec_output_format()
 {
@@ -371,93 +330,10 @@ out:
     return ret;
 }
 
-int COpenMaxVideo::change_vout_input_format()
-{
-  MMAL_STATUS_T status;
-  int ret = 0;
-  CLog::Log(LOGDEBUG, "%s::%s", CLASSNAME, __func__);
-  status = mmal_port_disable(m_vout_input);
-  if (status != MMAL_SUCCESS)
-  {
-    CLog::Log(LOGERROR, "%s::%s Failed to disable vout input port (status=%x %s)", CLASSNAME, __func__, status, mmal_status_to_string(status));
-    ret = -1;
-    goto out;
-  }
-
-  mmal_format_full_copy(m_vout_input->format, m_format);
-  status = mmal_port_format_commit(m_vout_input);
-  if (status != MMAL_SUCCESS)
-  {
-    CLog::Log(LOGERROR, "%s::%s Failed to commit vout input format (status=%x %s)", CLASSNAME, __func__, status, mmal_status_to_string(status));
-    ret = -1;
-    goto out;
-  }
-
-  printf("m_vout_input->buffer_num=%d\n", m_vout_input->buffer_num);
-  m_vout_input->buffer_size = m_vout_input->buffer_size_min;
-  status = mmal_port_enable(m_vout_input, vout_input_port_cb_static);
-  if (status != MMAL_SUCCESS)
-  {
-    CLog::Log(LOGERROR, "%s::%s Failed to enable vout input port (status=%x %s)", CLASSNAME, __func__, status, mmal_status_to_string(status));
-    ret = -1;
-    goto out;
-  }
-
-out:
-    return ret;
-}
-
 static void RenderUpdateCallBack(const void *ctx, const CRect &SrcRect, const CRect &DestRect)
 {
   COpenMaxVideo *omv= (COpenMaxVideo *)ctx;
   omv->SetVideoRect(SrcRect, DestRect);
-}
-
-bool COpenMaxVideo::init_vout()
-{
-  MMAL_STATUS_T status;
-  // todo: deinterlace
-
-  /* Create video renderer */
-  status = mmal_component_create(MMAL_COMPONENT_DEFAULT_VIDEO_RENDERER, &m_vout);
-  if(status != MMAL_SUCCESS)
-  {
-    CLog::Log(LOGERROR, "%s::%s Failed to create vout component (status=%x %s)", CLASSNAME, __func__, status, mmal_status_to_string(status));
-    return false;
-  }
-
-  m_vout->control->userdata = (struct MMAL_PORT_USERDATA_T *)this;
-  status = mmal_port_enable(m_vout->control, vout_control_port_cb);
-  if(status != MMAL_SUCCESS)
-  {
-    CLog::Log(LOGERROR, "%s::%s Failed to enable vout control port (status=%x %s)", CLASSNAME, __func__, status, mmal_status_to_string(status));
-    return false;
-  }
-  m_vout_input = m_vout->input[0];
-  m_vout_input->userdata = (struct MMAL_PORT_USERDATA_T *)this;
-  mmal_format_full_copy(m_vout_input->format, m_format);
-  //m_vout_input->buffer_num = 40;
-  status = mmal_port_format_commit(m_vout_input);
-  if (status != MMAL_SUCCESS)
-  {
-    CLog::Log(LOGERROR, "%s::%s Failed to commit vout input format (status=%x %s)", CLASSNAME, __func__, status, mmal_status_to_string(status));
-    return false;
-  }
-
-  status = mmal_port_enable(m_vout_input, vout_input_port_cb_static);
-  if(status != MMAL_SUCCESS)
-  {
-    CLog::Log(LOGERROR, "%s::%s Failed to vout enable input port (status=%x %s)", CLASSNAME, __func__, status, mmal_status_to_string(status));
-    return false;
-  }
-
-  status = mmal_component_enable(m_vout);
-  if(status != MMAL_SUCCESS)
-  {
-    CLog::Log(LOGERROR, "%s::%s Failed to enable vout component (status=%x %s)", CLASSNAME, __func__, status, mmal_status_to_string(status));
-    return false;
-  }
-  return true;
 }
 
 bool COpenMaxVideo::Open(CDVDStreamInfo &hints, CDVDCodecOptions &options, OpenMaxVideoPtr myself)
@@ -822,7 +698,6 @@ void COpenMaxVideo::Reset(void)
   #endif
   mmal_port_flush(m_dec_input);
   mmal_port_flush(m_dec_output);
-  //mmal_port_flush(m_vout_input);
 
   // blow all ready video frames
   SetDropState(true);
@@ -878,31 +753,6 @@ void COpenMaxVideo::Recycle(MMAL_BUFFER_HEADER_T *buffer)
     CLog::Log(LOGERROR, "%s::%s - Failed send buffer to decoder output port (status=0%x %s)", CLASSNAME, __func__, status, mmal_status_to_string(status));
     return;
   }
-}
-
-void COpenMaxVideo::Render(COpenMaxVideoBuffer *omvb, int index)
-{
-#if defined(OMX_DEBUG_VERBOSE)
-  CLog::Log(LOGDEBUG, "%s::%s %p (%p) index:%d frame:%d(%d)", CLASSNAME, __func__, omvb, omvb->mmal_buffer, index, m_changed_count_vout, omvb->m_changed_count);
-#endif
-
-  if (!m_vout && init_vout())
-    return;
-
-  if (index == 0)
-  {
-    if (m_changed_count_vout != omvb->m_changed_count)
-    {
-      m_changed_count_vout = omvb->m_changed_count;
-      change_vout_input_format();
-    }
-    omvb->Acquire();
-    mmal_port_send_buffer(m_vout_input, omvb->mmal_buffer);
-  }
-
-  MMAL_BUFFER_HEADER_T *buffer;
-  while (buffer = mmal_queue_get(m_dec_output_pool->queue), buffer)
-    Recycle(buffer);
 }
 
 void COpenMaxVideo::ReleaseOpenMaxBuffer(COpenMaxVideoBuffer *buffer)
@@ -1155,10 +1005,11 @@ void COpenMaxVideo::SetVideoRect(const CRect& InSrcRect, const CRect& InDestRect
   else
     region.mode = MMAL_DISPLAY_MODE_LETTERBOX;
 
+#if 0
   MMAL_STATUS_T status = mmal_util_set_display_region(m_vout_input, &region);
   if (status != MMAL_SUCCESS)
     CLog::Log(LOGERROR, "%s::%s Failed to set display region (status=%x %s)", CLASSNAME, __func__, status, mmal_status_to_string(status));
-
+#endif
   CLog::Log(LOGDEBUG, "%s::%s %d,%d,%d,%d -> %d,%d,%d,%d mode:%d", CLASSNAME, __func__,
       region.src_rect.x, region.src_rect.y, region.src_rect.width, region.src_rect.height,
       region.dest_rect.x, region.dest_rect.y, region.dest_rect.width, region.dest_rect.height, region.mode);

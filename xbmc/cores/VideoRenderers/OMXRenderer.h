@@ -111,6 +111,7 @@ public:
   virtual unsigned int GetMaxBufferSize() { return NUM_BUFFERS; }
   virtual unsigned int GetProcessorSize();
 
+  void vout_input_port_cb(MMAL_PORT_T *port, MMAL_BUFFER_HEADER_T *buffer);
 protected:
   int m_iYV12RenderBuffer;
   int m_NumYV12Buffers;
@@ -125,6 +126,13 @@ protected:
   int                  m_neededBuffers;
 
   CDVDStreamInfo    m_hints;
+
+  MMAL_COMPONENT_T *m_vout;
+  MMAL_PORT_T *m_vout_input;
+
+  uint32_t          m_changed_count_vout;
+  bool change_vout_input_format(MMAL_ES_FORMAT_T *m_format);
+  bool init_vout(MMAL_ES_FORMAT_T *m_format);
 
   int  NextYV12Texture();
 };

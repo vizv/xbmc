@@ -66,7 +66,7 @@ public:
   // reference counting
   COpenMaxVideoBuffer* Acquire();
   long                 Release();
-  void                 Render();
+  MMAL_ES_FORMAT_T    *GetFormat();
   COpenMaxVideo *m_omv;
   long m_refs;
 private:
@@ -93,20 +93,17 @@ public:
 
   // OpenMax decoder callback routines.
   void ReleaseOpenMaxBuffer(COpenMaxVideoBuffer *buffer);
-  void Render(COpenMaxVideoBuffer *buffer, int index);
   void Recycle(MMAL_BUFFER_HEADER_T *buffer);
 
   // MMAL decoder callback routines.
   void dec_output_port_cb(MMAL_PORT_T *port, MMAL_BUFFER_HEADER_T *buffer);
-  void vout_input_port_cb(MMAL_PORT_T *port, MMAL_BUFFER_HEADER_T *buffer);
   uint32_t          m_changed_count;
-  uint32_t          m_changed_count_vout;
   uint32_t          m_changed_count_dec;
+  MMAL_ES_FORMAT_T *GetFormat() { return m_format; }
 
 protected:
   void QueryCodec(void);
   void ReturnOpenMaxBuffer(COpenMaxVideoBuffer *buffer);
-  bool init_vout();
 
   // Video format
   bool              m_drop_state;
@@ -153,15 +150,10 @@ protected:
   MMAL_POOL_T *m_dec_output_pool;
   MMAL_QUEUE_T *m_decoded;
 
-  MMAL_COMPONENT_T *m_vout;
-  MMAL_PORT_T *m_vout_input;
-
   MMAL_ES_FORMAT_T *m_format;
-  bool              m_format_changed;
 
   MMAL_FOURCC_T m_codingType;
   int change_dec_output_format();
-  int change_vout_input_format();
 };
 
 // defined(HAVE_LIBOPENMAX)

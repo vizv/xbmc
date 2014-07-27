@@ -54,10 +54,113 @@ COMXRenderer::YUVBUFFER::~YUVBUFFER()
 }
 
 
+static void vout_control_port_cb(MMAL_PORT_T *port, MMAL_BUFFER_HEADER_T *buffer)
+{
+  mmal_buffer_header_release(buffer);
+}
+
+void COMXRenderer::vout_input_port_cb(MMAL_PORT_T *port, MMAL_BUFFER_HEADER_T *buffer)
+{
+  COpenMaxVideoBuffer *omvb = (COpenMaxVideoBuffer *)buffer->user_data;
+
+  #if defined(OMX_DEBUG_VERBOSE)
+  CLog::Log(LOGDEBUG, "%s::%s port:%p buffer %p (%p), len %d cmd:%x", CLASSNAME, __func__, port, buffer, omvb, buffer->length, buffer->cmd);
+  #endif
+  omvb->Release();
+}
+
+static void vout_input_port_cb_static(MMAL_PORT_T *port, MMAL_BUFFER_HEADER_T *buffer)
+{
+  COMXRenderer *omx = reinterpret_cast<COMXRenderer*>(port->userdata);
+  omx->vout_input_port_cb(port, buffer);
+}
+
+bool COMXRenderer::init_vout(MMAL_ES_FORMAT_T *m_format)
+{
+  MMAL_STATUS_T status;
+  // todo: deinterlace
+
+  /* Create video renderer */
+  status = mmal_component_create(MMAL_COMPONENT_DEFAULT_VIDEO_RENDERER, &m_vout);
+  if(status != MMAL_SUCCESS)
+  {
+    CLog::Log(LOGERROR, "%s::%s Failed to create vout component (status=%x %s)", CLASSNAME, __func__, status, mmal_status_to_string(status));
+    return false;
+  }
+
+  m_vout->control->userdata = (struct MMAL_PORT_USERDATA_T *)this;
+  status = mmal_port_enable(m_vout->control, vout_control_port_cb);
+  if(status != MMAL_SUCCESS)
+  {
+    CLog::Log(LOGERROR, "%s::%s Failed to enable vout control port (status=%x %s)", CLASSNAME, __func__, status, mmal_status_to_string(status));
+    return false;
+  }
+  m_vout_input = m_vout->input[0];
+  m_vout_input->userdata = (struct MMAL_PORT_USERDATA_T *)this;
+  mmal_format_full_copy(m_vout_input->format, m_format);
+  //m_vout_input->buffer_num = 40;
+  status = mmal_port_format_commit(m_vout_input);
+  if (status != MMAL_SUCCESS)
+  {
+    CLog::Log(LOGERROR, "%s::%s Failed to commit vout input format (status=%x %s)", CLASSNAME, __func__, status, mmal_status_to_string(status));
+    return false;
+  }
+
+  status = mmal_port_enable(m_vout_input, vout_input_port_cb_static);
+  if(status != MMAL_SUCCESS)
+  {
+    CLog::Log(LOGERROR, "%s::%s Failed to vout enable input port (status=%x %s)", CLASSNAME, __func__, status, mmal_status_to_string(status));
+    return false;
+  }
+
+  status = mmal_component_enable(m_vout);
+  if(status != MMAL_SUCCESS)
+  {
+    CLog::Log(LOGERROR, "%s::%s Failed to enable vout component (status=%x %s)", CLASSNAME, __func__, status, mmal_status_to_string(status));
+    return false;
+  }
+  return true;
+}
+
+bool COMXRenderer::change_vout_input_format(MMAL_ES_FORMAT_T *m_format)
+{
+  MMAL_STATUS_T status;
+  CLog::Log(LOGDEBUG, "%s::%s", CLASSNAME, __func__);
+  status = mmal_port_disable(m_vout_input);
+  if (status != MMAL_SUCCESS)
+  {
+    CLog::Log(LOGERROR, "%s::%s Failed to disable vout input port (status=%x %s)", CLASSNAME, __func__, status, mmal_status_to_string(status));
+    return false;
+  }
+
+  mmal_format_full_copy(m_vout_input->format, m_format);
+  status = mmal_port_format_commit(m_vout_input);
+  if (status != MMAL_SUCCESS)
+  {
+    CLog::Log(LOGERROR, "%s::%s Failed to commit vout input format (status=%x %s)", CLASSNAME, __func__, status, mmal_status_to_string(status));
+    return false;
+  }
+
+  printf("m_vout_input->buffer_num=%d\n", m_vout_input->buffer_num);
+  m_vout_input->buffer_size = m_vout_input->buffer_size_min;
+  status = mmal_port_enable(m_vout_input, vout_input_port_cb_static);
+  if (status != MMAL_SUCCESS)
+  {
+    CLog::Log(LOGERROR, "%s::%s Failed to enable vout input port (status=%x %s)", CLASSNAME, __func__, status, mmal_status_to_string(status));
+    return false;
+  }
+  return true;
+}
+
+
 COMXRenderer::COMXRenderer()
 {
   m_iYV12RenderBuffer = 0;
   m_NumYV12Buffers = 0;
+
+  m_vout = NULL;
+  m_vout_input = NULL;
+  m_changed_count_vout = 0;
 }
 
 COMXRenderer::~COMXRenderer()
@@ -191,7 +294,19 @@ void COMXRenderer::RenderUpdate(bool clear, DWORD flags, DWORD alpha)
 
   if (m_buffers[m_iYV12RenderBuffer].openMaxBuffer)
   {
-    m_buffers[m_iYV12RenderBuffer].openMaxBuffer->Render();
+    COpenMaxVideoBuffer *omvb = m_buffers[m_iYV12RenderBuffer].openMaxBuffer;
+    //CLog::Log(LOGDEBUG, "%s::%s %p (%p) index:%d frame:%d(%d)", CLASSNAME, __func__, omvb, omvb->mmal_buffer, index, m_changed_count_vout, omvb->m_changed_count);
+    assert(omvb);
+    if (!m_vout && init_vout(omvb->GetFormat()))
+      return;
+
+    if (m_changed_count_vout != omvb->m_changed_count)
+    {
+      m_changed_count_vout = omvb->m_changed_count;
+      change_vout_input_format(omvb->GetFormat());
+    }
+    omvb->Acquire();
+    mmal_port_send_buffer(m_vout_input, omvb->mmal_buffer);
   }
   else
   {
@@ -236,6 +351,17 @@ void COMXRenderer::UnInit()
 {
   CSingleLock lock(g_graphicsContext);
   CLog::Log(LOGNOTICE, "%s::%s", CLASSNAME, __func__);
+
+  if (m_vout) {
+    mmal_component_disable(m_vout);
+    mmal_port_disable(m_vout->control);
+  }
+
+  if (m_vout_input)
+    mmal_port_disable(m_vout_input);
+
+  if (m_vout)
+    mmal_component_release(m_vout);
 
   m_bConfigured = false;
 }
