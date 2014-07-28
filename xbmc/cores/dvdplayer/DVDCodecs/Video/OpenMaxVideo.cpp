@@ -143,9 +143,6 @@ COpenMaxVideo::~COpenMaxVideo()
   #endif
   assert(m_finished);
 
-
-  while (!m_demux_queue.empty())
-    m_demux_queue.pop();
 #ifdef DTS_QUEUE
   while (!m_dts_queue.empty())
     m_dts_queue.pop();
@@ -515,6 +512,7 @@ bool COpenMaxVideo::Open(CDVDStreamInfo &hints, CDVDCodecOptions &options, OpenM
     return false;
   }
 
+  printf("m_dec_input_pool: %dx%x=%dM\n", m_dec_input->buffer_num, m_dec_input->buffer_size, m_dec_input->buffer_num * m_dec_input->buffer_size >> 20);
   m_dec_input_pool = mmal_pool_create_with_allocator(m_dec_input->buffer_num, m_dec_input->buffer_size, m_dec_input, pool_allocator_alloc, pool_allocator_free);
   if (!m_dec_input_pool)
   {
@@ -522,6 +520,7 @@ bool COpenMaxVideo::Open(CDVDStreamInfo &hints, CDVDCodecOptions &options, OpenM
     return false;
   }
 
+  printf("m_dec_output_pool: %dx%x=%dM\n", m_dec_output->buffer_num, m_dec_output->buffer_size, m_dec_output->buffer_num * m_dec_output->buffer_size >> 20);
   m_dec_output_pool = mmal_pool_create_with_allocator(m_dec_output->buffer_num, m_dec_output->buffer_size, m_dec_output, pool_allocator_alloc, pool_allocator_free);
   if(!m_dec_output_pool)
   {
@@ -537,6 +536,7 @@ void COpenMaxVideo::Dispose()
 {
   // we are happy to exit, but let last shared pointer being deleted trigger the destructor
   bool done = false;
+  Reset();
   pthread_mutex_lock(&m_omx_output_mutex);
   if (!m_omx_output_busy)
     done = true;
@@ -556,10 +556,9 @@ void COpenMaxVideo::SetDropState(bool bDrop)
 {
 #if defined(OMX_DEBUG_VERBOSE)
   if (m_drop_state != bDrop)
-    CLog::Log(LOGDEBUG, "%s::%s - m_drop_state(%d)",
-      CLASSNAME, __func__, bDrop);
+    CLog::Log(LOGDEBUG, "%s::%s - m_drop_state(%d)", CLASSNAME, __func__, bDrop);
 #endif
-  // xxx m_drop_state = bDrop;
+  m_drop_state = bDrop;
   if (m_drop_state)
   {
     while (1)
@@ -574,7 +573,7 @@ void COpenMaxVideo::SetDropState(bool bDrop)
       }
       pthread_mutex_unlock(&m_omx_output_mutex);
       if (buffer)
-        ReturnOpenMaxBuffer(buffer);
+        ReleaseOpenMaxBuffer(buffer);
       else
         break;
     }
@@ -584,8 +583,8 @@ void COpenMaxVideo::SetDropState(bool bDrop)
 int COpenMaxVideo::Decode(uint8_t* pData, int iSize, double dts, double pts)
 {
   #if defined(OMX_DEBUG_VERBOSE)
-  //CLog::Log(LOGDEBUG, "%s::%s - %-8p %-6d dts:%.3f pts:%.3f demux_queue(%d) dts_queue(%d) ready_queue(%d) busy_queue(%d)",
-  //   CLASSNAME, __func__, pData, iSize, dts == DVD_NOPTS_VALUE ? 0.0 : dts*1e-6, pts == DVD_NOPTS_VALUE ? 0.0 : pts*1e-6, m_demux_queue.size(), m_dts_queue.size(), m_omx_output_ready.size(), m_omx_output_busy);
+  //CLog::Log(LOGDEBUG, "%s::%s - %-8p %-6d dts:%.3f pts:%.3f dts_queue(%d) ready_queue(%d) busy_queue(%d)",
+  //   CLASSNAME, __func__, pData, iSize, dts == DVD_NOPTS_VALUE ? 0.0 : dts*1e-6, pts == DVD_NOPTS_VALUE ? 0.0 : pts*1e-6, m_dts_queue.size(), m_omx_output_ready.size(), m_omx_output_busy);
   #endif
 
   unsigned int demuxer_bytes = iSize;
@@ -613,7 +612,7 @@ int COpenMaxVideo::Decode(uint8_t* pData, int iSize, double dts, double pts)
       buffer->length = demuxer_bytes > buffer->alloc_size ? buffer->alloc_size : demuxer_bytes;
       buffer->user_data = (void *)m_decode_frame_number;
 
-      if (m_drop_state)
+      if (0 && m_drop_state)
       {
         // Request decode only (maintain ref frames, but don't return a picture)
         buffer->flags |= MMAL_BUFFER_HEADER_FLAG_DECODEONLY;
@@ -627,8 +626,8 @@ int COpenMaxVideo::Decode(uint8_t* pData, int iSize, double dts, double pts)
         buffer->flags |= MMAL_BUFFER_HEADER_FLAG_FRAME_END;
 
       #if defined(OMX_DEBUG_VERBOSE)
-      CLog::Log(LOGDEBUG, "%s::%s - %-8p %-6d dts:%.3f pts:%.3f flags:%x demux_queue(%d) dts_queue(%d) ready_queue(%d) busy_queue(%d)",
-         CLASSNAME, __func__, buffer, iSize, dts == DVD_NOPTS_VALUE ? 0.0 : dts*1e-6, pts == DVD_NOPTS_VALUE ? 0.0 : pts*1e-6, buffer->flags, m_demux_queue.size(), m_dts_queue.size(), m_omx_output_ready.size(), m_omx_output_busy);
+      CLog::Log(LOGDEBUG, "%s::%s - %-8p %-6d dts:%.3f pts:%.3f flags:%x dts_queue(%d) ready_queue(%d) busy_queue(%d)",
+         CLASSNAME, __func__, buffer, iSize, dts == DVD_NOPTS_VALUE ? 0.0 : dts*1e-6, pts == DVD_NOPTS_VALUE ? 0.0 : pts*1e-6, buffer->flags, m_dts_queue.size(), m_omx_output_ready.size(), m_omx_output_busy);
       #endif
       status = mmal_port_send_buffer(m_dec_input, buffer);
       if (status != MMAL_SUCCESS)
@@ -641,7 +640,7 @@ int COpenMaxVideo::Decode(uint8_t* pData, int iSize, double dts, double pts)
       {
         m_decode_frame_number++;
 #ifdef DTS_QUEUE
-        if (!m_drop_state)
+        if (!(0 && m_drop_state))
         {
           // only push if we are successful with feeding OMX_EmptyThisBuffer
           pthread_mutex_lock(&m_omx_output_mutex);
@@ -692,8 +691,6 @@ void COpenMaxVideo::Reset(void)
   pthread_mutex_unlock(&m_omx_output_mutex);
 #endif
 
-  while (!m_demux_queue.empty())
-    m_demux_queue.pop();
   m_decoderPts = DVD_NOPTS_VALUE;
   m_droppedPics = 0;
   m_decode_frame_number = 1;
@@ -707,10 +704,6 @@ void COpenMaxVideo::ReturnOpenMaxBuffer(COpenMaxVideoBuffer *buffer)
 #endif
 
   mmal_buffer_header_release(buffer->mmal_buffer);
-
-#if defined(OMX_DEBUG_VERBOSE)
-  CLog::Log(LOGDEBUG, "%s::%s FillThisBuffer(%p) %p->%ld", CLASSNAME, __func__, buffer, buffer->mmal_buffer, buffer->m_refs);
-#endif
 }
 
 void COpenMaxVideo::Recycle(MMAL_BUFFER_HEADER_T *buffer)
@@ -723,8 +716,8 @@ void COpenMaxVideo::Recycle(MMAL_BUFFER_HEADER_T *buffer)
   mmal_buffer_header_reset(buffer);
   buffer->cmd = 0;
   #if defined(OMX_DEBUG_VERBOSE)
-  CLog::Log(LOGDEBUG, "%s::%s Send buffer %p from pool to decoder output port %p demux_queue(%d) dts_queue(%d) ready_queue(%d) busy_queue(%d)", CLASSNAME, __func__, buffer, m_dec_output,
-    m_demux_queue.size(), m_dts_queue.size(), m_omx_output_ready.size(), m_omx_output_busy);
+  CLog::Log(LOGDEBUG, "%s::%s Send buffer %p from pool to decoder output port %p dts_queue(%d) ready_queue(%d) busy_queue(%d)", CLASSNAME, __func__, buffer, m_dec_output,
+    m_dts_queue.size(), m_omx_output_ready.size(), m_omx_output_busy);
   #endif
   status = mmal_port_send_buffer(m_dec_output, buffer);
   if (status != MMAL_SUCCESS)

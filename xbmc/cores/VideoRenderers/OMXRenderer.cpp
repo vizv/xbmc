@@ -36,6 +36,10 @@
 
 #define CLASSNAME "COMXRenderer"
 
+#ifdef _DEBUG
+#define OMX_DEBUG_VERBOSE
+#endif
+
 COMXRenderer::YUVBUFFER::YUVBUFFER()
 {
   memset(&fields, 0, sizeof(fields));
@@ -75,6 +79,7 @@ bool COMXRenderer::init_vout(MMAL_ES_FORMAT_T *m_format)
   MMAL_STATUS_T status;
   // todo: deinterlace
 
+  CLog::Log(LOGDEBUG, "%s::%s", CLASSNAME, __func__);
   /* Create video renderer */
   status = mmal_component_create(MMAL_COMPONENT_DEFAULT_VIDEO_RENDERER, &m_vout);
   if(status != MMAL_SUCCESS)
@@ -302,8 +307,6 @@ void COMXRenderer::RenderUpdate(bool clear, DWORD flags, DWORD alpha)
     CLog::Log(LOGDEBUG, "%s::%s %p (%p) index:%d frame:%d(%d)", CLASSNAME, __func__, omvb, omvb->mmal_buffer, m_iYV12RenderBuffer, m_changed_count_vout, omvb->m_changed_count);
     assert(omvb);
 
-    omvb->Acquire();
-
     if (!m_vout && init_vout(omvb->GetFormat()))
        return;
 
@@ -313,6 +316,7 @@ void COMXRenderer::RenderUpdate(bool clear, DWORD flags, DWORD alpha)
       change_vout_input_format(omvb->GetFormat());
       m_changed_count_vout = omvb->m_changed_count;
     }
+    omvb->Acquire();
     mmal_port_send_buffer(m_vout_input, omvb->mmal_buffer);
   }
   else
@@ -348,8 +352,7 @@ unsigned int COMXRenderer::PreInit()
   m_formats.push_back(RENDER_FMT_BYPASS);
 
   m_iYV12RenderBuffer = 0;
-  m_NumYV12Buffers = 2;
-
+  m_NumYV12Buffers = 3;
 
   return 0;
 }

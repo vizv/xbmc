@@ -116,7 +116,6 @@ protected:
   OpenMaxVideoPtr   m_myself;
 
   std::queue<double> m_dts_queue;
-  std::queue<omx_demux_packet> m_demux_queue;
 
   // OpenMax output buffers (video frames)
   pthread_mutex_t   m_omx_output_mutex;
