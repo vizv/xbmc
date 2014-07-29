@@ -122,7 +122,7 @@ protected:
   RENDER_STEREO_MODE        m_display_stereo_mode;
   bool                      m_StereoInvert;
 
-  CDVDStreamInfo    m_hints;
+  unsigned int m_orientation;
 
   MMAL_COMPONENT_T *m_vout;
   MMAL_PORT_T *m_vout_input;

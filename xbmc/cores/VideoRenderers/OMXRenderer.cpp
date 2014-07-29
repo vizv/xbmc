@@ -162,6 +162,7 @@ COMXRenderer::COMXRenderer()
   m_vout_input = NULL;
   m_changed_count_vout = 0;
 
+  m_orientation = 0;
   m_src_rect.SetRect(0, 0, 0, 0);
   m_dst_rect.SetRect(0, 0, 0, 0);
   m_video_stereo_mode = RENDER_STEREO_MODE_OFF;
@@ -187,17 +188,18 @@ void COMXRenderer::AddProcessor(COpenMaxVideoBuffer *openMaxBuffer, int index)
 
 bool COMXRenderer::Configure(unsigned int width, unsigned int height, unsigned int d_width, unsigned int d_height, float fps, unsigned flags, ERenderFormat format, unsigned extended_format, unsigned int orientation)
 {
-  if(m_sourceWidth  != width
-  || m_sourceHeight != height)
-  {
-    m_sourceWidth       = width;
-    m_sourceHeight      = height;
-  }
-  CLog::Log(LOGDEBUG, "%s::%s - %dx%d->%dx%d@%.2f flags:%x format:%d ext:%x orient:%d", CLASSNAME, __func__, width, height, d_width, d_height, fps, flags, format, extended_format, orientation);
+  if (m_sourceWidth == width && m_sourceHeight == height && m_orientation == orientation && m_fps == fps && m_iFlags == flags && m_format == format)
+    return true;
+
+  m_sourceWidth  = width;
+  m_sourceHeight = height;
+  m_orientation  = orientation;
 
   m_fps = fps;
   m_iFlags = flags;
   m_format = format;
+
+  CLog::Log(LOGDEBUG, "%s::%s - %dx%d->%dx%d@%.2f flags:%x format:%d ext:%x orient:%d", CLASSNAME, __func__, width, height, d_width, d_height, fps, flags, format, extended_format, orientation);
 
   // calculate the input frame aspect ratio
   CalculateFrameAspectRatio(d_width, d_height);
@@ -473,7 +475,7 @@ void COMXRenderer::SetVideoRect(const CRect& InSrcRect, const CRect& InDestRect)
   {
     case RENDER_STEREO_MODE_SPLIT_VERTICAL:   stereo_mode = "left_right"; break;
     case RENDER_STEREO_MODE_SPLIT_HORIZONTAL: stereo_mode = "top_bottom"; break;
-    default:                                  stereo_mode = m_hints.stereo_mode; break;
+    default:                                  stereo_mode = "" /*m_hints.stereo_mode*/; break;
   }
 
   if (CMediaSettings::Get().GetCurrentVideoSettings().m_StereoInvert)
@@ -487,7 +489,7 @@ void COMXRenderer::SetVideoRect(const CRect& InSrcRect, const CRect& InDestRect)
   RENDER_STEREO_MODE display_stereo_mode = g_graphicsContext.GetStereoMode();
 
   // fix up transposed video
-  if (m_hints.orientation == 90 || m_hints.orientation == 270)
+  if (m_orientation == 90 || m_orientation == 270)
   {
     float diff = (DestRect.Height() - DestRect.Width()) * 0.5f;
     DestRect.x1 -= diff;
@@ -500,9 +502,9 @@ void COMXRenderer::SetVideoRect(const CRect& InSrcRect, const CRect& InDestRect)
   if (!(m_dst_rect != DestRect) && !(m_src_rect != SrcRect) && m_video_stereo_mode == video_stereo_mode && m_display_stereo_mode == display_stereo_mode && m_StereoInvert == stereo_invert)
     return;
 
-  CLog::Log(LOGDEBUG, "%s::%s %d,%d,%d,%d -> %d,%d,%d,%d (%d,%d,%d,%d,%s)", CLASSNAME, __func__,
+  CLog::Log(LOGDEBUG, "%s::%s %d,%d,%d,%d -> %d,%d,%d,%d orient:%d (%d,%d,%d,%d,%s)", CLASSNAME, __func__,
       (int)SrcRect.x1, (int)SrcRect.y1, (int)SrcRect.x2, (int)SrcRect.y2,
-      (int)DestRect.x1, (int)DestRect.y1, (int)DestRect.x2, (int)DestRect.y2,
+      (int)DestRect.x1, (int)DestRect.y1, (int)DestRect.x2, (int)DestRect.y2, m_orientation,
       video_stereo_mode, display_stereo_mode, CMediaSettings::Get().GetCurrentVideoSettings().m_StereoInvert, g_graphicsContext.GetStereoView(), stereo_mode.c_str());
 
   m_src_rect = SrcRect;
@@ -534,8 +536,8 @@ void COMXRenderer::SetVideoRect(const CRect& InSrcRect, const CRect& InDestRect)
     }
     else if (stereo_invert)
     {
-      SrcRect.x1 += m_hints.width / 2;
-      SrcRect.x2 += m_hints.width / 2;
+      SrcRect.x1 += m_sourceWidth / 2;
+      SrcRect.x2 += m_sourceWidth / 2;
     }
     break;
 
@@ -554,8 +556,8 @@ void COMXRenderer::SetVideoRect(const CRect& InSrcRect, const CRect& InDestRect)
     }
     else if (stereo_invert)
     {
-      SrcRect.y1 += m_hints.height / 2;
-      SrcRect.y2 += m_hints.height / 2;
+      SrcRect.y1 += m_sourceHeight / 2;
+      SrcRect.y2 += m_sourceHeight / 2;
     }
     break;
 
@@ -588,6 +590,18 @@ void COMXRenderer::SetVideoRect(const CRect& InSrcRect, const CRect& InDestRect)
 
   region.fullscreen = MMAL_FALSE;
   region.noaspect = MMAL_TRUE;
+
+  if (m_orientation)
+  {
+    region.set |= MMAL_DISPLAY_SET_TRANSFORM;
+    if (m_orientation == 90)
+      region.transform = MMAL_DISPLAY_ROT90;
+    else if (m_orientation == 180)
+      region.transform = MMAL_DISPLAY_ROT180;
+    else if (m_orientation == 270)
+      region.transform = MMAL_DISPLAY_ROT270;
+    else assert(0);
+  }
 
   if (video_stereo_mode == RENDER_STEREO_MODE_SPLIT_HORIZONTAL && display_stereo_mode == RENDER_STEREO_MODE_SPLIT_HORIZONTAL)
     region.mode = MMAL_DISPLAY_MODE_LETTERBOX;//OMX_DISPLAY_MODE_STEREO_TOP_TO_TOP;
