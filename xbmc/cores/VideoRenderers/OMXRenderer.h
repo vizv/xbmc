@@ -64,7 +64,8 @@ class COMXRenderer : public CBaseRenderer
       YV12Image image;
       unsigned  flipindex; /* used to decide if this has been uploaded */
 
-      COpenMaxVideoBuffer *openMaxBuffer;
+      COpenMaxVideoBuffer *openMaxBuffer; // used for hw decoded buffers
+      MMAL_BUFFER_HEADER_T *mmal_buffer;  // used for sw decoded buffers
     };
 public:
   COMXRenderer();
@@ -126,6 +127,7 @@ protected:
 
   MMAL_COMPONENT_T *m_vout;
   MMAL_PORT_T *m_vout_input;
+  MMAL_POOL_T *m_vout_input_pool;
 
   uint32_t          m_changed_count_vout;
   bool change_vout_input_format(MMAL_ES_FORMAT_T *m_format);

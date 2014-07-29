@@ -496,8 +496,8 @@ bool COpenMaxVideo::Open(CDVDStreamInfo &hints, CDVDCodecOptions &options, OpenM
     return false;
   }
 
-  //m_dec_output->buffer_num = 40;
-  //m_dec_output->buffer_size = m_dec_output->buffer_size_min;
+  m_dec_output->buffer_size = m_dec_output->buffer_size_min;
+  m_dec_output->buffer_num= m_dec_output->buffer_num_recommended;
   status = mmal_port_enable(m_dec_output, dec_output_port_cb_static);
   if (status != MMAL_SUCCESS)
   {
@@ -512,7 +512,7 @@ bool COpenMaxVideo::Open(CDVDStreamInfo &hints, CDVDCodecOptions &options, OpenM
     return false;
   }
 
-  printf("m_dec_input_pool: %dx%x=%dM\n", m_dec_input->buffer_num, m_dec_input->buffer_size, m_dec_input->buffer_num * m_dec_input->buffer_size >> 20);
+  printf("m_dec_input_pool: %dx%d=%dM\n", m_dec_input->buffer_num, m_dec_input->buffer_size, m_dec_input->buffer_num * m_dec_input->buffer_size >> 20);
   m_dec_input_pool = mmal_pool_create_with_allocator(m_dec_input->buffer_num, m_dec_input->buffer_size, m_dec_input, pool_allocator_alloc, pool_allocator_free);
   if (!m_dec_input_pool)
   {
@@ -520,7 +520,7 @@ bool COpenMaxVideo::Open(CDVDStreamInfo &hints, CDVDCodecOptions &options, OpenM
     return false;
   }
 
-  printf("m_dec_output_pool: %dx%x=%dM\n", m_dec_output->buffer_num, m_dec_output->buffer_size, m_dec_output->buffer_num * m_dec_output->buffer_size >> 20);
+  printf("m_dec_output_pool: %dx%d=%dM\n", m_dec_output->buffer_num, m_dec_output->buffer_size, m_dec_output->buffer_num * m_dec_output->buffer_size >> 20);
   m_dec_output_pool = mmal_pool_create_with_allocator(m_dec_output->buffer_num, m_dec_output->buffer_size, m_dec_output, pool_allocator_alloc, pool_allocator_free);
   if(!m_dec_output_pool)
   {

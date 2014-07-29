@@ -45,6 +45,7 @@ COMXRenderer::YUVBUFFER::YUVBUFFER()
   memset(&fields, 0, sizeof(fields));
   memset(&image , 0, sizeof(image));
   openMaxBuffer = NULL;
+  mmal_buffer = NULL;
 }
 
 COMXRenderer::YUVBUFFER::~YUVBUFFER()
@@ -52,6 +53,15 @@ COMXRenderer::YUVBUFFER::~YUVBUFFER()
   CLog::Log(LOGERROR, "%s::%s Delete %p", CLASSNAME, __func__, openMaxBuffer);
 }
 
+static void* pool_allocator_alloc(void *context, uint32_t size)
+{
+  return mmal_port_payload_alloc((MMAL_PORT_T *)context, size);
+}
+
+static void pool_allocator_free(void *context, void *mem)
+{
+  mmal_port_payload_free((MMAL_PORT_T *)context, (uint8_t *)mem);
+}
 
 static void vout_control_port_cb(MMAL_PORT_T *port, MMAL_BUFFER_HEADER_T *buffer)
 {
@@ -65,7 +75,16 @@ void COMXRenderer::vout_input_port_cb(MMAL_PORT_T *port, MMAL_BUFFER_HEADER_T *b
   #if defined(OMX_DEBUG_VERBOSE)
   CLog::Log(LOGDEBUG, "%s::%s port:%p buffer %p (%p), len %d cmd:%x", CLASSNAME, __func__, port, buffer, omvb, buffer->length, buffer->cmd);
   #endif
-  omvb->Release();
+
+  if (m_format == RENDER_FMT_OMXEGL)
+  {
+    omvb->Release();
+  }
+  else if (m_format == RENDER_FMT_YUV420P)
+  {
+    mmal_buffer_header_release(buffer);
+  }
+  else assert(0);
 }
 
 static void vout_input_port_cb_static(MMAL_PORT_T *port, MMAL_BUFFER_HEADER_T *buffer)
@@ -74,12 +93,13 @@ static void vout_input_port_cb_static(MMAL_PORT_T *port, MMAL_BUFFER_HEADER_T *b
   omx->vout_input_port_cb(port, buffer);
 }
 
-bool COMXRenderer::init_vout(MMAL_ES_FORMAT_T *m_format)
+bool COMXRenderer::init_vout(MMAL_ES_FORMAT_T *format)
 {
   MMAL_STATUS_T status;
   // todo: deinterlace
 
   CLog::Log(LOGDEBUG, "%s::%s", CLASSNAME, __func__);
+
   /* Create video renderer */
   status = mmal_component_create(MMAL_COMPONENT_DEFAULT_VIDEO_RENDERER, &m_vout);
   if(status != MMAL_SUCCESS)
@@ -97,14 +117,19 @@ bool COMXRenderer::init_vout(MMAL_ES_FORMAT_T *m_format)
   }
   m_vout_input = m_vout->input[0];
   m_vout_input->userdata = (struct MMAL_PORT_USERDATA_T *)this;
-  mmal_format_full_copy(m_vout_input->format, m_format);
-  //m_vout_input->buffer_num = 40;
+  mmal_format_full_copy(m_vout_input->format, format);
   status = mmal_port_format_commit(m_vout_input);
   if (status != MMAL_SUCCESS)
   {
     CLog::Log(LOGERROR, "%s::%s Failed to commit vout input format (status=%x %s)", CLASSNAME, __func__, status, mmal_status_to_string(status));
     return false;
   }
+
+  if (m_format == RENDER_FMT_YUV420P)
+    m_vout_input->buffer_num = m_NumYV12Buffers;
+  else
+    m_vout_input->buffer_num = m_vout_input->buffer_num_min;
+  m_vout_input->buffer_size = m_vout_input->buffer_size_recommended;
 
   status = mmal_port_enable(m_vout_input, vout_input_port_cb_static);
   if(status != MMAL_SUCCESS)
@@ -119,13 +144,25 @@ bool COMXRenderer::init_vout(MMAL_ES_FORMAT_T *m_format)
     CLog::Log(LOGERROR, "%s::%s Failed to enable vout component (status=%x %s)", CLASSNAME, __func__, status, mmal_status_to_string(status));
     return false;
   }
+
+  if (m_format == RENDER_FMT_YUV420P)
+  {
+    printf("m_vout_input_pool: %dx%d=%dM\n", m_vout_input->buffer_num, m_vout_input->buffer_size, m_vout_input->buffer_num * m_vout_input->buffer_size >> 20);
+    m_vout_input_pool = mmal_pool_create_with_allocator(m_vout_input->buffer_num, m_vout_input->buffer_size, m_vout_input, pool_allocator_alloc, pool_allocator_free);
+    if (!m_vout_input_pool)
+    {
+      CLog::Log(LOGERROR, "%s::%s Failed to create pool for decoder input port (status=%x %s)", CLASSNAME, __func__, status, mmal_status_to_string(status));
+      return false;
+    }
+  }
   return true;
 }
 
-bool COMXRenderer::change_vout_input_format(MMAL_ES_FORMAT_T *m_format)
+bool COMXRenderer::change_vout_input_format(MMAL_ES_FORMAT_T *format)
 {
   MMAL_STATUS_T status;
   CLog::Log(LOGDEBUG, "%s::%s", CLASSNAME, __func__);
+
   status = mmal_port_disable(m_vout_input);
   if (status != MMAL_SUCCESS)
   {
@@ -133,7 +170,7 @@ bool COMXRenderer::change_vout_input_format(MMAL_ES_FORMAT_T *m_format)
     return false;
   }
 
-  mmal_format_full_copy(m_vout_input->format, m_format);
+  mmal_format_full_copy(m_vout_input->format, format);
   status = mmal_port_format_commit(m_vout_input);
   if (status != MMAL_SUCCESS)
   {
@@ -160,6 +197,8 @@ COMXRenderer::COMXRenderer()
 
   m_vout = NULL;
   m_vout_input = NULL;
+  m_vout_input_pool = NULL;
+
   m_changed_count_vout = 0;
 
   m_orientation = 0;
@@ -228,26 +267,66 @@ int COMXRenderer::GetImage(YV12Image *image, int source, bool readonly)
   if( source == AUTOSOURCE )
    source = NextYV12Texture();
 
-  assert(m_format != RENDER_FMT_BYPASS);
   if (m_format == RENDER_FMT_OMXEGL)
   {
-    return source;
   }
-
-  YV12Image &im = m_buffers[source].image;
-
-  // copy the image - should be operator of YV12Image
-  for (int p=0;p<MAX_PLANES;p++)
+  else if (m_format == RENDER_FMT_YUV420P)
   {
-    image->plane[p]  = im.plane[p];
-    image->stride[p] = im.stride[p];
+    const int pitch = ALIGN_UP(m_sourceWidth, 32);
+    const int aligned_height = ALIGN_UP(m_sourceHeight, 16);
+    MMAL_BUFFER_HEADER_T *buffer = NULL;
+    if (!m_vout)
+    {
+      MMAL_ES_FORMAT_T *m_es_format = mmal_format_alloc();
+      m_es_format->encoding = MMAL_ENCODING_I420;
+      m_es_format->type = MMAL_ES_TYPE_VIDEO;
+      m_es_format->es->video.width = pitch;
+      m_es_format->es->video.height = aligned_height;
+      m_es_format->es->video.crop.width = m_sourceWidth;
+      m_es_format->es->video.crop.height = m_sourceHeight;
+
+      if (!m_vout && init_vout(m_es_format))
+      {
+         mmal_format_free(m_es_format);
+         return -1;
+      }
+      mmal_format_free(m_es_format);
+    }
+
+    buffer = mmal_queue_timedwait(m_vout_input_pool->queue, 500);
+    if (!buffer)
+    {
+      CLog::Log(LOGERROR, "%s::%s - mmal_queue_get failed", CLASSNAME, __func__);
+      return -1;
+    }
+
+    mmal_buffer_header_reset(buffer);
+
+    buffer->length = 3 * pitch * aligned_height >> 1;
+    assert(buffer->length <= buffer->alloc_size);
+
+    image->width    = m_sourceWidth;
+    image->height   = m_sourceHeight;
+    image->flags    = 0;
+    image->cshift_x = 1;
+    image->cshift_y = 1;
+    image->bpp      = 1;
+
+    image->stride[0] = pitch;
+    image->stride[1] = image->stride[2] = pitch>>image->cshift_x;
+
+    image->planesize[0] = pitch * aligned_height;
+    image->planesize[1] = image->planesize[2] = (pitch>>image->cshift_x)*(aligned_height>>image->cshift_y);
+
+    image->plane[0] = (uint8_t *)buffer->data;
+    image->plane[1] = image->plane[0] + image->planesize[0];
+    image->plane[2] = image->plane[1] + image->planesize[1];
+
+    CLog::Log(LOGDEBUG, "%s::%s - %p %d", CLASSNAME, __func__, buffer, source);
+    m_buffers[source].mmal_buffer = buffer;
+    //return -1;
   }
-  image->width    = im.width;
-  image->height   = im.height;
-  image->flags    = im.flags;
-  image->cshift_x = im.cshift_x;
-  image->cshift_y = im.cshift_y;
-  image->bpp      = 1;
+  else assert(0);
 
   return source;
 }
@@ -320,12 +399,19 @@ void COMXRenderer::RenderUpdate(bool clear, DWORD flags, DWORD alpha)
     }
     omvb->Acquire();
     mmal_port_send_buffer(m_vout_input, omvb->mmal_buffer);
+
   }
-  else
+  else if (m_format == RENDER_FMT_YUV420P)
   {
-    //assert(0);
-    printf("Render %dx%d %p,%p,%p\n", m_buffers[m_iYV12RenderBuffer].image.width, m_buffers[m_iYV12RenderBuffer].image.height, m_buffers[m_iYV12RenderBuffer].image.plane[0], m_buffers[m_iYV12RenderBuffer].image.plane[1], m_buffers[m_iYV12RenderBuffer].image.plane[2]);
+    CLog::Log(LOGDEBUG, "%s::%s - %p %d", CLASSNAME, __func__, m_buffers[m_iYV12RenderBuffer].mmal_buffer, m_iYV12RenderBuffer);
+    if (m_buffers[m_iYV12RenderBuffer].mmal_buffer)
+    {
+      mmal_port_send_buffer(m_vout_input, m_buffers[m_iYV12RenderBuffer].mmal_buffer);
+      m_buffers[m_iYV12RenderBuffer].mmal_buffer = NULL;
+      //mmal_buffer_header_release(m_buffers[m_iYV12RenderBuffer].mmal_buffer);
+    }
   }
+  else assert(0);
 }
 
 void COMXRenderer::FlipPage(int source)
@@ -363,7 +449,6 @@ void COMXRenderer::UnInit()
 {
   CSingleLock lock(g_graphicsContext);
   CLog::Log(LOGDEBUG, "%s::%s", CLASSNAME, __func__);
-
   if (m_vout)
   {
     mmal_component_disable(m_vout);
@@ -376,6 +461,13 @@ void COMXRenderer::UnInit()
     mmal_port_disable(m_vout_input);
     m_vout_input = NULL;
   }
+
+  if (m_vout_input_pool)
+  {
+    mmal_pool_destroy(m_vout_input_pool);
+    m_vout_input_pool = NULL;
+  }
+
   if (m_vout)
   {
     mmal_component_release(m_vout);
@@ -387,7 +479,7 @@ void COMXRenderer::UnInit()
     YUVBUFFER &buf = m_buffers[i];
     if (buf.openMaxBuffer)
     {
-      CLog::Log(LOGERROR, "%s::%s Delete %p", CLASSNAME, __func__, buf.openMaxBuffer);
+      CLog::Log(LOGDEBUG, "%s::%s Delete %p", CLASSNAME, __func__, buf.openMaxBuffer);
       SAFE_RELEASE(buf.openMaxBuffer);
     }
   }
