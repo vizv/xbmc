@@ -6190,7 +6190,18 @@ msgctxt "#13456"
 msgid "Hardware accelerated"
 msgstr ""
 
-#empty strings from id 13457 to 13499
+#: system/settings/settings.xml
+msgctxt "#13457"
+msgid "Allow hardware acceleration (OMXPlayer)"
+msgstr ""
+
+#. Description of setting "Videos -> Playback -> Allow hardware acceleration (OMXPlayer)" with label #13457
+#: system/settings/settings.xml
+msgctxt "#13458"
+msgid "Use OMXPlayer for decoding of video files."
+msgstr ""
+
+#empty strings from id 13459 to 13499
 
 #: system/settings/settings.xml
 msgctxt "#13500"

@@ -562,7 +562,7 @@ CDVDPlayer::CDVDPlayer(IPlayerCallback& callback)
   m_bOmxSentEOFs = false;
   m_threshold = 0.2f;
   m_current_deinterlace = CMediaSettings::Get().GetCurrentVideoSettings().m_DeinterlaceMode;
-  m_omxplayer_mode = false;
+  m_omxplayer_mode = CSettings::Get().GetBool("videoplayer.useomxplayer");
 }
 
 CDVDPlayer::~CDVDPlayer()
