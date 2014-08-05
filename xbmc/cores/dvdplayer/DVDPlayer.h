@@ -42,6 +42,33 @@
 #include "utils/StreamDetails.h"
 #include "threads/SystemClock.h"
 
+#ifdef HAS_OMXPLAYER
+#include "OMXCore.h"
+#include "OMXClock.h"
+#include "linux/RBP.h"
+#else
+
+// dummy class to avoid ifdefs where calls are made
+class OMXClock
+{
+  bool OMXInitialize(CDVDClock *clock) { return false; }
+  void OMXDeinitialize() {}
+  bool OMXIsPaused() { return m_pause; } { return false; }
+  bool OMXStop(bool lock = true) { return false; }
+  bool OMXStep(int steps = 1, bool lock = true) { return false; }
+  bool OMXReset(bool has_video, bool has_audio, bool lock = true) { return false; }
+  double OMXMediaTime(bool lock = true) { return 0.0; }
+  double OMXClockAdjustment(bool lock = true) { return 0.0; }
+  bool OMXMediaTime(double pts, bool lock = true) { return false; }
+  bool OMXPause(bool lock = true) { return false; }
+  bool OMXResume(bool lock = true) { return false; }
+  bool OMXSetSpeed(int speed, bool lock = true, bool pause_resume = false) { return false; }
+  bool OMXFlush(bool lock = true) { return false; }
+  bool OMXStateExecute(bool lock = true) { return false; }
+  void OMXStateIdle(bool lock = true) {}
+  bool HDMIClockSync(bool lock = true) { return false; }
+};
+#endif
 
 class CDVDInputStream;
 
@@ -257,6 +284,14 @@ public:
   virtual int GetCacheLevel() const ;
 
   virtual int OnDVDNavResult(void* pData, int iMessage);
+
+  virtual void GetRenderFeatures(std::vector<int> &renderFeatures);
+  virtual void GetDeinterlaceMethods(std::vector<int> &deinterlaceMethods);
+  virtual void GetDeinterlaceModes(std::vector<int> &deinterlaceModes);
+  virtual void GetAudioCapabilities(std::vector<int> &audioCaps);
+  virtual void GetSubtitleCapabilities(std::vector<int> &subCaps);
+  virtual bool ControlsVolume() {return m_omxplayer_mode;}
+
 protected:
   friend class CSelectionStreams;
 
@@ -264,8 +299,11 @@ protected:
   virtual void OnExit();
   virtual void Process();
 
-  virtual void CreatePlayers();
-  virtual void DestroyPlayers();
+  void CreatePlayers();
+  void DestroyPlayers();
+  void DoProcessing();
+  bool StillPlaying();
+
   bool OpenStream(CCurrentStream& current, int iStream, int source, bool reset = true);
   bool OpenStreamPlayer(CCurrentStream& current, CDVDStreamInfo& hint, bool reset);
   bool OpenAudioStream(CDVDStreamInfo& hint, bool reset = true);
@@ -407,6 +445,10 @@ protected:
 
   friend class CDVDPlayerVideo;
   friend class CDVDPlayerAudio;
+#ifdef HAS_OMXPLAYER
+  friend class OMXPlayerVideo;
+  friend class OMXPlayerAudio;
+#endif
 
   struct SPlayerState
   {
@@ -497,4 +539,17 @@ protected:
   bool m_HasAudio;
 
   bool m_DemuxerPausePending;
+
+  // omxplayer variables
+  OMXClock m_av_clock;
+  EDEINTERLACEMODE m_current_deinterlace;
+  bool m_bOmxWaitVideo;
+  bool m_bOmxWaitAudio;
+  bool m_bOmxSentEOFs;
+  float m_threshold;
+  int m_video_fifo;
+  int m_audio_fifo;
+  double m_last_check_time;         // we periodically check for gpu underrun
+  double m_stamp;                   // last media stamp
+  bool m_omxplayer_mode;            // using omxplayer acceleration
 };
