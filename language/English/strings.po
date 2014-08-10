@@ -15931,3 +15931,13 @@ msgstr ""
 msgctxt "#37031"
 msgid "Specifies how Blu-rays should be opened/played back. Disc menus are not fully supported yet and may cause problems."
 msgstr ""
+
+#: system/settings/settings.xml
+msgctxt "#38020"
+msgid "Support browsing into archives"
+msgstr ""
+
+#: system/settings/settings.xml
+msgctxt "#38021"
+msgid "Allow viewing and playing files in archives (e.g. zip, rar)"
+msgstr ""
