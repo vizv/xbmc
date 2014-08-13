@@ -67,6 +67,7 @@ private:
   void Deinitialize();
   static void RefreshCoverArt();
   static void RefreshMetadata();
+  static void ResetMetadata();
 
   int m_port;
 #if defined(HAVE_LIBSHAIRPLAY)
