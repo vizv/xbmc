@@ -6453,7 +6453,11 @@ msgctxt "#13555"
 msgid "%d Minutes"
 msgstr ""
 
-#empty strings from id 13556 to 13599
+msgctxt "#13556"
+msgid "Enable native resolution switching"
+msgstr ""
+
+#empty strings from id 13557 to 13599
 
 #: system/settings/darwin.xml
 msgctxt "#13600"
