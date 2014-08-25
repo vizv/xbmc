@@ -275,6 +275,10 @@ bool CActiveAEResample::Init(uint64_t dst_chan_layout, int dst_channels, int dst
 
   LOGTIME(3);
 
+  // audio_mixer only supports up to 192kHz, however as long as ratio of samplerates remains the same we can lie
+  while (src_rate > 192000 || dst_rate > 192000)
+    src_rate >>= 1, dst_rate >>= 1;
+
   OMX_INIT_STRUCTURE(m_pcm_input);
   m_pcm_input.nPortIndex            = m_omx_mixer.GetInputPort();
   m_pcm_input.eNumData              = OMX_NumericalDataSigned;
