@@ -50,7 +50,6 @@ CBaseRenderer::CBaseRenderer()
 
   m_nativeUpscaleSettings =
   {
-    true, //NativeUpscaleMode
     true, //OverrideFPS
     false, //CorrectPixelRatio
     1920, //DestWidth
@@ -125,7 +124,7 @@ void CBaseRenderer::ChooseBestResolution(float fps)
   if( m_nativeUpscaleSettings.MaxHeight && iNatH > m_nativeUpscaleSettings.MaxHeight )
     iNatH = 0;
 
-  if( m_nativeUpscaleSettings.NativeUpscaleMode && iNatW && iNatH )     // Native Upscale Mode
+  if( CSettings::Get().GetBool("videoplayer.nativeresolution") && iNatW && iNatH )     // Native Upscale Mode
   {
     CLog::Log(LOGNOTICE, "Searching for NATIVE resolution: %dx%d", m_sourceWidth, m_sourceHeight);
 
@@ -717,7 +716,7 @@ void CBaseRenderer::SetViewMode(int viewMode)
   float sourceFrameRatio = GetAspectRatio();
 
   // if we upscale via external AVR device, correct the pixel ratio
-  if( m_nativeUpscaleSettings.NativeUpscaleMode && m_bestResolution != m_resolution
+  if( CSettings::Get().GetBool("videoplayer.nativeresolution") && m_bestResolution != m_resolution
    && m_nativeUpscaleSettings.CorrectPixelRatio )
   {
     float destWidth = (float)(m_nativeUpscaleSettings.DestWidth);

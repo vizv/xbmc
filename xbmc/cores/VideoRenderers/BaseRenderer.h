@@ -74,7 +74,6 @@ struct DVDVideoPicture;
 
 typedef struct NativeUpscale
 {
-    bool NativeUpscaleMode;
     bool OverrideFPS;
     bool CorrectPixelRatio;
     int  DestWidth;
