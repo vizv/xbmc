@@ -230,11 +230,7 @@ int CSMBDirectory::OpenDir(const CURL& url, std::string& strAuth)
 {
   int fd = -1;
 
-  /* make a writeable copy */
-  CURL urlIn(url);
-
-  CPasswordManager::GetInstance().AuthenticateURL(urlIn);
-  strAuth = smb.URLEncode(urlIn);
+  strAuth = smb.URLEncode(url);
 
   // remove the / or \ at the end. the samba library does not strip them off
   // don't do this for smb:// !!
@@ -260,7 +256,7 @@ int CSMBDirectory::OpenDir(const CURL& url, std::string& strAuth)
     if (errno == EACCES)
     {
       if (m_flags & DIR_FLAG_ALLOW_PROMPT)
-        RequireAuthentication(urlIn);
+        RequireAuthentication(url);
       break;
     }
 
@@ -289,9 +285,7 @@ bool CSMBDirectory::Create(const CURL& url2)
   CSingleLock lock(smb);
   smb.Init();
 
-  CURL url(url2);
-  CPasswordManager::GetInstance().AuthenticateURL(url);
-  std::string strFileName = smb.URLEncode(url);
+  std::string strFileName = smb.URLEncode(url2);
 
   int result = smbc_mkdir(strFileName.c_str(), 0);
   success = (result == 0 || EEXIST == errno);
@@ -306,9 +300,7 @@ bool CSMBDirectory::Remove(const CURL& url2)
   CSingleLock lock(smb);
   smb.Init();
 
-  CURL url(url2);
-  CPasswordManager::GetInstance().AuthenticateURL(url);
-  std::string strFileName = smb.URLEncode(url);
+  std::string strFileName = smb.URLEncode(url2);
 
   int result = smbc_rmdir(strFileName.c_str());
 
@@ -326,9 +318,7 @@ bool CSMBDirectory::Exists(const CURL& url2)
   CSingleLock lock(smb);
   smb.Init();
 
-  CURL url(url2);
-  CPasswordManager::GetInstance().AuthenticateURL(url);
-  std::string strFileName = smb.URLEncode(url);
+  std::string strFileName = smb.URLEncode(url2);
 
   struct stat info;
   if (smbc_stat(strFileName.c_str(), &info) != 0)
