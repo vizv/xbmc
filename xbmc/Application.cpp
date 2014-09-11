@@ -5941,3 +5941,10 @@ bool CApplication::NotifyActionListeners(const CAction &action) const
   
   return false;
 }
+
+bool CApplication::ScreenSaverDisablesAutoScrolling()
+{
+  return IsInScreenSaver() && m_screenSaver &&
+    (m_screenSaver->ID() == "screensaver.xbmc.builtin.black" ||
+     m_screenSaver->ID() == "screensaver.xbmc.builtin.dim");
+}
