@@ -66,6 +66,8 @@ public:
   unsigned char *CaptureDisplay(int width, int height, int *stride, bool swap_red_blue, bool video_only = true);
   DllOMX *GetDllOMX() { return m_OMX ? m_OMX->GetDll() : NULL; }
   void WaitVsync();
+  double AdjustHDMIClock(double adjust);
+  double GetAdjustHDMIClock() { return m_last_pll_adjust; }
 
   void SuspendVideoOutput();
   void ResumeVideoOutput();
@@ -91,6 +93,7 @@ private:
   int m_x;
   int m_y;
   bool m_enabled;
+  double m_last_pll_adjust;
   public:
   void init_cursor();
   void set_cursor(const void *pixels, int width, int height, int hotspot_x, int hotspot_y);
