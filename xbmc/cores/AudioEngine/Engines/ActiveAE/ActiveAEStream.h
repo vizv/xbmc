@@ -104,7 +104,8 @@ public:
   void Flush();
   void SetDrain(bool drain);
   bool IsDrained();
-  void SetRR(double rr, double atempoThreshold);
+  void SetRR(double rr, double atempoThreshold, double pllAdjustRequest, double pllThreshold, double &pllAdjustActual);
+  void SetRR(double rr, double atempoThreshold) { double pllAdjustActual; SetRR(rr, atempoThreshold, 0.0, 0.0, pllAdjustActual); }
   double GetRR();
   void FillBuffer();
   bool DoesNormalize();
@@ -169,15 +170,15 @@ public:
   const unsigned int GetSampleRate() const override ;
   const enum AEDataFormat GetDataFormat() const override;
   
-  double GetResampleRatio() override;
-  void SetResampleRatio(double ratio) override;
-  void SetResampleMode(int mode) override;
-  void RegisterAudioCallback(IAudioCallback* pCallback) override;
-  void UnRegisterAudioCallback() override;
-  void FadeVolume(float from, float to, unsigned int time) override;
-  bool IsFading() override;
-  void RegisterSlave(IAEStream *stream) override;
-  bool HasDSP() override;
+  virtual double GetResampleRatio() override;
+  virtual void SetResampleRatio(double ratio) override;
+  virtual void SetResampleMode(int mode, float plladjust);
+  virtual void RegisterAudioCallback(IAudioCallback* pCallback) override;
+  virtual void UnRegisterAudioCallback() override;
+  virtual void FadeVolume(float from, float to, unsigned int time) override;
+  virtual bool IsFading() override;
+  virtual void RegisterSlave(IAEStream *stream) override;
+  virtual bool HasDSP() override;
 
 protected:
 
@@ -189,6 +190,7 @@ protected:
   float m_streamAmplify;
   double m_streamResampleRatio;
   int m_streamResampleMode;
+  float m_streamPllAdjust;
   unsigned int m_streamSpace;
   bool m_streamDraining;
   bool m_streamDrained;
@@ -229,6 +231,7 @@ protected:
   int m_fadingTime;
   int m_profile;
   int m_resampleMode;
+  float m_pllAdjust;
   double m_resampleIntegral;
   double m_clockSpeed;
   enum AVMatrixEncoding m_matrixEncoding;
