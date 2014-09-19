@@ -23,6 +23,7 @@
 #include "DVDCodecs/Audio/DVDAudioCodec.h"
 #include "DVDCodecs/DVDFactoryCodec.h"
 #include "settings/Settings.h"
+#include "settings/AdvancedSettings.h"
 #include "video/VideoReferenceClock.h"
 #include "utils/log.h"
 #include "utils/MathUtils.h"
@@ -136,8 +137,8 @@ bool CVideoPlayerAudio::AllowDTSHDDecode()
 bool CVideoPlayerAudio::OpenStream(CDVDStreamInfo &hints)
 {
   CLog::Log(LOGNOTICE, "Finding audio codec for: %i", hints.codec);
-  bool allowpassthrough = !CSettings::GetInstance().GetBool(CSettings::SETTING_VIDEOPLAYER_USEDISPLAYASCLOCK);
-  if (hints.realtime)
+  bool allowpassthrough = !CSettings::GetInstance().GetBool(CSettings::SETTING_VIDEOPLAYER_USEDISPLAYASCLOCK) || CSettings::GetInstance().GetInt("videoplayer.synctype") == SYNC_PLLADJUST;
+  if (hints.realtime && CSettings::GetInstance().GetInt("videoplayer.synctype") != SYNC_PLLADJUST)
     allowpassthrough = false;
   CDVDAudioCodec* codec = CDVDFactoryCodec::CreateAudioCodec(hints, allowpassthrough, AllowDTSHDDecode());
   if(!codec)
@@ -186,9 +187,9 @@ void CVideoPlayerAudio::OpenStream(CDVDStreamInfo &hints, CDVDAudioCodec* codec)
   m_synctype = SYNC_DISCON;
   m_setsynctype = SYNC_DISCON;
   if (CSettings::GetInstance().GetBool(CSettings::SETTING_VIDEOPLAYER_USEDISPLAYASCLOCK))
-    m_setsynctype = SYNC_RESAMPLE;
+    m_setsynctype = CSettings::GetInstance().GetInt("videoplayer.synctype");
   else if (hints.realtime)
-    m_setsynctype = SYNC_RESAMPLE;
+    m_setsynctype = CSettings::GetInstance().GetInt("videoplayer.synctype");
 
   m_prevsynctype = -1;
 
@@ -234,7 +235,6 @@ void CVideoPlayerAudio::CloseStream(bool bWaitForBuffers)
 
   // uninit queue
   m_messageQueue.End();
-
   CLog::Log(LOGNOTICE, "Deleting audio codec");
   if (m_pAudioCodec)
   {
@@ -466,8 +466,11 @@ void CVideoPlayerAudio::UpdatePlayerInfo()
   //print the inverse of the resample ratio, since that makes more sense
   //if the resample ratio is 0.5, then we're playing twice as fast
   if (m_synctype == SYNC_RESAMPLE)
-    s << ", rr:" << std::fixed << std::setprecision(5) << 1.0 / m_dvdAudio.GetResampleRatio();
-
+    s << ", rr:" << std::fixed << std::setprecision(5) << 1.0 / m_dvdAudio.GetResampleRatio() << ", err:" << std::fixed << std::setprecision(1) << m_dvdAudio.GetSyncError() * 1e-3 << "ms";
+#ifdef TARGET_RASPBERRY_PI
+  if (m_synctype == SYNC_PLLADJUST)
+    s << ", pll:" << std::fixed << std::setprecision(5) << g_RBP.GetAdjustHDMIClock() << ", err:" << std::fixed << std::setprecision(1) << m_dvdAudio.GetSyncError() * 1e-3 << "ms";
+#endif
   s << ", att:" << std::fixed << std::setprecision(1) << log(GetCurrentAttenuation()) * 20.0f << " dB";
 
   SInfo info;
@@ -601,12 +604,14 @@ void CVideoPlayerAudio::SetSyncType(bool passthrough)
 
   if (m_synctype != m_prevsynctype)
   {
-    const char *synctypes[] = {"clock feedback", "resample", "invalid"};
-    int synctype = (m_synctype >= 0 && m_synctype <= 1) ? m_synctype : 2;
+    const char *synctypes[] = {"clock feedback", "skip/duplicate", "resample", "pll adjust", "invalid"};
+    int synctype = (m_synctype >= 0 && m_synctype <= 3) ? m_synctype : 4;
     CLog::Log(LOGDEBUG, "CVideoPlayerAudio:: synctype set to %i: %s", m_synctype, synctypes[synctype]);
     m_prevsynctype = m_synctype;
     if (m_synctype == SYNC_RESAMPLE)
       m_dvdAudio.SetResampleMode(1);
+    else if (m_synctype == SYNC_PLLADJUST)
+      m_dvdAudio.SetResampleMode(2);
     else
       m_dvdAudio.SetResampleMode(0);
   }
@@ -678,8 +683,8 @@ bool CVideoPlayerAudio::AcceptsData() const
 bool CVideoPlayerAudio::SwitchCodecIfNeeded()
 {
   CLog::Log(LOGDEBUG, "CVideoPlayerAudio: Sample rate changed, checking for passthrough");
-  bool allowpassthrough = !CSettings::GetInstance().GetBool(CSettings::SETTING_VIDEOPLAYER_USEDISPLAYASCLOCK);
-  if (m_streaminfo.realtime)
+  bool allowpassthrough = !CSettings::GetInstance().GetBool(CSettings::SETTING_VIDEOPLAYER_USEDISPLAYASCLOCK) || CSettings::GetInstance().GetInt("videoplayer.synctype") == SYNC_PLLADJUST;
+  if (m_streaminfo.realtime && CSettings::GetInstance().GetInt("videoplayer.synctype") != SYNC_PLLADJUST)
     allowpassthrough = false;
   CDVDAudioCodec *codec = CDVDFactoryCodec::CreateAudioCodec(m_streaminfo, allowpassthrough, AllowDTSHDDecode());
   if (!codec || codec->NeedPassthrough() == m_pAudioCodec->NeedPassthrough()) {
