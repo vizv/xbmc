@@ -56,7 +56,9 @@ extern "C" {
 enum AVSync
 {
   SYNC_DISCON = 0,
-  SYNC_RESAMPLE
+  SYNC_SKIPDUP,
+  SYNC_RESAMPLE,
+  SYNC_PLLADJUST
 };
 
 struct AEDelayStatus

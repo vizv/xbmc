@@ -34,6 +34,11 @@ using namespace ActiveAE;
 #include "windowing/WindowingFactory.h"
 #include "utils/log.h"
 
+#if defined(TARGET_RASPBERRY_PI)
+#include "settings/AdvancedSettings.h"
+#include "linux/RBP.h"
+#endif
+
 #define MAX_CACHE_LEVEL 0.4   // total cache time of stream in seconds
 #define MAX_WATER_LEVEL 0.2   // buffered time after stream stages in seconds
 #define MAX_BUFFER_TIME 0.1   // max time of a buffer in seconds
@@ -2355,7 +2360,17 @@ CSampleBuffer* CActiveAE::SyncStream(CActiveAEStream *stream)
   if (!newerror || stream->m_syncClock != CActiveAEStream::INSYNC)
     return ret;
 
-  if (stream->m_resampleMode)
+  if (stream->m_resampleMode == 2)  // pll adjust
+  {
+#if defined(TARGET_RASPBERRY_PI)
+    double e = std::max(std::min(error / 50.0, 1.0), -1.0);
+    double adjust = g_advancedSettings.m_maxPllAdjust * 1e-6;
+    double m_plladjust = 1.0 + e * adjust;
+    double m_last_plladjust = g_RBP.AdjustHDMIClock(m_plladjust);
+    CLog::Log(LOGDEBUG, "CDVDPlayerAudio::%s pll:%.5f (%.5f) error:%.6f e:%.6f a:%f", __FUNCTION__, m_plladjust, m_last_plladjust, error, e * adjust, adjust );
+#endif
+  }
+  else if (stream->m_resampleMode)
   {
     if (stream->m_resampleBuffers)
     {
