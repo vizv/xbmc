@@ -1119,6 +1119,7 @@ unsigned int COMXAudio::AddPackets(const void* data, unsigned int len, double dt
     return len;
   }
 
+#if 0
   if(m_eEncoding == OMX_AUDIO_CodingDTS && m_LostSync && (m_Passthrough || m_HWDecode))
   {
     int skip = SyncDTS((uint8_t *)data, len);
@@ -1132,6 +1133,7 @@ unsigned int COMXAudio::AddPackets(const void* data, unsigned int len, double dt
     if(skip > 0)
       return len;
   }
+#endif
 
   unsigned pitch = (m_Passthrough || m_HWDecode) ? 1:(m_BitsPerSample >> 3) * m_InputChannels;
   unsigned int demuxer_samples = len / pitch;
