@@ -502,6 +502,10 @@ bool CMMALRenderer::Supports(EINTERLACEMETHOD method)
 {
   if (method == VS_INTERLACEMETHOD_DEINTERLACE)
     return true;
+  if (method == VS_INTERLACEMETHOD_DEINTERLACE_HALF)
+    return true;
+  if (method == VS_INTERLACEMETHOD_RENDER_BOB)
+    return true;
 
   return false;
 }
