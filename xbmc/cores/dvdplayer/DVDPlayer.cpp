@@ -618,6 +618,7 @@ CDVDPlayer::CDVDPlayer(IPlayerCallback& callback)
   m_OmxPlayerState.bOmxSentEOFs        = false;
   m_OmxPlayerState.threshold           = 0.2f;
   m_OmxPlayerState.current_deinterlace = CMediaSettings::Get().GetCurrentVideoSettings().m_DeinterlaceMode;
+  m_OmxPlayerState.interlace_method    = g_renderManager.AutoInterlaceMethod(CMediaSettings::Get().GetCurrentVideoSettings().m_InterlaceMethod);
 #ifdef HAS_OMXPLAYER
   m_omxplayer_mode                     = CSettings::Get().GetBool("videoplayer.useomxplayer");
 #else
@@ -1123,13 +1124,15 @@ void CDVDPlayer::OMXDoProcessing()
     bool audio_fifo_low = false, video_fifo_low = false, audio_fifo_high = false, video_fifo_high = false;
 
     // if deinterlace setting has changed, we should close and open video
-    if (m_OmxPlayerState.current_deinterlace != CMediaSettings::Get().GetCurrentVideoSettings().m_DeinterlaceMode)
+    if (m_OmxPlayerState.current_deinterlace != CMediaSettings::Get().GetCurrentVideoSettings().m_DeinterlaceMode ||
+        m_OmxPlayerState.interlace_method    != g_renderManager.AutoInterlaceMethod(CMediaSettings::Get().GetCurrentVideoSettings().m_InterlaceMethod))
     {
       CloseStream(m_CurrentVideo, false);
       OpenStream(m_CurrentVideo, m_CurrentVideo.id, m_CurrentVideo.source);
       if (m_State.canseek)
         m_messenger.Put(new CDVDMsgPlayerSeek(GetTime(), true, true, true, true, true));
       m_OmxPlayerState.current_deinterlace = CMediaSettings::Get().GetCurrentVideoSettings().m_DeinterlaceMode;
+      m_OmxPlayerState.interlace_method    = g_renderManager.AutoInterlaceMethod(CMediaSettings::Get().GetCurrentVideoSettings().m_InterlaceMethod);
     }
 
     m_OmxPlayerState.video_fifo = (int)(100.0*(m_dvdPlayerVideo->GetDecoderBufferSize()-m_dvdPlayerVideo->GetDecoderFreeSpace())/m_dvdPlayerVideo->GetDecoderBufferSize());
