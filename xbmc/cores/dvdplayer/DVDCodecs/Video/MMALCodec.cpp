@@ -137,6 +137,7 @@ CMMALVideo::CMMALVideo()
   m_demux_queue_length = 0;
   m_es_format = mmal_format_alloc();
   m_preroll = true;
+  m_speed = DVD_PLAYSPEED_NORMAL;
 }
 
 CMMALVideo::~CMMALVideo()
@@ -701,6 +702,7 @@ bool CMMALVideo::Open(CDVDStreamInfo &hints, CDVDCodecOptions &options, MMALVide
   m_drop_state = false;
   m_startframe = false;
   m_preroll = !m_hints.stills;
+  m_speed = DVD_PLAYSPEED_NORMAL;
 
   return true;
 }
@@ -975,9 +977,17 @@ void CMMALVideo::Reset(void)
   m_decoderPts = DVD_NOPTS_VALUE;
   m_droppedPics = 0;
   m_decode_frame_number = 1;
-  m_preroll = !m_hints.stills;
+  m_preroll = !m_hints.stills && (m_speed == DVD_PLAYSPEED_NORMAL || m_speed == DVD_PLAYSPEED_PAUSE);
 }
 
+void CMMALVideo::SetSpeed(int iSpeed)
+{
+#if defined(MMAL_DEBUG_VERBOSE)
+  CLog::Log(LOGDEBUG, "%s::%s %d->%d", CLASSNAME, __func__, m_speed, iSpeed);
+#endif
+
+  m_speed = iSpeed;
+}
 
 void CMMALVideo::ReturnBuffer(CMMALVideoBuffer *buffer)
 {
