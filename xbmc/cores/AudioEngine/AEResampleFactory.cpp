@@ -18,8 +18,12 @@
  *
  */
 
+#include "settings/Settings.h"
 #include "AEResampleFactory.h"
 #include "Engines/ActiveAE/ActiveAEResampleFFMPEG.h"
+#if defined(TARGET_RASPBERRY_PI)
+  #include "Engines/ActiveAE/ActiveAEResamplePi.h"
+#endif
 
 extern "C" {
 #include "libavutil/channel_layout.h"
@@ -32,6 +36,10 @@ namespace ActiveAE
 
 IAEResample *CAEResampleFactory::Create()
 {
+#if defined(TARGET_RASPBERRY_PI)
+  if (CSettings::Get().GetBool("videoplayer.resamplepi"))
+    return new CActiveAEResamplePi();
+#endif
   return new CActiveAEResampleFFMPEG();
 }
 

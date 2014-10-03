@@ -15998,3 +15998,13 @@ msgstr ""
 msgctxt "#38006"
 msgid "Adjust PLL"
 msgstr ""
+
+#: system/settings/rbp.xml
+msgctxt "#38010"
+msgid "Use accelerated resampling"
+msgstr ""
+
+#: system/settings/rbp.xml
+msgctxt "#38011"
+msgid "This setting reduces CPU by handing audio resampling on the GPU"
+msgstr ""
