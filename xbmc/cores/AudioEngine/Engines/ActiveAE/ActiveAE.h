@@ -23,7 +23,7 @@
 #include "threads/Thread.h"
 
 #include "ActiveAESink.h"
-#include "ActiveAEResample.h"
+#include "cores/AudioEngine/Interfaces/AEResample.h"
 #include "cores/AudioEngine/Interfaces/AEStream.h"
 #include "cores/AudioEngine/Interfaces/AESound.h"
 #include "cores/AudioEngine/AEFactory.h"

@@ -20,7 +20,7 @@
  */
 
 #include "cores/AudioEngine/Interfaces/AESound.h"
-#include "cores/AudioEngine/Engines/ActiveAE/ActiveAEResample.h"
+#include "cores/AudioEngine/AEResampleFactory.h"
 #include "filesystem/File.h"
 
 class DllAvUtil;

@@ -2676,14 +2676,14 @@ bool CActiveAE::ResampleSound(CActiveAESound *sound)
 
   orig_config = sound->GetSound(true)->config;
 
-  dst_config.channel_layout = CActiveAEResample::GetAVChannelLayout(m_internalFormat.m_channelLayout);
+  dst_config.channel_layout = CAEResampleFactory::GetAVChannelLayout(m_internalFormat.m_channelLayout);
   dst_config.channels = m_internalFormat.m_channelLayout.Count();
   dst_config.sample_rate = m_internalFormat.m_sampleRate;
-  dst_config.fmt = CActiveAEResample::GetAVSampleFormat(m_internalFormat.m_dataFormat);
+  dst_config.fmt = CAEResampleFactory::GetAVSampleFormat(m_internalFormat.m_dataFormat);
   dst_config.bits_per_sample = CAEUtil::DataFormatToUsedBits(m_internalFormat.m_dataFormat);
   dst_config.dither_bits = CAEUtil::DataFormatToDitherBits(m_internalFormat.m_dataFormat);
 
-  CActiveAEResample *resampler = new CActiveAEResample();
+  IAEResample *resampler = CAEResampleFactory::Create();
   resampler->Init(dst_config.channel_layout,
                   dst_config.channels,
                   dst_config.sample_rate,
