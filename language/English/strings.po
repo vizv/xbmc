@@ -16161,3 +16161,18 @@ msgstr ""
 #: system/settings/settings.xml
 msgctxt "#38009"
 msgid "%i dB"
+
+#: system/settings/rbp.xml
+msgctxt "#38012"
+msgid "Audio output latency"
+msgstr ""
+
+#: system/settings/rbp.xml
+msgctxt "#38013"
+msgid "Increase this to protect against underruns, reduce to have lower latency gui sounds"
+msgstr ""
+
+#: system/settings/rbp.xml
+msgctxt "#38014"
+msgid "%i ms"
+msgstr ""
