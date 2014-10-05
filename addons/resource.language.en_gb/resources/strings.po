@@ -16741,3 +16741,17 @@ msgstr ""
 msgctxt "#38121"
 msgid "This option supports 8 channel DTS HD decoding, but may use more CPU. It is only available when DTS and DTS-HD audio passthrough is disabled"
 msgstr ""
+
+msgctxt "#38100"
+msgid "Audio output latency"
+msgstr ""
+
+#: system/settings/rbp.xml
+msgctxt "#38101"
+msgid "Increase this to protect against underruns, reduce to have lower latency gui sounds"
+msgstr ""
+
+#: system/settings/rbp.xml
+msgctxt "#38102"
+msgid "%i ms"
+msgstr ""
