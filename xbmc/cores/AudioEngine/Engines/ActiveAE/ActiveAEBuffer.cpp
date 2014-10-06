@@ -258,7 +258,7 @@ bool CActiveAEBufferPoolResample::ResampleBuffers(int64_t timestamp)
 
     bool skipInput = false;
     // avoid that ffmpeg resample buffer grows too large
-    if (out_samples > free_samples * 2 && !m_empty)
+    if (out_samples > free_samples && !m_empty)
       skipInput = true;
 
     bool hasInput = !m_inputSamples.empty();
