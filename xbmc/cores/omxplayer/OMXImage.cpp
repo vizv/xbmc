@@ -206,7 +206,8 @@ bool COMXImage::CreateThumb(const std::string& srcFile, unsigned int maxHeight, 
   COMXImageReEnc reenc;
   void *pDestBuffer;
   unsigned int nDestSize;
-  if (URIUtils::HasExtension(srcFile, ".jpg|.tbn") && file.ReadFile(srcFile) && reenc.ReEncode(file, maxWidth, maxHeight, pDestBuffer, nDestSize))
+  int orientation = additional_info == "flipped" ? 1:0;
+  if (URIUtils::HasExtension(srcFile, ".jpg|.tbn") && file.ReadFile(srcFile, orientation) && reenc.ReEncode(file, maxWidth, maxHeight, pDestBuffer, nDestSize))
   {
     XFILE::CFile outfile;
     if (outfile.OpenForWrite(destFile, true))
@@ -592,7 +593,7 @@ static void inline SKIPN(uint8_t * &p, unsigned int n)
   p += n;
 }
 
-OMX_IMAGE_CODINGTYPE COMXImageFile::GetCodingType(unsigned int &width, unsigned int &height)
+OMX_IMAGE_CODINGTYPE COMXImageFile::GetCodingType(unsigned int &width, unsigned int &height, int orientation)
 {
   OMX_IMAGE_CODINGTYPE eCompressionFormat = OMX_IMAGE_CodingMax;
   bool progressive = false;
@@ -809,7 +810,7 @@ OMX_IMAGE_CODINGTYPE COMXImageFile::GetCodingType(unsigned int &width, unsigned 
                 {
                   SKIPN(p, 1 * 7);
                   readBits += 7;
-                  m_orientation = READ8(p);
+                  m_orientation = READ8(p)-1;
                   readBits += 1;
                   SKIPN(p, 1 * 2);
                   readBits += 2;
@@ -818,7 +819,7 @@ OMX_IMAGE_CODINGTYPE COMXImageFile::GetCodingType(unsigned int &width, unsigned 
                 {
                   SKIPN(p, 1 * 6);
                   readBits += 6;
-                  m_orientation = READ8(p);
+                  m_orientation = READ8(p)-1;
                   readBits += 1;
                   SKIPN(p, 1 * 3);
                   readBits += 3;
@@ -848,7 +849,9 @@ OMX_IMAGE_CODINGTYPE COMXImageFile::GetCodingType(unsigned int &width, unsigned 
     }
   }
 
-  if(m_orientation > 8)
+  // apply input orientation
+  m_orientation = m_orientation ^ orientation;
+  if(m_orientation < 0 || m_orientation >= 8)
     m_orientation = 0;
 
   if(eCompressionFormat == OMX_IMAGE_CodingMax)
@@ -872,7 +875,7 @@ OMX_IMAGE_CODINGTYPE COMXImageFile::GetCodingType(unsigned int &width, unsigned 
 }
 
 
-bool COMXImageFile::ReadFile(const std::string& inputFile)
+bool COMXImageFile::ReadFile(const std::string& inputFile, int orientation)
 {
   XFILE::CFile      m_pFile;
   m_filename = inputFile.c_str();
@@ -903,7 +906,7 @@ bool COMXImageFile::ReadFile(const std::string& inputFile)
   m_pFile.Read(m_image_buffer, m_image_size);
   m_pFile.Close();
 
-  OMX_IMAGE_CODINGTYPE eCompressionFormat = GetCodingType(m_width, m_height);
+  OMX_IMAGE_CODINGTYPE eCompressionFormat = GetCodingType(m_width, m_height, orientation);
   if(eCompressionFormat != OMX_IMAGE_CodingJPEG)
   {
     CLog::Log(LOGERROR, "%s::%s %s GetCodingType=0x%x\n", CLASSNAME, __func__, inputFile.c_str(), eCompressionFormat);
@@ -1659,7 +1662,7 @@ bool COMXImageReEnc::HandlePortSettingChange(unsigned int resize_width, unsigned
       item.metadata.eValueCharset = OMX_MetadataCharsetASCII;
       item.metadata.sLanguageCountry = 0;
       item.metadata.nValueMaxSize = sizeof(item.metadata_space);
-      sprintf((char *)item.metadata.nValue, "%d", orientation);
+      sprintf((char *)item.metadata.nValue, "%d", orientation + 1);
       item.metadata.nValueSizeUsed = strlen((char *)item.metadata.nValue);
 
       omx_err = m_omx_encoder.SetParameter(OMX_IndexConfigMetadataItem, &item);
