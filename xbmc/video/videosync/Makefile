@@ -1,5 +1,4 @@
-SRCS=VideoSyncGLX.cpp \
-     VideoSyncCocoa.cpp \
+SRCS=VideoSyncCocoa.cpp \
      VideoSyncDRM.cpp \
 
 LIB=videosync.a
