@@ -925,6 +925,10 @@ int CMMALVideo::Decode(uint8_t* pData, int iSize, double dts, double pts)
   }
   else
     m_preroll = false;
+
+  if (m_preroll && m_output_ready.size() >= GetAllowedReferences())
+    m_preroll = false;
+
   if (!m_output_ready.empty() && !m_preroll)
   {
     #if defined(MMAL_DEBUG_VERBOSE)
