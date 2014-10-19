@@ -618,7 +618,7 @@ CDVDPlayer::CDVDPlayer(IPlayerCallback& callback)
   m_OmxPlayerState.bOmxSentEOFs        = false;
   m_OmxPlayerState.threshold           = 0.2f;
   m_OmxPlayerState.current_deinterlace = CMediaSettings::Get().GetCurrentVideoSettings().m_DeinterlaceMode;
-  m_OmxPlayerState.interlace_method    = g_renderManager.AutoInterlaceMethod(CMediaSettings::Get().GetCurrentVideoSettings().m_InterlaceMethod);
+  m_OmxPlayerState.interlace_method    = VS_INTERLACEMETHOD_MAX;
 #ifdef HAS_OMXPLAYER
   m_omxplayer_mode                     = CSettings::Get().GetBool("videoplayer.useomxplayer");
 #else
@@ -1123,10 +1123,16 @@ void CDVDPlayer::OMXDoProcessing()
     float threshold = 0.1f;
     bool audio_fifo_low = false, video_fifo_low = false, audio_fifo_high = false, video_fifo_high = false;
 
+    if (m_OmxPlayerState.interlace_method == VS_INTERLACEMETHOD_MAX)
+      m_OmxPlayerState.interlace_method = g_renderManager.AutoInterlaceMethod(CMediaSettings::Get().GetCurrentVideoSettings().m_InterlaceMethod);
+
     // if deinterlace setting has changed, we should close and open video
     if (m_OmxPlayerState.current_deinterlace != CMediaSettings::Get().GetCurrentVideoSettings().m_DeinterlaceMode ||
-        m_OmxPlayerState.interlace_method    != g_renderManager.AutoInterlaceMethod(CMediaSettings::Get().GetCurrentVideoSettings().m_InterlaceMethod))
+        (m_OmxPlayerState.current_deinterlace != VS_DEINTERLACEMODE_OFF && m_OmxPlayerState.interlace_method != g_renderManager.AutoInterlaceMethod(CMediaSettings::Get().GetCurrentVideoSettings().m_InterlaceMethod)))
     {
+      CLog::Log(LOGERROR, "%s - Reopen stream due to interlace change (%d,%d,%d,%d)", __FUNCTION__, m_OmxPlayerState.current_deinterlace, CMediaSettings::Get().GetCurrentVideoSettings().m_DeinterlaceMode,
+              m_OmxPlayerState.interlace_method, g_renderManager.AutoInterlaceMethod(CMediaSettings::Get().GetCurrentVideoSettings().m_InterlaceMethod));
+
       CloseStream(m_CurrentVideo, false);
       OpenStream(m_CurrentVideo, m_CurrentVideo.id, m_CurrentVideo.source);
       if (m_State.canseek)
