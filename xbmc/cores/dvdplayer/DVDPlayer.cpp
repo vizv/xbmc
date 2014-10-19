@@ -2111,7 +2111,6 @@ void CDVDPlayer::CheckContinuity(CCurrentStream& current, DemuxPacket* pPacket)
       // not sure yet - flags the packets as unknown until we get confirmation on another audio/video packet
       pPacket->dts = DVD_NOPTS_VALUE;
       pPacket->pts = DVD_NOPTS_VALUE;
-      current.originaldts = pPacket->dts;
     }
   }
   else
