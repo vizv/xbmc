@@ -31,6 +31,8 @@
 
 #if defined(HAVE_X11)
 #include "video/videosync/VideoSyncDRM.h"
+#elif defined(TARGET_RASPBERRY_PI)
+#include "video/videosync/VideoSyncPi.h"
 #endif
 
 using namespace std;
@@ -88,6 +90,8 @@ void CVideoReferenceClock::Process()
     m_pVideoSync = new CVideoSyncD3D();
 #elif defined(TARGET_DARWIN)
     m_pVideoSync = new CVideoSyncCocoa();
+#elif defined(TARGET_RASPBERRY_PI)
+    m_pVideoSync = new CVideoSyncPi();
 #endif
     SetupSuccess = m_pVideoSync->Setup(CBUpdateClock);
 

@@ -1,5 +1,6 @@
 SRCS=VideoSyncCocoa.cpp \
      VideoSyncDRM.cpp \
+     VideoSyncPi.cpp \
 
 LIB=videosync.a
 
