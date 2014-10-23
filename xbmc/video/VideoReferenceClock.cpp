@@ -68,6 +68,7 @@ void CVideoReferenceClock::CBUpdateClock(int NrVBlanks, uint64_t time)
 {
   {
     CSingleLock lock(g_VideoReferenceClock.m_CritSection);
+    g_VideoReferenceClock.m_RefreshRate = g_graphicsContext.GetFPS();
     g_VideoReferenceClock.m_VblankTime = time;
     g_VideoReferenceClock.UpdateClock(NrVBlanks, true);
     g_VideoReferenceClock.m_pVideoSync->SetFps((float)g_VideoReferenceClock.m_RefreshRate);
@@ -96,6 +97,7 @@ void CVideoReferenceClock::Process()
     SetupSuccess = m_pVideoSync->Setup(CBUpdateClock);
 
     UpdateRefreshrate(true); //forced refreshrate update
+    m_RefreshRate = g_graphicsContext.GetFPS();
     m_pVideoSync->SetFps((float)m_RefreshRate);
 
     CSingleLock SingleLock(m_CritSection);
