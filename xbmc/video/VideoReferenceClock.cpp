@@ -82,6 +82,9 @@ void CVideoReferenceClock::Process()
   bool SetupSuccess = false;
   int64_t Now;
 
+  /* This shouldn't be very busy and timing is important so increase priority */
+  SetPriority(GetPriority()+1);
+
   while(!m_bStop)
   {
     //set up the vblank clock
