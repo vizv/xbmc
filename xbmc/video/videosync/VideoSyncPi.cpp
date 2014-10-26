@@ -27,6 +27,7 @@
 #include "utils/TimeUtils.h"
 #include "utils/log.h"
 #include "linux/RBP.h"
+#include "threads/Thread.h"
 
 bool CVideoSyncPi::Setup(PUPDATECLOCK func)
 {
@@ -37,6 +38,9 @@ bool CVideoSyncPi::Setup(PUPDATECLOCK func)
 
 void CVideoSyncPi::Run(volatile bool& stop)
 {
+  /* This shouldn't be very busy and timing is important so increase priority */
+  CThread::GetCurrentThread()->SetPriority(CThread::GetCurrentThread()->GetPriority()+1);
+
   while (!stop)
   {
     g_RBP.WaitVsync();
