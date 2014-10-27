@@ -35,6 +35,10 @@
 #include "utils/Variant.h"
 #include "utils/XMLUtils.h"
 
+#if defined(TARGET_RASPBERRY_PI)
+#include "platform/linux/RBP.h"
+#endif
+
 using namespace ADDON;
 using namespace XFILE;
 
@@ -371,7 +375,12 @@ void CAdvancedSettings::Initialize()
   m_iPVRTimeshiftThreshold = 10;
   m_bPVRTimeshiftSimpleOSD = true;
 
+#ifdef TARGET_RASPBERRY_PI
+  // want default to be memory dependent, but interface to gpu not available yet, so set in RBP.cpp
+  m_cacheMemSize = ~0;
+#else
   m_cacheMemSize = 1024 * 1024 * 20; // 20 MiB
+#endif
   m_cacheBufferMode = CACHE_BUFFER_MODE_INTERNET; // Default (buffer all internet streams/filesystems)
   m_cacheChunkSize = 128 * 1024; // 128 KiB
   // the following setting determines the readRate of a player data
@@ -420,7 +429,9 @@ void CAdvancedSettings::Initialize()
   m_openGlDebugging = false;
 
   m_userAgent = g_sysinfo.GetUserAgent();
-
+#ifdef TARGET_RASPBERRY_PI
+  g_RBP.InitializeSettings();
+#endif
   m_initialized = true;
 }
 
