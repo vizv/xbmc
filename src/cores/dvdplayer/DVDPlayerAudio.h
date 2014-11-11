@@ -233,6 +233,8 @@ protected:
   double m_maxspeedadjust;
   double m_resampleratio; //resample ratio when using SYNC_RESAMPLE, used for the codec info
   double m_plladjust;    // for display using SYNC_PLLADJUST
+  double m_last_error;    // for display using SYNC_PLLADJUST
+  double m_last_plladjust;    // for display using SYNC_PLLADJUST
 
   struct SInfo
   {
