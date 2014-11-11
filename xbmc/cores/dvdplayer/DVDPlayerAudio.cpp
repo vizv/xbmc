@@ -113,7 +113,9 @@ CDVDPlayerAudio::CDVDPlayerAudio(CDVDClock* pClock, CDVDMessageQueue& parent)
   m_started = false;
   m_silence = false;
   m_resampleratio = 1.0;
-  m_plladjust = 1.0f;
+  m_plladjust = 1.0;
+  m_last_plladjust = 1.0;
+  m_last_error = 0.0;
   m_synctype = SYNC_DISCON;
   m_setsynctype = SYNC_DISCON;
   m_prevsynctype = -1;
@@ -192,6 +194,8 @@ void CDVDPlayerAudio::OpenStream( CDVDStreamInfo &hints, CDVDAudioCodec* codec )
 
   m_error = 0;
   m_errors.Flush();
+  m_plladjust = 1.0;
+  m_last_plladjust = 1.0;
   m_integral = 0;
   m_prevskipped = false;
   m_syncclock = true;
@@ -234,7 +238,6 @@ void CDVDPlayerAudio::CloseStream(bool bWaitForBuffers)
 
   // uninit queue
   m_messageQueue.End();
-
   CLog::Log(LOGNOTICE, "Deleting audio codec");
   if (m_pAudioCodec)
   {
@@ -475,9 +478,11 @@ void CDVDPlayerAudio::UpdatePlayerInfo()
   //print the inverse of the resample ratio, since that makes more sense
   //if the resample ratio is 0.5, then we're playing twice as fast
   if (m_synctype == SYNC_RESAMPLE)
-    s << ", rr:" << fixed << setprecision(5) << 1.0 / m_resampleratio;
+    s << ", rr:" << fixed << setprecision(5) << 1.0 / m_resampleratio << ", err:" << fixed << setprecision(1) << m_last_error * 1e-3 << "ms";
+  if (m_synctype == SYNC_SKIPDUP)
+    s << ", err:" << fixed << setprecision(1) << m_last_error * 1e-3 << "ms";
   if (m_synctype == SYNC_PLLADJUST)
-    s << ", pll:" << fixed << setprecision(5) << 1.0 / m_plladjust;
+    s << ", pll:" << fixed << setprecision(5) << m_last_plladjust << ", err:" << fixed << setprecision(1) << m_last_error * 1e-3 << "ms";
 
   s << ", att:" << fixed << setprecision(1) << log(GetCurrentAttenuation()) * 20.0f << " dB";
 
@@ -651,6 +656,7 @@ void CDVDPlayerAudio::HandleSyncError(double duration)
     m_pClock->Update(clock+error, absolute, 0.0, "CDVDPlayerAudio::HandleSyncError1");
     m_errors.Flush();
     m_error = 0;
+    m_plladjust = 1.0;
     m_syncclock = false;
 
     return;
@@ -704,32 +710,18 @@ void CDVDPlayerAudio::HandleSyncError(double duration)
         proportional = m_error / DVD_TIME_BASE / proportionaldiv;
       }
       m_resampleratio = 1.0 / m_pClock->GetClockSpeed() + proportional + m_integral;
+      CLog::Log(LOGDEBUG, "CDVDPlayerAudio::%s rr:%.5f error:%.3fms", __FUNCTION__, m_resampleratio, m_error * 1e-3);
     }
     else if (m_synctype == SYNC_PLLADJUST)
     {
 #if defined(TARGET_RASPBERRY_PI)
-      //reset the integral on big errors, failsafe
-      if (fabs(m_error) > DVD_TIME_BASE)
-        m_integral = 0;
-      else if (fabs(m_error) > DVD_MSEC_TO_TIME(5))
-        m_integral += m_error / DVD_TIME_BASE / INTEGRAL;
-
-      double proportional = 0.0;
-
-      //on big errors use more proportional
-      if (fabs(m_error / DVD_TIME_BASE) > 0.0)
-      {
-        double proportionaldiv = PROPORTIONAL * (PROPREF / fabs(m_error / DVD_TIME_BASE));
-        if (proportionaldiv < PROPDIVMIN) proportionaldiv = PROPDIVMIN;
-        else if (proportionaldiv > PROPDIVMAX) proportionaldiv = PROPDIVMAX;
-
-        proportional = m_error / DVD_TIME_BASE / proportionaldiv;
-      }
-      m_plladjust = 1.0 / m_pClock->GetClockSpeed() + proportional + m_integral;
-      double new_adjust = g_RBP.AdjustHDMIClock(m_plladjust);
-      CLog::Log(LOGDEBUG, "CDVDPlayerAudio::%s pll:%.4f (%.4f) proportional:%.4f integral:%.4f", __FUNCTION__, m_plladjust, new_adjust, proportional, m_integral);
+      double e = std::max(std::min(m_error, DVD_MSEC_TO_TIME(10)), -DVD_MSEC_TO_TIME(10));
+      m_plladjust = 1.0 + e * 1.5e-8;
+      m_last_plladjust = g_RBP.AdjustHDMIClock(m_plladjust);
+      CLog::Log(LOGDEBUG, "CDVDPlayerAudio::%s pll:%.5f (%.5f) error:%.6f e:%.6f", __FUNCTION__, m_plladjust, m_last_plladjust, m_error, e * 1.5e-8 );
 #endif
     }
+    m_last_error = m_error;
   }
 }
 
