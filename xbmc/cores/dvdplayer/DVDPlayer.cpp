@@ -531,6 +531,7 @@ int CSelectionStreams::CountSource(StreamType type, StreamSource source) const
 
 void CDVDPlayer::CreatePlayers()
 {
+  CSingleLock lock(m_players_lock);
 #ifdef HAS_OMXPLAYER
   if (m_omxplayer_mode && OMXPlayerUnsuitable(m_HasVideo, m_HasAudio, m_pDemuxer, m_pInputStream, m_SelectionStreams))
   {
@@ -560,6 +561,7 @@ void CDVDPlayer::CreatePlayers()
 
 void CDVDPlayer::DestroyPlayers()
 {
+  CSingleLock lock(m_players_lock);
   if (!m_players_created)
     return;
   delete m_dvdPlayerVideo;
@@ -4150,6 +4152,7 @@ double CDVDPlayer::GetQueueTime()
 
 void CDVDPlayer::GetVideoStreamInfo(SPlayerVideoStreamInfo &info)
 {
+  CSingleLock lock(m_players_lock);
   info.bitrate = m_dvdPlayerVideo->GetVideoBitrate();
 
   std::string retVal;
