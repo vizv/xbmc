@@ -16226,3 +16226,14 @@ msgstr ""
 msgctxt "#38015"
 msgid "Extract thumbnails from video files"
 msgstr ""
+
+#. Description of setting "Services -> SMB Client -> Maximum client version" with label #38012
+#: system/settings/settings.xml
+msgctxt "#38011"
+msgid "Specifies the maximum allowed 'client max protocol' when connecting to samba servers. Higher number can allow higher performance on slow network links. Accepted values NT1, SMB2, SMB3"
+msgstr ""
+
+#: system/settings/settings.xml
+msgctxt "#38012"
+msgid "Maximum client version"
+msgstr ""
