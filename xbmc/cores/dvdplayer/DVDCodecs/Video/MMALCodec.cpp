@@ -908,13 +908,13 @@ int CMMALVideo::Decode(uint8_t* pData, int iSize, double dts, double pts)
   {
     if (g_advancedSettings.CanLogComponent(LOGVIDEO))
       CLog::Log(LOGDEBUG, "%s::%s - got space for output: demux_queue(%d) space(%d)", CLASSNAME, __func__, m_demux_queue_length, mmal_queue_length(m_dec_input_pool->queue) * m_dec_input->buffer_size);
-    ret |= VC_BUFFER;
+    ret |= VC_PICTURE;
   }
   if (mmal_queue_length(m_dec_input_pool->queue) > 0 && !m_demux_queue_length)
   {
     if (g_advancedSettings.CanLogComponent(LOGVIDEO))
       CLog::Log(LOGDEBUG, "%s::%s -  got output picture:%d", CLASSNAME, __func__, m_output_ready.size());
-    ret |= VC_PICTURE;
+    ret |= VC_BUFFER;
   }
   if (!ret)
   {
@@ -965,13 +965,6 @@ void CMMALVideo::Reset(void)
   m_decode_frame_number = 1;
 }
 
-void CMMALVideo::SetSpeed(int iSpeed)
-{
-  if (g_advancedSettings.CanLogComponent(LOGVIDEO))
-    CLog::Log(LOGDEBUG, "%s::%s %d->%d", CLASSNAME, __func__, m_speed, iSpeed);
-
-  m_speed = iSpeed;
-}
 
 void CMMALVideo::ReturnBuffer(CMMALVideoBuffer *buffer)
 {
