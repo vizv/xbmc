@@ -919,8 +919,8 @@ int CMMALVideo::Decode(uint8_t* pData, int iSize, double dts, double pts)
   if (!ret)
   {
     if (g_advancedSettings.CanLogComponent(LOGVIDEO))
-      CLog::Log(LOGDEBUG, "%s::%s - Nothing to do: dts_queue(%d) ready_queue(%d) busy_queue(%d) demux_queue(%d) space(%d) preroll(%d)",
-        CLASSNAME, __func__, m_dts_queue.size(), m_output_ready.size(), m_output_busy, m_demux_queue_length, mmal_queue_length(m_dec_input_pool->queue) * m_dec_input->buffer_size, m_preroll);
+      CLog::Log(LOGDEBUG, "%s::%s - Nothing to do: dts_queue(%d) ready_queue(%d) busy_queue(%d) demux_queue(%d) space(%d)",
+        CLASSNAME, __func__, m_dts_queue.size(), m_output_ready.size(), m_output_busy, m_demux_queue_length, mmal_queue_length(m_dec_input_pool->queue) * m_dec_input->buffer_size);
     Sleep(10); // otherwise we busy spin
   }
   return ret;
