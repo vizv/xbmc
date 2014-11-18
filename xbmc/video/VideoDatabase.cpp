@@ -6720,27 +6720,48 @@ bool CVideoDatabase::GetMusicVideosNav(const std::string& strBaseDir, CFileItemL
   return GetMusicVideosByWhere(videoUrl.ToString(), filter, items, true, sortDescription, getDetails);
 }
 
-bool CVideoDatabase::GetRecentlyAddedMoviesNav(const std::string& strBaseDir, CFileItemList& items, unsigned int limit /* = 0 */, int getDetails /* = VideoDbDetailsNone */)
+bool CVideoDatabase::GetRecentlyAddedMoviesNav(const std::string& strBaseDir, CFileItemList& items, unsigned int limit /* = 0 */, int getDetails /* = VideoDbDetailsNone */, bool hideWatched /* = false */)
 {
   Filter filter;
   filter.order = "dateAdded desc, idMovie desc";
   filter.limit = PrepareSQL("%u", limit ? limit : g_advancedSettings.m_iVideoLibraryRecentlyAddedItems);
+
+  if (hideWatched)
+  {
+    filter.AppendWhere("playCount <= 0");// only query unwatched items
+    filter.AppendWhere("playCount IS NULL", false);
+  }
+
   return GetMoviesByWhere(strBaseDir, filter, items, SortDescription(), getDetails);
 }
 
-bool CVideoDatabase::GetRecentlyAddedEpisodesNav(const std::string& strBaseDir, CFileItemList& items, unsigned int limit /* = 0 */, int getDetails /* = VideoDbDetailsNone */)
+bool CVideoDatabase::GetRecentlyAddedEpisodesNav(const std::string& strBaseDir, CFileItemList& items, unsigned int limit /* = 0 */, int getDetails /* = VideoDbDetailsNone */, bool hideWatched /* = false */)
 {
   Filter filter;
   filter.order = "dateAdded desc, idEpisode desc";
   filter.limit = PrepareSQL("%u", limit ? limit : g_advancedSettings.m_iVideoLibraryRecentlyAddedItems);
+
+  if (hideWatched)
+  {
+    filter.AppendWhere("playCount <= 0");// only query unwatched items
+    filter.AppendWhere("playCount IS NULL", false);
+  }
+
   return GetEpisodesByWhere(strBaseDir, filter, items, false, SortDescription(), getDetails);
 }
 
-bool CVideoDatabase::GetRecentlyAddedMusicVideosNav(const std::string& strBaseDir, CFileItemList& items, unsigned int limit /* = 0 */, int getDetails /* = VideoDbDetailsNone */)
+bool CVideoDatabase::GetRecentlyAddedMusicVideosNav(const std::string& strBaseDir, CFileItemList& items, unsigned int limit /* = 0 */, int getDetails /* = VideoDbDetailsNone */, bool hideWatched /* = false */)
 {
   Filter filter;
   filter.order = "dateAdded desc, idMVideo desc";
   filter.limit = PrepareSQL("%u", limit ? limit : g_advancedSettings.m_iVideoLibraryRecentlyAddedItems);
+
+  if (hideWatched)
+  {
+    filter.AppendWhere("playCount <= 0");// only query unwatched items
+    filter.AppendWhere("playCount IS NULL", false);
+  }
+
   return GetMusicVideosByWhere(strBaseDir, filter, items, true, SortDescription(), getDetails);
 }
 
