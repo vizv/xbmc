@@ -12227,6 +12227,12 @@ msgctxt "#20471"
 msgid "Show empty TV shows"
 msgstr ""
 
+#. Label of setting "Videos -> Library -> Hide watched videos in recently added list (home screen)"
+#: system/settings/settings.xml
+msgctxt "#20479"
+msgid "Hide watched videos in recently added list (home screen)"
+msgstr ""
+
 #empty strings from id 20472 to 21329
 #up to 21329 is reserved for the video db !! !
 
@@ -17713,6 +17719,13 @@ msgid "Notification event describe regular processes and actions performed by th
 msgstr ""
 
 #empty strings from id 36462 to 36499
+
+#. Description of setting "Videos -> Library -> Hide watched videos in recently added list."
+#: system/settings/settings.xml
+msgctxt "#36499"
+msgid "If enabled all watched items in the recently added list on the home screen will be hidden. This includes movies, episodes and musicvideos. The effect depends on the used skin and its settings."
+msgstr ""
+
 #end reservation
 
 #. label of a setting for the stereoscopic 3D mode of the GUI that is/should be applied
