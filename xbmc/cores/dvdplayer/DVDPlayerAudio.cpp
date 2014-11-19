@@ -650,6 +650,8 @@ void CDVDPlayerAudio::HandleSyncError(double duration)
   double error = m_dvdAudio.GetPlayingPts() - clock;
   EMasterClock master = m_pClock->GetMaster();
 
+  CLog::Log(LOGNOTICE, "---------------- error: %f", error/1000);
+
   if( (fabs(error) > DVD_MSEC_TO_TIME(100) || m_syncclock)
   &&  (master == MASTER_CLOCK_AUDIO
     || master == MASTER_CLOCK_AUDIO_VIDEOREF) )
