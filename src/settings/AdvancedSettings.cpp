@@ -108,6 +108,7 @@ void CAdvancedSettings::Initialize()
 
   m_audioHeadRoom = 0;
   m_ac3Gain = 12.0f;
+  m_maxPllAdjust = 300;
   m_audioApplyDrc = true;
   m_dvdplayerIgnoreDTSinWAV = false;
 
@@ -481,6 +482,7 @@ void CAdvancedSettings::ParseSettingsFile(const CStdString &file)
   if (pElement)
   {
     XMLUtils::GetFloat(pElement, "ac3downmixgain", m_ac3Gain, -96.0f, 96.0f);
+    XMLUtils::GetInt(pElement, "maxplladjust", m_maxPllAdjust, 0, 1000000);
     XMLUtils::GetInt(pElement, "headroom", m_audioHeadRoom, 0, 12);
     XMLUtils::GetString(pElement, "defaultplayer", m_audioDefaultPlayer);
     // 101 on purpose - can be used to never automark as watched

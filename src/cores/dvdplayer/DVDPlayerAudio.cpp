@@ -25,6 +25,7 @@
 #include "DVDCodecs/DVDCodecs.h"
 #include "DVDCodecs/DVDFactoryCodec.h"
 #include "settings/Settings.h"
+#include "settings/AdvancedSettings.h"
 #include "video/VideoReferenceClock.h"
 #include "utils/log.h"
 #include "utils/TimeUtils.h"
@@ -715,10 +716,11 @@ void CDVDPlayerAudio::HandleSyncError(double duration)
     else if (m_synctype == SYNC_PLLADJUST)
     {
 #if defined(TARGET_RASPBERRY_PI)
-      double e = std::max(std::min(m_error, DVD_MSEC_TO_TIME(10)), -DVD_MSEC_TO_TIME(10));
-      m_plladjust = 1.0 + e * 1.5e-8;
+      double e = std::max(std::min(m_error / DVD_MSEC_TO_TIME(10), 1.0), -1.0);
+      double adjust = g_advancedSettings.m_maxPllAdjust * 1e-6;
+      m_plladjust = 1.0 + e * adjust;
       m_last_plladjust = g_RBP.AdjustHDMIClock(m_plladjust);
-      CLog::Log(LOGDEBUG, "CDVDPlayerAudio::%s pll:%.5f (%.5f) error:%.6f e:%.6f", __FUNCTION__, m_plladjust, m_last_plladjust, m_error, e * 1.5e-8 );
+      CLog::Log(LOGDEBUG, "CDVDPlayerAudio::%s pll:%.5f (%.5f) error:%.6f e:%.6f a:%f", __FUNCTION__, m_plladjust, m_last_plladjust, m_error, e * adjust, adjust );
 #endif
     }
     m_last_error = m_error;
