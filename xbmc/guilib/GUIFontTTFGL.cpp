@@ -218,10 +218,9 @@ void CGUIFontTTFGL::LastEnd()
       g_Windowing.SetScissors(clip);
 
       // Apply the translation to the currently active (top-of-stack) model view matrix
-      g_matrices.MatrixMode(MM_MODELVIEW);
-      g_matrices.PushMatrix();
-      g_matrices.Translatef(m_vertexTrans[i].translateX, m_vertexTrans[i].translateY, m_vertexTrans[i].translateZ);
-      glUniformMatrix4fv(modelLoc, 1, GL_FALSE, g_matrices.GetMatrix(MM_MODELVIEW));
+      glMatrixModview.Push();
+      glMatrixModview->Translatef(m_vertexTrans[i].translateX, m_vertexTrans[i].translateY, m_vertexTrans[i].translateZ);
+      glUniformMatrix4fv(modelLoc, 1, GL_FALSE, glMatrixModview.Get());
 
       // Bind the buffer to the OpenGL context's GL_ARRAY_BUFFER binding point
       glBindBuffer(GL_ARRAY_BUFFER, (GLuint) m_vertexTrans[i].vertexBuffer->bufferHandle);
@@ -242,12 +241,12 @@ void CGUIFontTTFGL::LastEnd()
         glDrawElements(GL_TRIANGLES, 6 * count, GL_UNSIGNED_SHORT, 0);
       }
 
-      g_matrices.PopMatrix();
+      glMatrixModview.PopLoad();
     }
     // Restore the original scissor rectangle
     g_Windowing.ResetScissors();
     // Restore the original model view matrix
-    glUniformMatrix4fv(modelLoc, 1, GL_FALSE, g_matrices.GetMatrix(MM_MODELVIEW));
+    glUniformMatrix4fv(modelLoc, 1, GL_FALSE, glMatrixModview.Get());
     // Unbind GL_ARRAY_BUFFER and GL_ELEMENT_ARRAY_BUFFER
     glBindBuffer(GL_ARRAY_BUFFER, 0);
     glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
