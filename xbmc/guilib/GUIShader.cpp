@@ -90,8 +90,8 @@ bool CGUIShader::OnEnabled()
 {
   // This is called after glUseProgram()
 
-  GLfloat *projMatrix = g_matrices.GetMatrix(MM_PROJECTION);
-  GLfloat *modelMatrix = g_matrices.GetMatrix(MM_MODELVIEW);
+  GLfloat *projMatrix = glMatrixProject.Get();
+  GLfloat *modelMatrix = glMatrixModview.Get();
   glUniformMatrix4fv(m_hProj,  1, GL_FALSE, projMatrix);
   glUniformMatrix4fv(m_hModel, 1, GL_FALSE, modelMatrix);
 
