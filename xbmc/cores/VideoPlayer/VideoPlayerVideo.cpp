@@ -255,7 +255,8 @@ void CVideoPlayerVideo::Process()
 
   while (!m_bStop)
   {
-    int iQueueTimeOut = (int)(m_stalled ? frametime : frametime * 10) / 1000;
+    bool bPictureWaiting = m_hints.stills && (m_pVideoCodec->Decode(NULL, 0, DVD_NOPTS_VALUE, DVD_NOPTS_VALUE) & VC_PICTURE);
+    int iQueueTimeOut = (int)(bPictureWaiting ? 0 : (m_hints.stills || m_stalled) ? frametime : frametime * 10) / 1000;
     int iPriority = (m_speed == DVD_PLAYSPEED_PAUSE && m_syncState == IDVDStreamPlayer::SYNC_INSYNC) ? 1 : 0;
 
     if (m_syncState == IDVDStreamPlayer::SYNC_WAITSYNC)
@@ -275,38 +276,47 @@ void CVideoPlayerVideo::Process()
       if( iPriority )
         continue;
 
-      // check if decoder has produced some output
-      while (!m_bStop)
+      // check for picture waiting
+      if (bPictureWaiting)
       {
-        m_pVideoCodec->SetCodecControl(0);
-        int decoderState = m_pVideoCodec->Decode(NULL, 0, DVD_NOPTS_VALUE, DVD_NOPTS_VALUE);
-
-        bool cont = ProcessDecoderOutput(decoderState, frametime, pts);
-
-        if (!cont)
-          break;
-
-        if (decoderState & VC_BUFFER)
-          break;
+        // create a dummy demuxer packet to prod the decode logic
+        pMsg = new CDVDMsgDemuxerPacket(CDVDDemuxUtils::AllocateDemuxPacket(0), false);
       }
-
-      //Okey, start rendering at stream fps now instead, we are likely in a stillframe
-      if (!m_stalled)
+      else
       {
-        if(m_syncState == IDVDStreamPlayer::SYNC_INSYNC)
-          CLog::Log(LOGINFO, "CVideoPlayerVideo - Stillframe detected, switching to forced %f fps", m_fFrameRate);
-        m_stalled = true;
-        pts += frametime * 4;
-      }
+        // check if decoder has produced some output
+        while (!m_bStop)
+        {
+          m_pVideoCodec->SetCodecControl(0);
+          int decoderState = m_pVideoCodec->Decode(NULL, 0, DVD_NOPTS_VALUE, DVD_NOPTS_VALUE);
 
-      //Waiting timed out, output last picture
-      if (m_picture.iFlags & DVP_FLAG_ALLOCATED)
-      {
-        OutputPicture(&m_picture, pts);
-        pts += frametime;
-      }
+          bool cont = ProcessDecoderOutput(decoderState, frametime, pts);
 
-      continue;
+          if (!cont)
+            break;
+
+          if (decoderState & VC_BUFFER)
+            break;
+        }
+
+        //Okey, start rendering at stream fps now instead, we are likely in a stillframe
+        if (!m_stalled)
+        {
+          if(m_syncState == IDVDStreamPlayer::SYNC_INSYNC)
+            CLog::Log(LOGINFO, "CVideoPlayerVideo - Stillframe detected, switching to forced %f fps", m_fFrameRate);
+          m_stalled = true;
+          pts += frametime * 4;
+        }
+
+        //Waiting timed out, output last picture
+        if (m_picture.iFlags & DVP_FLAG_ALLOCATED)
+        {
+          OutputPicture(&m_picture, pts);
+          pts += frametime;
+        }
+
+        continue;
+      }
     }
 
     if (pMsg->IsType(CDVDMsg::GENERAL_SYNCHRONIZE))
