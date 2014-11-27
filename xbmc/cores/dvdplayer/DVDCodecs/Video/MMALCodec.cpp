@@ -361,7 +361,7 @@ bool CMMALVideo::CreateDeinterlace(EINTERLACEMETHOD interlace_method)
   MMAL_PARAMETER_IMAGEFX_PARAMETERS_T imfx_param = {{MMAL_PARAMETER_IMAGE_EFFECT_PARAMETERS, sizeof(imfx_param)},
         interlace_method == VS_INTERLACEMETHOD_MMAL_ADVANCED || interlace_method == VS_INTERLACEMETHOD_MMAL_ADVANCED_HALF ?
             MMAL_PARAM_IMAGEFX_DEINTERLACE_ADV : MMAL_PARAM_IMAGEFX_DEINTERLACE_FAST,
-        3, {3, 0, m_hints.stills || interlace_method == VS_INTERLACEMETHOD_MMAL_ADVANCED_HALF || interlace_method == VS_INTERLACEMETHOD_MMAL_BOB_HALF }};
+        3, {3, 0, interlace_method == VS_INTERLACEMETHOD_MMAL_ADVANCED_HALF || interlace_method == VS_INTERLACEMETHOD_MMAL_BOB_HALF }};
   status = mmal_port_parameter_set(m_deint->output[0], &imfx_param.hdr);
   if (status != MMAL_SUCCESS)
   {
