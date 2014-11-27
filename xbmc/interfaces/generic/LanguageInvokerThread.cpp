@@ -54,7 +54,13 @@ bool CLanguageInvokerThread::execute(const std::string &script, const std::vecto
     m_condition.notify_one();
   }
   else
+  {
     Create();
+    #ifdef TARGET_RASPBERRY_PI
+    /* low prio */
+    SetPriority(GetPriority()-1);
+    #endif
+  }
 
   //Todo wait until running
 
