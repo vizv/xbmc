@@ -57,6 +57,7 @@ public:
   float m_aspect_ratio;
   int index;
   double dts;
+  uint32_t m_changed_count;
   // reference counting
   CMMALVideoBuffer* Acquire();
   long              Release();
@@ -98,6 +99,8 @@ public:
   // MMAL decoder callback routines.
   void dec_output_port_cb(MMAL_PORT_T *port, MMAL_BUFFER_HEADER_T *buffer);
   void dec_control_port_cb(MMAL_PORT_T *port, MMAL_BUFFER_HEADER_T *buffer);
+  uint32_t          m_changed_count;
+  uint32_t          m_changed_count_dec;
 
 protected:
   void QueryCodec(void);
