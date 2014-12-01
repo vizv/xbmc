@@ -192,6 +192,11 @@ CDVDVideoCodec* CDVDFactoryCodec::CreateVideoCodec(CDVDStreamInfo &hint, unsigne
 #else
   hwSupport += "iMXVPU:no ";
 #endif
+#if defined(HAS_MMAL)
+  hwSupport += "MMAL:yes ";
+#else
+  hwSupport += "MMAL:no ";
+#endif
   CLog::Log(LOGDEBUG, "CDVDFactoryCodec: compiled in hardware support: %s", hwSupport.c_str());
 
 #if defined(HAS_MMAL)
