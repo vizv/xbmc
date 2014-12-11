@@ -12422,7 +12422,7 @@ msgstr ""
 
 #: system/settings/settings.xml
 msgctxt "#20433"
-msgid "Extract thumbnails and video information"
+msgid "Extract video information from files"
 msgstr ""
 
 #: xbmc/dialogs/GUIDialogSmartPlaylistRule.cpp
@@ -16904,7 +16904,7 @@ msgstr ""
 #. Description of setting with label #20433 "Extract thumbnails and video information"
 #: system/settings/settings.xml
 msgctxt "#36178"
-msgid "Extract thumbnails and metadata information such as codec and aspect ratio from videos."
+msgid "Extract metadata information such as codec and aspect ratio from videos."
 msgstr ""
 
 #. Description of setting with label #20419 "Replace file names with library titles"
@@ -16916,7 +16916,7 @@ msgstr ""
 #. Description of setting with label #20433 "Extract thumbnails and video information"
 #: system/settings/settings.xml
 msgctxt "#36180"
-msgid "Extract thumbnails and information, such as codecs and aspect ratio, to display in library mode."
+msgid "Extract thumbnails, to display in library Mode."
 msgstr ""
 
 #: system/settings/settings.xml
@@ -19575,3 +19575,6 @@ msgctxt "#39007"
 msgid "This provides access to where picture sources can be added and otherwise managed."
 msgstr ""
 
+msgctxt "#38190"
+msgid "Extract thumbnails from video files"
+msgstr ""
