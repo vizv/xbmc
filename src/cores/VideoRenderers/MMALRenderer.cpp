@@ -149,6 +149,7 @@ CMMALRenderer::CMMALRenderer()
   m_vout_input_pool = NULL;
   memset(m_buffers, 0, sizeof m_buffers);
   m_release_queue = mmal_queue_create();
+  m_format = RENDER_FMT_NONE;
   Create();
 }
 
@@ -176,6 +177,8 @@ void CMMALRenderer::AddProcessor(CMMALVideoBuffer *buffer, int index)
 
 bool CMMALRenderer::Configure(unsigned int width, unsigned int height, unsigned int d_width, unsigned int d_height, float fps, unsigned flags, ERenderFormat format, unsigned extended_format, unsigned int orientation)
 {
+  // changed enough that we need to recreate renderer
+  bool changed = format != m_format;
   ReleaseBuffers();
 
   m_sourceWidth  = width;
@@ -228,9 +231,11 @@ bool CMMALRenderer::Configure(unsigned int width, unsigned int height, unsigned 
       else if (CONF_FLAGS_YUVCOEF_MASK(m_iFlags) == CONF_FLAGS_YUVCOEF_240M)
         es_format->es->video.color_space = MMAL_COLOR_SPACE_SMPTE240M;
     }
-    if (m_bConfigured)
+    if (m_bConfigured && changed)
       UnInit();
-    m_bConfigured = init_vout(es_format);
+    if (!m_bConfigured)
+      m_bConfigured = init_vout(es_format);
+    RenderUpdate(true, 0, 255);
     mmal_format_free(es_format);
   }
   else
@@ -470,6 +475,7 @@ void CMMALRenderer::UnInit()
   m_video_stereo_mode = RENDER_STEREO_MODE_OFF;
   m_display_stereo_mode = RENDER_STEREO_MODE_OFF;
   m_StereoInvert = false;
+  m_format = RENDER_FMT_NONE;
 
   m_bConfigured = false;
 }
