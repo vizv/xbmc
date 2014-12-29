@@ -716,7 +716,7 @@ void CDVDPlayerAudio::HandleSyncError(double duration)
     else if (m_synctype == SYNC_PLLADJUST)
     {
 #if defined(TARGET_RASPBERRY_PI)
-      double e = std::max(std::min(m_error / DVD_MSEC_TO_TIME(10), 1.0), -1.0);
+      double e = std::max(std::min(m_error / DVD_MSEC_TO_TIME(50), 1.0), -1.0);
       double adjust = g_advancedSettings.m_maxPllAdjust * 1e-6;
       m_plladjust = 1.0 + e * adjust;
       m_last_plladjust = g_RBP.AdjustHDMIClock(m_plladjust);

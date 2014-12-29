@@ -108,7 +108,7 @@ void CAdvancedSettings::Initialize()
 
   m_audioHeadRoom = 0;
   m_ac3Gain = 12.0f;
-  m_maxPllAdjust = 300;
+  m_maxPllAdjust = 1000;
   m_audioApplyDrc = true;
   m_dvdplayerIgnoreDTSinWAV = false;
 
