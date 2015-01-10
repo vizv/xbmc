@@ -2219,7 +2219,6 @@ void CApplication::Render()
     {
       g_renderManager.FrameWait(100);
       g_infoManager.UpdateFPS();
-      g_renderManager.FrameMove();
       g_renderManager.FrameFinish();
       return;
     }
