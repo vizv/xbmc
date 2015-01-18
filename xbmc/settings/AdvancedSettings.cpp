@@ -117,7 +117,7 @@ void CAdvancedSettings::Initialize()
   m_limiterRelease = 0.1f;
 
   m_omxHWAudioDecode = false;
-  m_omxDecodeStartWithValidFrame = false;
+  m_omxDecodeStartWithValidFrame = true;
 
   m_karaokeSyncDelayCDG = 0.0f;
   m_karaokeSyncDelayLRC = 0.0f;
