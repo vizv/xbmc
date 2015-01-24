@@ -2175,6 +2175,9 @@ bool CApplication::RenderNoPresent()
   // dont show GUI when playing full screen video
   if (g_graphicsContext.IsFullScreenVideo())
   {
+    g_graphicsContext.SetRenderingResolution(g_graphicsContext.GetVideoResolution(), false);
+    g_renderManager.Render(true, 0, 255);
+
     // close window overlays
     CGUIDialog *overlay = (CGUIDialog *)g_windowManager.GetWindow(WINDOW_DIALOG_VIDEO_OVERLAY);
     if (overlay) overlay->Close(true);
@@ -2243,6 +2246,7 @@ void CApplication::Render()
     if (!extPlayerActive && g_graphicsContext.IsFullScreenVideo() && !m_pPlayer->IsPausedPlayback())
     {
       m_bPresentFrame = g_renderManager.FrameWait(100);
+      hasRendered = true;
     }
     else
     {
@@ -2285,6 +2289,8 @@ void CApplication::Render()
   if(!g_Windowing.BeginRender())
     return;
 
+  g_renderManager.FrameMove();
+
   CDirtyRegionList dirtyRegions = g_windowManager.GetDirty();
   if(g_graphicsContext.GetStereoMode())
   {
@@ -2305,6 +2311,8 @@ void CApplication::Render()
     if(RenderNoPresent())
       hasRendered = true;
   }
+
+  g_renderManager.FrameFinish();
 
   g_Windowing.EndRender();
 
@@ -2330,7 +2338,7 @@ void CApplication::Render()
     flip = true;
 
   //fps limiter, make sure each frame lasts at least singleFrameTime milliseconds
-  if (limitFrames || !(flip || m_bPresentFrame))
+  if (limitFrames || !flip)
   {
     if (!limitFrames)
       singleFrameTime = 40; //if not flipping, loop at 25 fps
@@ -5944,3 +5952,4 @@ bool CApplication::ScreenSaverDisablesAutoScrolling()
 
   return onBlackDimScreenSaver || openingStreams;
 }
+

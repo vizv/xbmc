@@ -120,7 +120,6 @@ CXBMCRenderManager::CXBMCRenderManager()
   m_QueueSize   = 2;
   m_QueueSkip   = 0;
   m_format      = RENDER_FMT_NONE;
-  m_renderedOverlay = false;
 }
 
 CXBMCRenderManager::~CXBMCRenderManager()
@@ -234,7 +233,7 @@ bool CXBMCRenderManager::Configure(unsigned int width, unsigned int height, unsi
 
   /* make sure any queued frame was fully presented */
   XbmcThreads::EndTime endtime(5000);
-  while(m_presentstep != PRESENT_IDLE && m_presentstep != PRESENT_READY)
+  while(m_presentstep != PRESENT_IDLE)
   {
     if(endtime.IsTimePast())
     {
@@ -293,7 +292,6 @@ bool CXBMCRenderManager::Configure(unsigned int width, unsigned int height, unsi
     m_presentpts = DVD_NOPTS_VALUE;
     m_sleeptime = 1.0;
     m_presentevent.notifyAll();
-    m_renderedOverlay = false;
 
     CLog::Log(LOGDEBUG, "CXBMCRenderManager::Configure - %d", m_QueueSize);
   }
@@ -768,58 +766,22 @@ void CXBMCRenderManager::RegisterRenderFeaturesCallBack(const void *ctx, RenderF
     m_pRenderer->RegisterRenderFeaturesCallBack(ctx, fn);
 }
 
-void CXBMCRenderManager::Render(bool clear, DWORD flags, DWORD alpha, bool gui)
+void CXBMCRenderManager::Render(bool clear, DWORD flags, DWORD alpha)
 {
   CSharedLock lock(m_sharedSection);
 
-  if (!gui && m_pRenderer->IsGuiLayer())
-    return;
+  SPresent& m = m_Queue[m_presentsource];
 
-  if (!gui || m_pRenderer->IsGuiLayer())
-  {
-    SPresent& m = m_Queue[m_presentsource];
+  if( m.presentmethod == PRESENT_METHOD_BOB )
+    PresentFields(clear, flags, alpha);
+  else if( m.presentmethod == PRESENT_METHOD_WEAVE )
+    PresentFields(clear, flags | RENDER_FLAG_WEAVE, alpha);
+  else if( m.presentmethod == PRESENT_METHOD_BLEND )
+    PresentBlend(clear, flags, alpha);
+  else
+    PresentSingle(clear, flags, alpha);
 
-    if( m.presentmethod == PRESENT_METHOD_BOB )
-      PresentFields(clear, flags, alpha);
-    else if( m.presentmethod == PRESENT_METHOD_WEAVE )
-      PresentFields(clear, flags | RENDER_FLAG_WEAVE, alpha);
-    else if( m.presentmethod == PRESENT_METHOD_BLEND )
-      PresentBlend(clear, flags, alpha);
-    else
-      PresentSingle(clear, flags, alpha);
-  }
-
-  if (gui)
-  {
-    m_renderedOverlay = m_overlays.HasOverlay(m_presentsource);
-    m_overlays.Render(m_presentsource);
-  }
-}
-
-bool CXBMCRenderManager::IsGuiLayer()
-{
-  { CSingleLock lock(m_presentlock);
-
-    if (!m_pRenderer)
-      return false;
-
-    if (m_pRenderer->IsGuiLayer() || m_renderedOverlay || m_overlays.HasOverlay(m_presentsource))
-      return true;
-  }
-  return false;
-}
-
-bool CXBMCRenderManager::IsVideoLayer()
-{
-  { CSingleLock lock(m_presentlock);
-
-    if (!m_pRenderer)
-      return false;
-
-    if (!m_pRenderer->IsGuiLayer())
-      return true;
-  }
-  return false;
+  m_overlays.Render(m_presentsource);
 }
 
 /* simple present method */

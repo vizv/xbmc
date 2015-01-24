@@ -100,7 +100,6 @@ namespace OVERLAY {
     void Render(int idx);
     void Flush();
     void Release(int idx);
-    bool HasOverlay(int idx);
 
   protected:
 
