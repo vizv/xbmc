@@ -59,8 +59,7 @@ public:
   void Update();
   void FrameMove();
   void FrameFinish();
-  void FrameWait(int ms);
-  bool HasFrame();
+  bool FrameWait(int ms);
   void Render(bool clear, DWORD flags = 0, DWORD alpha = 255, bool gui = true);
   bool IsGuiLayer();
   bool IsVideoLayer();
