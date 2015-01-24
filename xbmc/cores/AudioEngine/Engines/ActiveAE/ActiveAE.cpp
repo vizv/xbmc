@@ -564,6 +564,7 @@ void CActiveAE::StateMachine(int signal, Protocol *port, Message *msg)
           CActiveAEStream *stream;
           streamMsg = (MsgStreamNew*)msg->data;
           stream = CreateStream(streamMsg);
+          CLog::Log(LOGNOTICE, "ActiveAE::%s - NEWSTREAM %p %p", __FUNCTION__, streamMsg, stream);
           if(stream)
           {
             msg->Reply(CActiveAEDataProtocol::ACC, &stream, sizeof(CActiveAEStream*));
@@ -1228,6 +1229,7 @@ CActiveAEStream* CActiveAE::CreateStream(MsgStreamNew *streamMsg)
   }
   if (hasRawStream || (hasStream && AE_IS_RAW(streamMsg->format.m_dataFormat)))
   {
+    CLog::Log(LOGNOTICE, "CActiveAE::CreateStream - raw");
     return NULL;
   }
 
@@ -1256,6 +1258,7 @@ CActiveAEStream* CActiveAE::CreateStream(MsgStreamNew *streamMsg)
 
   m_streams.push_back(stream);
 
+  CLog::Log(LOGNOTICE, "CActiveAE::CreateStream - %p", stream);
   return stream;
 }
 
@@ -2750,11 +2753,13 @@ IAEStream *CActiveAE::MakeStream(enum AEDataFormat dataFormat, unsigned int samp
   msg.options = options;
 
   Message *reply;
+  CLog::Log(LOGNOTICE, "ActiveAE::%s - about to create stream", __FUNCTION__);
   if (m_dataPort.SendOutMessageSync(CActiveAEDataProtocol::NEWSTREAM,
                                     &reply,10000,
                                     &msg, sizeof(MsgStreamNew)))
   {
     bool success = reply->signal == CActiveAEControlProtocol::ACC;
+    CLog::Log(LOGNOTICE, "ActiveAE::%s - created stream : %d", __FUNCTION__, success);
     if (success)
     {
       CActiveAEStream *stream = *(CActiveAEStream**)reply->data;
