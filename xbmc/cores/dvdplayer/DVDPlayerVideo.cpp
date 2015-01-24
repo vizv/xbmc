@@ -162,6 +162,8 @@ CDVDPlayerVideo::CDVDPlayerVideo( CDVDClock* pClock
 
 CDVDPlayerVideo::~CDVDPlayerVideo()
 {
+  CLog::Log(LOGNOTICE, "drop:%d skip:%d", m_iDroppedFrames, g_renderManager.GetSkippedFrames());
+
   StopThread();
   g_VideoReferenceClock.Stop();
 }
