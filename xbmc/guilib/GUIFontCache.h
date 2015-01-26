@@ -38,6 +38,7 @@
 #include "boost/multi_index/sequenced_index.hpp"
 #include "boost/multi_index/hashed_index.hpp"
 #include "boost/multi_index/member.hpp"
+#include "boost/shared_ptr.hpp"
 
 #include "TransformMatrix.h"
 
@@ -201,7 +202,14 @@ struct CGUIFontCacheStaticPosition
   void UpdateWithOffsets(const CGUIFontCacheStaticPosition &cached, bool scrolling) {}
 };
 
-typedef std::vector<SVertex> CGUIFontCacheStaticValue;
+struct CGUIFontCacheStaticValue : public boost::shared_ptr<std::vector<SVertex> >
+{
+  void clear()
+  {
+    if (*this)
+      (*this)->clear();
+  }
+};
 
 inline bool Match(const CGUIFontCacheStaticPosition &a, const TransformMatrix &a_m,
                   const CGUIFontCacheStaticPosition &b, const TransformMatrix &b_m,

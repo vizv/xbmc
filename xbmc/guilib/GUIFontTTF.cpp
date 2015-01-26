@@ -30,6 +30,7 @@
 #include "URL.h"
 #include "filesystem/File.h"
 #include "threads/SystemClock.h"
+#include "boost/make_shared.hpp"
 
 #include <math.h>
 
@@ -357,6 +358,7 @@ void CGUIFontTTFBase::DrawTextInternal(float x, float y, const vecColors &colors
 {
   Begin();
 
+  uint32_t rawAlignment = alignment;
   bool dirtyCache;
   bool hardwareClipping = g_Windowing.ScissorsCanEffectClipping();
   CGUIFontCacheStaticPosition staticPos(x, y);
@@ -376,8 +378,8 @@ void CGUIFontTTFBase::DrawTextInternal(float x, float y, const vecColors &colors
                             XbmcThreads::SystemClockMillis(),
                             dirtyCache) :
       unusedVertexBuffer;
-  std::vector<SVertex> tempVertices;
-  std::vector<SVertex> &vertices = hardwareClipping ?
+  boost::shared_ptr<std::vector<SVertex> > tempVertices = boost::make_shared<std::vector<SVertex> >();
+  boost::shared_ptr<std::vector<SVertex> > &vertices = hardwareClipping ?
       tempVertices :
       m_staticCache.Lookup(staticPos,
                            colors, text,
@@ -467,7 +469,7 @@ void CGUIFontTTFBase::DrawTextInternal(float x, float y, const vecColors &colors
 
           for (int i = 0; i < 3; i++)
           {
-            RenderCharacter(startX + cursorX, startY, period, color, !scrolling, vertices);
+            RenderCharacter(startX + cursorX, startY, period, color, !scrolling, *tempVertices);
             cursorX += period->advance;
           }
           break;
@@ -476,7 +478,7 @@ void CGUIFontTTFBase::DrawTextInternal(float x, float y, const vecColors &colors
       else if (maxPixelWidth > 0 && cursorX > maxPixelWidth)
         break;  // exceeded max allowed width - stop rendering
 
-      RenderCharacter(startX + cursorX, startY, ch, color, !scrolling, vertices);
+      RenderCharacter(startX + cursorX, startY, ch, color, !scrolling, *tempVertices);
       if ( alignment & XBFONT_JUSTIFIED )
       {
         if ((*pos & 0xffff) == L' ')
@@ -489,17 +491,36 @@ void CGUIFontTTFBase::DrawTextInternal(float x, float y, const vecColors &colors
     }
     if (hardwareClipping)
     {
-      CVertexBuffer newVertexBuffer = CreateVertexBuffer(tempVertices);
+      CVertexBuffer &vertexBuffer = m_dynamicCache.Lookup(dynamicPos,
+                                                          colors, text,
+                                                          rawAlignment, maxPixelWidth,
+                                                          scrolling,
+                                                          XbmcThreads::SystemClockMillis(),
+                                                          dirtyCache);
+      CVertexBuffer newVertexBuffer = CreateVertexBuffer(*tempVertices);
       vertexBuffer = newVertexBuffer;
       m_vertexTrans.push_back(CTranslatedVertices(0, 0, 0, &vertexBuffer, g_graphicsContext.GetClipRegion()));
     }
+    else
+    {
+      m_staticCache.Lookup(staticPos,
+                           colors, text,
+                           rawAlignment, maxPixelWidth,
+                           scrolling,
+                           XbmcThreads::SystemClockMillis(),
+                           dirtyCache) = *static_cast<CGUIFontCacheStaticValue *>(&tempVertices);
+      /* Append the new vertices to the set collected since the first Begin() call */
+      m_vertex.insert(m_vertex.end(), tempVertices->begin(), tempVertices->end());
+    }
   }
-  else if (hardwareClipping)
-    m_vertexTrans.push_back(CTranslatedVertices(dynamicPos.m_x, dynamicPos.m_y, dynamicPos.m_z, &vertexBuffer, g_graphicsContext.GetClipRegion()));
-  if (!hardwareClipping)
-    /* Append the new vertices (from the cache or otherwise) to the set collected
-     * since the first Begin() call */
-    m_vertex.insert(m_vertex.end(), vertices.begin(), vertices.end());
+  else
+  {
+    if (hardwareClipping)
+      m_vertexTrans.push_back(CTranslatedVertices(dynamicPos.m_x, dynamicPos.m_y, dynamicPos.m_z, &vertexBuffer, g_graphicsContext.GetClipRegion()));
+    else
+      /* Append the vertices from the cache to the set collected since the first Begin() call */
+      m_vertex.insert(m_vertex.end(), vertices->begin(), vertices->end());
+  }
 
   End();
 }
