@@ -404,7 +404,6 @@ void CMMALRenderer::FlipPage(int source)
 
 unsigned int CMMALRenderer::PreInit()
 {
-  CSingleLock lock(g_graphicsContext);
   m_bConfigured = false;
   UnInit();
 
@@ -434,7 +433,6 @@ void CMMALRenderer::ReleaseBuffers()
 
 void CMMALRenderer::UnInit()
 {
-  CSingleLock lock(g_graphicsContext);
   CLog::Log(LOGDEBUG, "%s::%s", CLASSNAME, __func__);
   if (m_vout)
   {
