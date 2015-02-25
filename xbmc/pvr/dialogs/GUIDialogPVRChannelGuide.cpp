@@ -37,6 +37,7 @@ using namespace PVR;
 CGUIDialogPVRChannelGuide::CGUIDialogPVRChannelGuide()
     : CGUIDialog(WINDOW_DIALOG_PVR_CHANNEL_GUIDE, "DialogPVRChannelGuide.xml")
 {
+  m_loadType = LOAD_ON_GUI_INIT;
   m_vecItems.reset(new CFileItemList);
 }
 
