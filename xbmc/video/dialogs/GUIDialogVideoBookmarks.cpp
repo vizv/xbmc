@@ -61,7 +61,7 @@ CGUIDialogVideoBookmarks::CGUIDialogVideoBookmarks()
     : CGUIDialog(WINDOW_DIALOG_VIDEO_BOOKMARKS, "VideoOSDBookmarks.xml")
 {
   m_vecItems = new CFileItemList;
-  m_loadType = KEEP_IN_MEMORY;
+  m_loadType = LOAD_ON_GUI_INIT;
 }
 
 CGUIDialogVideoBookmarks::~CGUIDialogVideoBookmarks()
