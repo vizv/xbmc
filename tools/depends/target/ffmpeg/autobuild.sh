@@ -130,6 +130,8 @@ tar --strip-components=1 -xf $MYDIR/${ARCHIVE}
 patch -p1 < ../ffmpeg_Speed_up_wtv_index_creation.patch
 patch -p1 < ../0001-mpeg4video-Signal-unsupported-GMC-with-more-than-one.patch
 patch -p1 < ../0001-Discard-data-before-VO-VOL-in-mpeg-4-over-mpegts.patch
+patch -p1 < ../hevcdsp_ARM_NEON_optimized_epel_functions.patch
+patch -p1 < ../added_ARM_NEON_optimized_SAO_patches.patch
 
 CFLAGS="$CFLAGS" CXXFLAGS="$CXXFLAGS" LDFLAGS="$LDFLAGS" \
 ./configure --prefix=$FFMPEG_PREFIX \
