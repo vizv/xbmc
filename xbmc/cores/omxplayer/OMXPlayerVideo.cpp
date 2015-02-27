@@ -295,7 +295,7 @@ void OMXPlayerVideo::Output(double pts, bool bDropPacket)
   const double preroll = DVD_MSEC_TO_TIME(100);
   double media_pts = m_av_clock->OMXMediaTime();
 
-  if (m_nextOverlay != DVD_NOPTS_VALUE && media_pts + preroll <= m_nextOverlay)
+  if (m_nextOverlay != DVD_NOPTS_VALUE && media_pts != 0.0 && media_pts + preroll <= m_nextOverlay)
     return;
 
   int buffer = g_renderManager.WaitForBuffer(CThread::m_bStop);
