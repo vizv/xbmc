@@ -29,7 +29,7 @@ namespace ActiveAE
 class CAEResampleFactory
 {
 public:
-  static IAEResample *Create();
+  static IAEResample *Create(bool force_ffmpeg = false);
 };
 
 }

@@ -874,7 +874,6 @@ void CActiveAESink::SwapInit(CSampleBuffer* samples)
 
 void CActiveAESink::GenerateNoise()
 {
-#ifndef TARGET_RASPBERRY_PI
   int nb_floats = m_sampleOfSilence.pkt->max_nb_samples;
   nb_floats *= m_sampleOfSilence.pkt->config.channels;
 
@@ -896,7 +895,7 @@ void CActiveAESink::GenerateNoise()
   }
 
   SampleConfig config = m_sampleOfSilence.pkt->config;
-  IAEResample *resampler = CAEResampleFactory::Create();
+  IAEResample *resampler = CAEResampleFactory::Create(true);
   resampler->Init(config.channel_layout,
                  config.channels,
                  config.sample_rate,
@@ -915,7 +914,6 @@ void CActiveAESink::GenerateNoise()
 
   _aligned_free(noise);
   delete resampler;
-#endif
 }
 
 void CActiveAESink::SetSilenceTimer()
