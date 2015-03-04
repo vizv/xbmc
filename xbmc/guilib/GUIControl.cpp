@@ -152,7 +152,7 @@ void CGUIControl::DoProcess(unsigned int currentTime, CDirtyRegionList &dirtyreg
 
   changed |= m_controlIsDirty;
 
-  m_controlIsDirty = false;
+  m_controlIsDirty = changed;
 
   if (changed)
   {
@@ -187,6 +187,7 @@ void CGUIControl::DoRender()
       g_graphicsContext.RestoreCameraPosition();
     g_graphicsContext.RemoveTransform();
   }
+  m_controlIsDirty = false;
 }
 
 bool CGUIControl::OnAction(const CAction &action)
