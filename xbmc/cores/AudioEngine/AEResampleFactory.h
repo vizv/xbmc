@@ -26,10 +26,17 @@ class IAEResample;
 namespace ActiveAE
 {
 
+/**
+ * Bit options to pass to IAE::GetStream
+ */
+enum AEStreamOptions {
+  AERESAMPLEFACTORY_QUICK_RESAMPLE = 0x01  /* This is a quick resample job (e.g. resample a single noise packet) and may not be worth using GPU acceleration */
+};
+
 class CAEResampleFactory
 {
 public:
-  static IAEResample *Create(bool force_ffmpeg = false);
+  static IAEResample *Create(uint32_t flags = 0);
 };
 
 }
