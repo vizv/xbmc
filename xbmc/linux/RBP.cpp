@@ -21,6 +21,7 @@
 #include "RBP.h"
 #if defined(TARGET_RASPBERRY_PI)
 
+#include <assert.h>
 #include "settings/Settings.h"
 #include "settings/AdvancedSettings.h"
 #include "utils/log.h"
