@@ -2010,7 +2010,10 @@ void CApplication::Render()
   }
 
   if (flip)
+  {
     g_graphicsContext.Flip(dirtyRegions);
+    CTimeUtils::UpdateFrameTime(flip);
+  }
 
   if (!extPlayerActive && g_graphicsContext.IsFullScreenVideo() && !m_pPlayer->IsPausedPlayback())
   {
@@ -2018,7 +2021,6 @@ void CApplication::Render()
   }
 
   m_lastFrameTime = XbmcThreads::SystemClockMillis();
-  CTimeUtils::UpdateFrameTime(flip);
 
   g_renderManager.UpdateResolution();
   g_renderManager.ManageCaptures();
