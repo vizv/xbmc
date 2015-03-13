@@ -330,6 +330,7 @@ CApplication::CApplication(void)
   m_currentStackPosition = 0;
   m_lastFrameTime = 0;
   m_lastRenderTime = 0;
+  m_skipGuiRender = false;
   m_bTestMode = false;
 
   m_muted = false;
@@ -1945,12 +1946,7 @@ void CApplication::Render()
   CDirtyRegionList dirtyRegions;
 
   // render gui layer
-  int fps = 0;
-  if (g_graphicsContext.IsFullScreenVideo() && !m_pPlayer->IsPausedPlayback())
-    fps = CSettings::Get().GetInt("videoplayer.limitguiupdate");
-  unsigned int now = XbmcThreads::SystemClockMillis();
-  unsigned int frameTime = now - m_lastRenderTime;
-  if (fps <= 0 || frameTime * fps >= 1000)
+  if (!m_skipGuiRender)
   {
     dirtyRegions = g_windowManager.GetDirty();
     if (g_graphicsContext.GetStereoMode())
@@ -1987,6 +1983,7 @@ void CApplication::Render()
   g_infoManager.ResetCache();
   lock.Leave();
 
+  unsigned int now = XbmcThreads::SystemClockMillis();
   if (hasRendered)
     m_lastRenderTime = now;
 
@@ -2473,8 +2470,20 @@ void CApplication::FrameMove(bool processEvents, bool processGUI)
   }
   if (processGUI && m_renderGUI)
   {
+    m_skipGuiRender = false;
+    int fps = 0;
+    if (g_graphicsContext.IsFullScreenVideo() && !m_pPlayer->IsPausedPlayback())
+      fps = CSettings::Get().GetInt("videoplayer.limitguiupdate");
+    unsigned int now = XbmcThreads::SystemClockMillis();
+    unsigned int frameTime = now - m_lastRenderTime;
+    if (fps > 0 && frameTime * fps < 1000)
+      m_skipGuiRender = true;
+
     if (!m_bStop)
-      g_windowManager.Process(CTimeUtils::GetFrameTime());
+    {
+      if (!m_skipGuiRender)
+        g_windowManager.Process(CTimeUtils::GetFrameTime());
+    }
     g_windowManager.FrameMove();
   }
 }
