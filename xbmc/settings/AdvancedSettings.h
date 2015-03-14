@@ -142,6 +142,7 @@ class CAdvancedSettings : public ISettingCallback, public ISettingsHandler
     int m_audioHeadRoom;
     float m_ac3Gain;
     int m_maxPllAdjust;
+    int m_force3dMode;
     std::string m_audioDefaultPlayer;
     float m_audioPlayCountMinimumPercent;
     bool m_dvdplayerIgnoreDTSinWAV;

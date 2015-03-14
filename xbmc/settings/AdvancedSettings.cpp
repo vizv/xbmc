@@ -110,6 +110,7 @@ void CAdvancedSettings::Initialize()
   m_audioHeadRoom = 0;
   m_ac3Gain = 12.0f;
   m_maxPllAdjust = 1000;
+  m_force3dMode = 0;
   m_audioApplyDrc = true;
   m_dvdplayerIgnoreDTSinWAV = false;
 
@@ -554,6 +555,8 @@ void CAdvancedSettings::ParseSettingsFile(const std::string &file)
     XMLUtils::GetInt(pElement, "percentseekbackward", m_videoPercentSeekBackward, -100, 0);
     XMLUtils::GetInt(pElement, "percentseekforwardbig", m_videoPercentSeekForwardBig, 0, 100);
     XMLUtils::GetInt(pElement, "percentseekbackwardbig", m_videoPercentSeekBackwardBig, -100, 0);
+    XMLUtils::GetInt(pElement, "force3dmode", m_force3dMode, 0x80000000, 0x7fffffff);
+    CLog::Log(LOGNOTICE, "%s - m_force3dMode=%x", __FUNCTION__,  m_force3dMode);
 
     TiXmlElement* pVideoExcludes = pElement->FirstChildElement("excludefromlisting");
     if (pVideoExcludes)

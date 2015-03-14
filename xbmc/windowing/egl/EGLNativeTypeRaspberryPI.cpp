@@ -28,6 +28,7 @@
 #include "linux/RBP.h"
 #include "utils/StringUtils.h"
 #include "settings/Settings.h"
+#include "settings/AdvancedSettings.h"
 #include <cassert>
 
 #ifndef __VIDEOCORE4__
@@ -35,6 +36,10 @@
 #endif
 
 #define __VCCOREVER__ 0x04000000
+
+#define  DISPMANX_DUPLICATE_MONO  ((DISPMANX_TRANSFORM_T)(1 << 20))
+#define  DISPMANX_DUPLICATE_SBS   ((DISPMANX_TRANSFORM_T)(2 << 20))
+#define  DISPMANX_DUPLICATE_TB    ((DISPMANX_TRANSFORM_T)(3 << 20))
 
 #define IS_WIDESCREEN(m) ( m == 3 || m == 7 || m == 9 || \
     m == 11 || m == 13 || m == 15 || m == 18 || m == 22 || \
@@ -284,7 +289,10 @@ bool CEGLNativeTypeRaspberryPI::SetNativeResolution(const RESOLUTION_INFO &res)
       /* inform TV of any 3D settings. Note this property just applies to next hdmi mode change, so no need to call for 2D modes */
       HDMI_PROPERTY_PARAM_T property;
       property.property = HDMI_PROPERTY_3D_STRUCTURE;
-      if (res.dwFlags & D3DPRESENTFLAG_MODE3DSBS)
+      CLog::Log(LOGNOTICE, "%s - m_force3dMode=%x", __FUNCTION__,  g_advancedSettings.m_force3dMode);
+      if (g_advancedSettings.m_force3dMode)
+        property.param1 = g_advancedSettings.m_force3dMode;
+      else if (res.dwFlags & D3DPRESENTFLAG_MODE3DSBS)
         property.param1 = HDMI_3D_FORMAT_SBS_HALF;
       else if (res.dwFlags & D3DPRESENTFLAG_MODE3DTB)
         property.param1 = HDMI_3D_FORMAT_TB_HALF;
@@ -383,6 +391,13 @@ bool CEGLNativeTypeRaspberryPI::SetNativeResolution(const RESOLUTION_INFO &res)
 
   DISPMANX_TRANSFORM_T transform = DISPMANX_NO_ROTATE;
   DISPMANX_UPDATE_HANDLE_T dispman_update = m_DllBcmHost->vc_dispmanx_update_start(0);
+
+  if (res.dwFlags & D3DPRESENTFLAG_MODE3DSBS)
+    transform = DISPMANX_DUPLICATE_SBS;
+  else if (res.dwFlags & D3DPRESENTFLAG_MODE3DTB)
+    transform = DISPMANX_DUPLICATE_TB;
+  else
+    transform = DISPMANX_DUPLICATE_MONO;
 
   CLog::Log(LOGDEBUG, "EGL set resolution %dx%d -> %dx%d @ %.2f fps (%d,%d) flags:%x aspect:%.2f\n",
       m_width, m_height, dst_rect.width, dst_rect.height, res.fRefreshRate, GETFLAGS_GROUP(res.dwFlags), GETFLAGS_MODE(res.dwFlags), (int)res.dwFlags, res.fPixelRatio);
