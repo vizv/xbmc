@@ -41,6 +41,11 @@
 #include <sys/time.h>
 #include <inttypes.h>
 
+#define  DISPMANX_DUPLICATE_MONO  ((DISPMANX_TRANSFORM_T)(1 << 20))
+#define  DISPMANX_DUPLICATE_SBS   ((DISPMANX_TRANSFORM_T)(2 << 20))
+#define  DISPMANX_DUPLICATE_TB    ((DISPMANX_TRANSFORM_T)(3 << 20))
+
+
 #ifdef CLASSNAME
 #undef CLASSNAME
 #endif
@@ -223,15 +228,6 @@ bool COMXVideo::PortSettingsChanged()
   OMX_CONFIG_DISPLAYREGIONTYPE configDisplay;
   OMX_INIT_STRUCTURE(configDisplay);
   configDisplay.nPortIndex = m_omx_render.GetInputPort();
-
-  configDisplay.set = OMX_DISPLAY_SET_TRANSFORM;
-  configDisplay.transform = m_transform;
-  omx_err = m_omx_render.SetConfig(OMX_IndexConfigDisplayRegion, &configDisplay);
-  if(omx_err != OMX_ErrorNone)
-  {
-    CLog::Log(LOGWARNING, "%s::%s - could not set transform : %d", CLASSNAME, __func__, m_transform);
-    return false;
-  }
 
   if(m_hdmi_clock_sync)
   {
@@ -887,7 +883,7 @@ void COMXVideo::SetVideoRect(const CRect& SrcRect, const CRect& DestRect, RENDER
 
   OMX_INIT_STRUCTURE(configDisplay);
   configDisplay.nPortIndex = m_omx_render.GetInputPort();
-  configDisplay.set                 = (OMX_DISPLAYSETTYPE)(OMX_DISPLAY_SET_DEST_RECT|OMX_DISPLAY_SET_SRC_RECT|OMX_DISPLAY_SET_FULLSCREEN|OMX_DISPLAY_SET_NOASPECT|OMX_DISPLAY_SET_MODE);
+  configDisplay.set                 = (OMX_DISPLAYSETTYPE)(OMX_DISPLAY_SET_DEST_RECT|OMX_DISPLAY_SET_SRC_RECT|OMX_DISPLAY_SET_FULLSCREEN|OMX_DISPLAY_SET_NOASPECT|OMX_DISPLAY_SET_MODE|OMX_DISPLAY_SET_TRANSFORM);
   configDisplay.dest_rect.x_offset  = lrintf(DestRect.x1);
   configDisplay.dest_rect.y_offset  = lrintf(DestRect.y1);
   configDisplay.dest_rect.width     = lrintf(DestRect.Width());
@@ -900,17 +896,16 @@ void COMXVideo::SetVideoRect(const CRect& SrcRect, const CRect& DestRect, RENDER
 
   configDisplay.fullscreen = OMX_FALSE;
   configDisplay.noaspect = OMX_TRUE;
+  configDisplay.mode = OMX_DISPLAY_MODE_LETTERBOX;
+  configDisplay.transform = m_transform;
 
-  if (video_mode == RENDER_STEREO_MODE_SPLIT_HORIZONTAL && display_mode == RENDER_STEREO_MODE_SPLIT_HORIZONTAL)
-    configDisplay.mode = OMX_DISPLAY_MODE_STEREO_TOP_TO_TOP;
-  else if (video_mode == RENDER_STEREO_MODE_SPLIT_HORIZONTAL && display_mode == RENDER_STEREO_MODE_SPLIT_VERTICAL)
-    configDisplay.mode = OMX_DISPLAY_MODE_STEREO_TOP_TO_LEFT;
-  else if (video_mode == RENDER_STEREO_MODE_SPLIT_VERTICAL && display_mode == RENDER_STEREO_MODE_SPLIT_HORIZONTAL)
-    configDisplay.mode = OMX_DISPLAY_MODE_STEREO_LEFT_TO_TOP;
-  else if (video_mode == RENDER_STEREO_MODE_SPLIT_VERTICAL && display_mode == RENDER_STEREO_MODE_SPLIT_VERTICAL)
-    configDisplay.mode = OMX_DISPLAY_MODE_STEREO_LEFT_TO_LEFT;
+  if (video_mode == RENDER_STEREO_MODE_SPLIT_HORIZONTAL)
+    configDisplay.transform = (OMX_DISPLAYTRANSFORMTYPE)(configDisplay.transform | DISPMANX_DUPLICATE_TB);
+  else if (video_mode == RENDER_STEREO_MODE_SPLIT_VERTICAL)
+    configDisplay.transform = (OMX_DISPLAYTRANSFORMTYPE)(configDisplay.transform | DISPMANX_DUPLICATE_SBS);
   else
-    configDisplay.mode = OMX_DISPLAY_MODE_LETTERBOX;
+    configDisplay.transform = (OMX_DISPLAYTRANSFORMTYPE)(configDisplay.transform | DISPMANX_DUPLICATE_MONO);
+
 
   m_omx_render.SetConfig(OMX_IndexConfigDisplayRegion, &configDisplay);
 
