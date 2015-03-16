@@ -621,12 +621,15 @@ void CMMALRenderer::SetVideoRect(const CRect& InSrcRect, const CRect& InDestRect
   else
     region.transform = MMAL_DISPLAY_ROT0;
 
-  if (video_stereo_mode == RENDER_STEREO_MODE_SPLIT_HORIZONTAL)
+  if (m_video_stereo_mode == RENDER_STEREO_MODE_SPLIT_HORIZONTAL)
     region.transform = (MMAL_DISPLAYTRANSFORM_T)(region.transform | DISPMANX_STEREOSCOPIC_TB);
-  else if (video_stereo_mode == RENDER_STEREO_MODE_SPLIT_VERTICAL)
+  else if (m_video_stereo_mode == RENDER_STEREO_MODE_SPLIT_VERTICAL)
     region.transform = (MMAL_DISPLAYTRANSFORM_T)(region.transform | DISPMANX_STEREOSCOPIC_SBS);
   else
     region.transform = (MMAL_DISPLAYTRANSFORM_T)(region.transform | DISPMANX_STEREOSCOPIC_MONO);
+
+  if (m_StereoInvert)
+    region.transform = (MMAL_DISPLAYTRANSFORM_T)(region.transform | DISPMANX_STEREOSCOPIC_INVERT);
 
   MMAL_STATUS_T status = mmal_util_set_display_region(m_vout_input, &region);
   if (status != MMAL_SUCCESS)

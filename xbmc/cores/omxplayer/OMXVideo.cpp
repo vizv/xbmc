@@ -868,7 +868,7 @@ void COMXVideo::Reset(void)
 }
 
 ///////////////////////////////////////////////////////////////////////////////////////////
-void COMXVideo::SetVideoRect(const CRect& SrcRect, const CRect& DestRect, RENDER_STEREO_MODE video_mode, RENDER_STEREO_MODE display_mode)
+void COMXVideo::SetVideoRect(const CRect& SrcRect, const CRect& DestRect, RENDER_STEREO_MODE video_mode, RENDER_STEREO_MODE display_mode, bool stereo_invert)
 {
   CSingleLock lock (m_critSection);
   if(!m_is_open)
@@ -900,6 +900,9 @@ void COMXVideo::SetVideoRect(const CRect& SrcRect, const CRect& DestRect, RENDER
     configDisplay.transform = (OMX_DISPLAYTRANSFORMTYPE)(configDisplay.transform | DISPMANX_STEREOSCOPIC_SBS);
   else
     configDisplay.transform = (OMX_DISPLAYTRANSFORMTYPE)(configDisplay.transform | DISPMANX_STEREOSCOPIC_MONO);
+
+  if (stereo_invert)
+    configDisplay.transform = (OMX_DISPLAYTRANSFORMTYPE)(configDisplay.transform | DISPMANX_STEREOSCOPIC_INVERT);
 
   m_omx_render.SetConfig(OMX_IndexConfigDisplayRegion, &configDisplay);
 
