@@ -39,6 +39,7 @@
 #include "OMXCore.h"
 #include "xbmc/utils/CPUInfo.h"
 #include "threads/CriticalSection.h"
+#include "threads/Event.h"
 
 class CRBP
 {
@@ -81,6 +82,7 @@ private:
   class DllLibOMXCore;
   CCriticalSection m_critSection;
   DISPMANX_DISPLAY_HANDLE_T m_display;
+  CEvent     m_vsync;
 };
 
 extern CRBP g_RBP;
