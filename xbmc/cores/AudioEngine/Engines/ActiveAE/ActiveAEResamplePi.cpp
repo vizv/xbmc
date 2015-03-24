@@ -506,6 +506,7 @@ int CActiveAEResamplePi::Resample(uint8_t **dst_buffer, int dst_samples, uint8_t
     if (omx_err != OMX_ErrorNone)
     {
       CLog::Log(LOGERROR, "%s::%s OMX_EmptyThisBuffer() failed with result(0x%x)", CLASSNAME, __func__, omx_err);
+      m_omx_mixer.DecoderEmptyBufferDone(m_omx_mixer.GetComponent(), omx_buffer);
       return false;
     }
 
