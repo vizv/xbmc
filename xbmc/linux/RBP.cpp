@@ -186,17 +186,17 @@ static void vsync_callback(DISPMANX_UPDATE_HANDLE_T u, void *arg)
 void CRBP::WaitVsync()
 {
   int s;
-  CEvent sync;
   DISPMANX_DISPLAY_HANDLE_T m_display = vc_dispmanx_display_open( 0 /*screen*/ );
   if (m_display == DISPMANX_NO_HANDLE)
   {
     CLog::Log(LOGDEBUG, "CRBP::%s skipping while display closed", __func__);
     return;
   }
-  s = vc_dispmanx_vsync_callback(m_display, vsync_callback, (void *)&sync);
+  m_vsync.Reset();
+  s = vc_dispmanx_vsync_callback(m_display, vsync_callback, (void *)&m_vsync);
   if (s == 0)
   {
-    sync.Wait();
+    m_vsync.Wait();
   }
   else assert(0);
   s = vc_dispmanx_vsync_callback(m_display, NULL, NULL);
