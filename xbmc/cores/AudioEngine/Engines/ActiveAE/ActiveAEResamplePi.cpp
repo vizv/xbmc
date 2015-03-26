@@ -519,8 +519,11 @@ int CActiveAEResamplePi::Resample(uint8_t **dst_buffer, int dst_samples, uint8_t
     }
     omx_err = m_omx_mixer.FillThisBuffer(m_encoded_buffer);
     if (omx_err != OMX_ErrorNone)
+    {
+      CLog::Log(LOGERROR, "%s::%s m_omx_mixer.FillThisBuffer result(0x%x)", CLASSNAME, __func__, omx_err);
+      m_omx_mixer.DecoderFillBufferDone(m_omx_mixer.GetComponent(), m_encoded_buffer);
       return false;
-
+    }
     omx_err = m_omx_mixer.WaitForOutputDone(1000);
     if (omx_err != OMX_ErrorNone)
     {
