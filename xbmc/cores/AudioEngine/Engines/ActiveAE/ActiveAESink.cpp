@@ -324,6 +324,7 @@ void CActiveAESink::StateMachine(int signal, Protocol *port, Message *msg)
           samples = *((CSampleBuffer**)msg->data);
           CLog::Log(LOGNOTICE, "CActiveAESink::StateMachine CSinkDataProtocol::SAMPLE");
           delay = OutputSamples(samples);
+          CLog::Log(LOGNOTICE, "---------------- delay: %d GetWaterLevel:%f", delay, m_stats->GetWaterLevel());
           msg->Reply(CSinkDataProtocol::RETURNSAMPLE, &samples, sizeof(CSampleBuffer*));
           if (m_extError)
           {
