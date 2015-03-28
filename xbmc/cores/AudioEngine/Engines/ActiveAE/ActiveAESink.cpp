@@ -322,6 +322,7 @@ void CActiveAESink::StateMachine(int signal, Protocol *port, Message *msg)
           CSampleBuffer *samples;
           unsigned int delay;
           samples = *((CSampleBuffer**)msg->data);
+          CLog::Log(LOGNOTICE, "CActiveAESink::StateMachine CSinkDataProtocol::SAMPLE");
           delay = OutputSamples(samples);
           msg->Reply(CSinkDataProtocol::RETURNSAMPLE, &samples, sizeof(CSampleBuffer*));
           if (m_extError)
@@ -369,6 +370,7 @@ void CActiveAESink::StateMachine(int signal, Protocol *port, Message *msg)
         case CSinkDataProtocol::SAMPLE:
           m_extError = false;
           OpenSink();
+          CLog::Log(LOGNOTICE, "CActiveAESink::StateMachine CSinkDataProtocol::SAMPLE S_TOP_CONFIGURED_SUSPEND");
           OutputSamples(&m_sampleOfSilence);
           m_state = S_TOP_CONFIGURED_PLAY;
           m_extTimeout = 0;
@@ -400,6 +402,7 @@ void CActiveAESink::StateMachine(int signal, Protocol *port, Message *msg)
         switch (signal)
         {
         case CSinkDataProtocol::SAMPLE:
+          CLog::Log(LOGNOTICE, "CActiveAESink::StateMachine CSinkDataProtocol::SAMPLE S_TOP_CONFIGURED_IDLE");
           OutputSamples(&m_sampleOfSilence);
           m_state = S_TOP_CONFIGURED_PLAY;
           m_extTimeout = 0;
@@ -459,6 +462,7 @@ void CActiveAESink::StateMachine(int signal, Protocol *port, Message *msg)
         switch (signal)
         {
         case CSinkControlProtocol::TIMEOUT:
+          CLog::Log(LOGNOTICE, "CActiveAESink::StateMachine CSinkDataProtocol::TIMEOUT S_TOP_CONFIGURED_SILENCE");
           OutputSamples(&m_sampleOfSilence);
           if (m_extError)
           {

@@ -419,6 +419,7 @@ void CAESinkPi::GetDelay(AEDelayStatus& status)
       CLASSNAME, __func__, omx_err);
   }
   double sinkbuffer_seconds_to_empty = m_sinkbuffer_sec_per_byte * param.nU32 * m_format.m_frameSize;
+  CLog::Log(LOGNOTICE, "---------------- GetDelay: %f", sinkbuffer_seconds_to_empty*1000);
   status.SetDelay(sinkbuffer_seconds_to_empty);
 }
 
@@ -447,6 +448,7 @@ unsigned int CAESinkPi::AddPackets(uint8_t **data, unsigned int frames, unsigned
   if (delay <= 0.0 && m_submitted)
     CLog::Log(LOGNOTICE, "%s:%s Underrun (delay:%.2f frames:%d)", CLASSNAME, __func__, delay, frames);
 
+  CLog::Log(LOGNOTICE, "---------------- AddPackets: %f", 1000 * m_sinkbuffer_sec_per_byte * frames * m_format.m_frameSize );
   omx_buffer = m_omx_output->GetInputBuffer(1000);
   if (omx_buffer == NULL)
   {
@@ -476,7 +478,10 @@ unsigned int CAESinkPi::AddPackets(uint8_t **data, unsigned int frames, unsigned
   GetDelay(status);
   delay = status.GetDelay();
   if (delay > m_latency)
+  {
     Sleep((int)(1000.0f * (delay - m_latency)));
+    CLog::Log(LOGNOTICE, "---------------- AddPackets: Slept for %d ms", (int)(1000.0f * (delay - m_latency)));
+  }
   return frames;
 }
 
