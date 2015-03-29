@@ -840,6 +840,8 @@ bool PAPlayer::QueueData(StreamInfo *si)
   }
 
   unsigned int added = si->m_stream->AddData(&data, 0, samples/si->m_channelInfo.Count(), 0);
+  CLog::Log(LOGNOTICE, "---------------- QueueData(%d) = %d", samples/si->m_channelInfo.Count(), added);
+
   si->m_framesSent += added;
 
   const ICodec* codec = si->m_decoder.GetCodec();
