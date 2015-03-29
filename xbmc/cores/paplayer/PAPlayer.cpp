@@ -570,6 +570,7 @@ void PAPlayer::Process()
 
     double freeBufferTime = 0.0;
     ProcessStreams(freeBufferTime);
+    CLog::Log(LOGNOTICE, "---------------- Process %f", freeBufferTime);
 
     // if none of our streams wants at least 10ms of data, we sleep
     if (freeBufferTime < 0.01)
