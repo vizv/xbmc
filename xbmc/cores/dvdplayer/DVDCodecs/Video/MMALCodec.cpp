@@ -130,6 +130,7 @@ CMMALVideo::CMMALVideo()
   m_es_format = mmal_format_alloc();
   m_preroll = true;
   m_speed = DVD_PLAYSPEED_NORMAL;
+  m_codecControlFlags = 0;
 }
 
 CMMALVideo::~CMMALVideo()
@@ -945,6 +946,9 @@ int CMMALVideo::Decode(uint8_t* pData, int iSize, double dts, double pts)
     if (g_advancedSettings.CanLogComponent(LOGVIDEO))
       CLog::Log(LOGDEBUG, "%s::%s -  got output picture:%d", CLASSNAME, __func__, m_output_ready.size());
     ret |= VC_PICTURE;
+    // renderer is low - give priority to returning pictures
+    if (0 && m_codecControlFlags & DVD_CODEC_CTRL_DRAIN)
+      ret &= ~VC_BUFFER;
   }
   if (!ret)
   {
@@ -997,6 +1001,7 @@ void CMMALVideo::Reset(void)
   m_decoderPts = DVD_NOPTS_VALUE;
   m_decode_frame_number = 1;
   m_preroll = !m_hints.stills && (m_speed == DVD_PLAYSPEED_NORMAL || m_speed == DVD_PLAYSPEED_PAUSE);
+  m_codecControlFlags = 0;
 }
 
 void CMMALVideo::SetSpeed(int iSpeed)
@@ -1136,4 +1141,11 @@ bool CMMALVideo::GetCodecStats(double &pts, int &droppedPics)
   //if (g_advancedSettings.CanLogComponent(LOGVIDEO))
   //  CLog::Log(LOGDEBUG, "%s::%s - pts:%.0f droppedPics:%d", CLASSNAME, __func__, pts, droppedPics);
   return true;
+}
+
+void CMMALVideo::SetCodecControl(int flags)
+{
+  m_codecControlFlags = flags;
+  if (g_advancedSettings.CanLogComponent(LOGVIDEO))
+    CLog::Log(LOGDEBUG, "%s::%s flags:%x", CLASSNAME, __func__, flags);
 }
