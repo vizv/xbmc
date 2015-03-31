@@ -36,7 +36,7 @@
 #define CLASSNAME "CMMALRenderer"
 
 #ifdef _DEBUG
-//#define MMAL_DEBUG_VERBOSE
+#define MMAL_DEBUG_VERBOSE
 #endif
 
 static void vout_control_port_cb(MMAL_PORT_T *port, MMAL_BUFFER_HEADER_T *buffer)

@@ -1226,5 +1226,6 @@ bool CXBMCRenderManager::GetStats(double &sleeptime, double &pts, int &bufferLev
   sleeptime = m_sleeptime;
   pts = m_presentpts;
   bufferLevel = m_queued.size() + m_discard.size();
+  CLog::Log(LOGDEBUG,"CXBMCRenderManager::GetStats sleeptime:%.3f pts:%.3f bufferLevel:%d (%d,%d)", sleeptime*1e-6, pts*1e-6, bufferLevel, m_queued.size(), m_discard.size());
   return true;
 }

@@ -529,6 +529,7 @@ void CDVDPlayerVideo::Process()
         if (m_bAllowDrop)
         {
           m_pullupCorrection.Flush();
+          CLog::Log(LOGDEBUG, "CDVDPlayerVideo - dropping as EOS_VERYLATE");
           bRequestDrop = true;
         }
       }
@@ -553,9 +554,10 @@ void CDVDPlayerVideo::Process()
       }
 
       // if player want's us to drop this packet, do so nomatter what
-      if(bPacketDrop)
+      if(bPacketDrop) {
+        CLog::Log(LOGDEBUG, "CDVDPlayerVideo - dropping as requested by bPacketDrop");
         bRequestDrop = true;
-
+      }
       // tell codec if next frame should be dropped
       // problem here, if one packet contains more than one frame
       // both frames will be dropped in that case instead of just the first
@@ -1441,8 +1443,9 @@ int CDVDPlayerVideo::CalcDropRequirement(double pts, bool updateOnly)
 
   // calculate lateness
   iLateness = iSleepTime + m_droppingStats.m_totalGain;
-  if (iLateness < 0 && m_speed)
+  if (iLateness < -1e-6 && m_speed)
   {
+    CLog::Log(LOGDEBUG,"CDVDPlayerVideo::CalcDropRequirement - allow:%d iLateness:%f (%f %f %f) bNewFrame:%d lateFrames:%d dropReq:%d notskip:%d", m_bAllowDrop, iLateness, iSleepTime, m_droppingStats.m_totalGain, 2/m_fFrameRate, bNewFrame, m_droppingStats.m_lateFrames, m_droppingStats.m_dropRequests , m_iNrOfPicturesNotToSkip);
     if (bNewFrame)
       m_droppingStats.m_lateFrames++;
 
@@ -1455,6 +1458,7 @@ int CDVDPlayerVideo::CalcDropRequirement(double pts, bool updateOnly)
       {
         if (bNewFrame || m_droppingStats.m_dropRequests < 5)
         {
+          CLog::Log(LOGDEBUG,"CDVDPlayerVideo::CalcDropRequirement - EOS_VERYLATE");
           result |= EOS_VERYLATE;
         }
         m_droppingStats.m_dropRequests++;
