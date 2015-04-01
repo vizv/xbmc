@@ -382,13 +382,10 @@ bool CMMALVideo::CreateDeinterlace(EINTERLACEMETHOD interlace_method)
   MMAL_PORT_T *m_deint_input = m_deint->input[0];
   m_deint_input->userdata = (struct MMAL_PORT_USERDATA_T *)this;
 
-  if (!advanced_deinterlace)
-  {
-    // Image_fx assumed 3 frames of context. simple deinterlace doesn't require this
-    status = mmal_port_parameter_set_uint32(m_deint_input, MMAL_PARAMETER_EXTRA_BUFFERS, -2);
-    if (status != MMAL_SUCCESS)
-      CLog::Log(LOGERROR, "%s::%s Failed to enable extra buffers on %s (status=%x %s)", CLASSNAME, __func__, m_deint_input->name, status, mmal_status_to_string(status));
-  }
+  // Image_fx assumed 3 frames of context. simple deinterlace doesn't require this
+  status = mmal_port_parameter_set_uint32(m_deint_input, MMAL_PARAMETER_EXTRA_BUFFERS, GetAllowedReferences() - 5 + advanced_deinterlace ? 2:0);
+  if (status != MMAL_SUCCESS)
+    CLog::Log(LOGERROR, "%s::%s Failed to enable extra buffers on %s (status=%x %s)", CLASSNAME, __func__, m_deint_input->name, status, mmal_status_to_string(status));
 
   // Now connect the decoder output port to deinterlace input port
   status =  mmal_connection_create(&m_deint_connection, m_dec->output[0], m_deint->input[0], MMAL_CONNECTION_FLAG_TUNNELLING | MMAL_CONNECTION_FLAG_ALLOCATION_ON_INPUT);
