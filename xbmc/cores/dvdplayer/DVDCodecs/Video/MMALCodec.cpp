@@ -274,6 +274,11 @@ void CMMALVideo::dec_output_port_cb(MMAL_PORT_T *port, MMAL_BUFFER_HEADER_T *buf
         if (g_advancedSettings.CanLogComponent(LOGVIDEO))
           CLog::Log(LOGDEBUG, "%s::%s - dropping %p (drop:%d)", CLASSNAME, __func__, buffer, m_drop_state);
       }
+      else if (g_advancedSettings.m_omxDecodeStartWithValidFrame && (buffer->flags & MMAL_BUFFER_HEADER_FLAG_CORRUPTED))
+      {
+        CLog::Log(LOGDEBUG, "%s::%s - %p buffer_size(%u) dts:%.3f pts:%.3f flags:%x:%x Corrupted",
+          CLASSNAME, __func__, buffer, buffer->length, dts*1e-6, buffer->pts*1e-6, buffer->flags, buffer->type->video.flags);
+      }
       else
       {
         CMMALVideoBuffer *omvb = new CMMALVideoBuffer(this);
@@ -643,7 +648,7 @@ bool CMMALVideo::Open(CDVDStreamInfo &hints, CDVDCodecOptions &options, MMALVide
 
   error_concealment.hdr.id = MMAL_PARAMETER_VIDEO_DECODE_ERROR_CONCEALMENT;
   error_concealment.hdr.size = sizeof(MMAL_PARAMETER_BOOLEAN_T);
-  error_concealment.enable = g_advancedSettings.m_omxDecodeStartWithValidFrame;
+  error_concealment.enable = false;
   status = mmal_port_parameter_set(m_dec_input, &error_concealment.hdr);
   if (status != MMAL_SUCCESS)
     CLog::Log(LOGERROR, "%s::%s Failed to disable error concealment on %s (status=%x %s)", CLASSNAME, __func__, m_dec_input->name, status, mmal_status_to_string(status));
