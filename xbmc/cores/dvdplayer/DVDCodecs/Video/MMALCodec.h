@@ -57,7 +57,6 @@ public:
   int height;
   float m_aspect_ratio;
   int index;
-  double dts;
   uint32_t m_changed_count;
   // reference counting
   CMMALVideoBuffer* Acquire();
@@ -145,7 +144,6 @@ protected:
   int               m_speed;
   bool              m_preroll;
   int               m_codecControlFlags;
-  uint32_t          m_history_valid_pts;
 
   MMAL_COMPONENT_T *m_dec;
   MMAL_PORT_T *m_dec_input;
