@@ -196,7 +196,7 @@ void CRBP::WaitVsync()
   s = vc_dispmanx_vsync_callback(m_display, vsync_callback, (void *)&m_vsync);
   if (s == 0)
   {
-    m_vsync.Wait();
+    m_vsync.WaitMSec(1000);
   }
   else assert(0);
   s = vc_dispmanx_vsync_callback(m_display, NULL, NULL);
