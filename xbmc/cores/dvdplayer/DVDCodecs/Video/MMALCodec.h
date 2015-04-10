@@ -40,6 +40,7 @@
 #include "guilib/Geometry.h"
 #include "rendering/RenderSystem.h"
 #include "cores/VideoRenderers/BaseRenderer.h"
+#include "threads/Thread.h"
 
 class CMMALVideo;
 typedef std::shared_ptr<CMMALVideo> MMALVideoPtr;
@@ -66,7 +67,7 @@ public:
 private:
 };
 
-class CMMALVideo
+class CMMALVideo : public CThread
 {
   typedef struct mmal_demux_packet {
     uint8_t *buff;
@@ -78,6 +79,7 @@ class CMMALVideo
 public:
   CMMALVideo();
   virtual ~CMMALVideo();
+  virtual void Process();
 
   // Required overrides
   virtual bool Open(CDVDStreamInfo &hints, CDVDCodecOptions &options, MMALVideoPtr myself);
@@ -108,6 +110,7 @@ protected:
   void ReturnBuffer(CMMALVideoBuffer *buffer);
   bool CreateDeinterlace(EINTERLACEMETHOD interlace_method);
   bool DestroyDeinterlace();
+  void StopThread();
 
   // Video format
   int               m_decoded_width;
@@ -155,6 +158,8 @@ protected:
   MMAL_CONNECTION_T *m_deint_connection;
 
   MMAL_FOURCC_T m_codingType;
+  CEvent            m_sync;
+  MMAL_BUFFER_HEADER_T m_quit_packet;
   bool change_dec_output_format();
 };
 

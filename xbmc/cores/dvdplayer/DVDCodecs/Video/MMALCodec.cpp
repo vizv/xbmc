@@ -92,7 +92,16 @@ long CMMALVideoBuffer::Release()
 #undef CLASSNAME
 #define CLASSNAME "CMMALVideo"
 
+void CMMALVideo::Process()
+{
+  MMAL_BUFFER_HEADER_T *buffer;
+  while (buffer = mmal_queue_wait(m_dec_output_pool->queue), buffer && buffer != &m_quit_packet)
+    Recycle(buffer);
+  m_sync.Set();
+}
+
 CMMALVideo::CMMALVideo()
+: CThread("CMMALVideo")
 {
   if (g_advancedSettings.CanLogComponent(LOGVIDEO))
     CLog::Log(LOGDEBUG, "%s::%s %p", CLASSNAME, __func__, this);
@@ -130,6 +139,7 @@ CMMALVideo::CMMALVideo()
   m_speed = DVD_PLAYSPEED_NORMAL;
   m_codecControlFlags = 0;
   m_history_valid_pts = 0;
+  mmal_buffer_header_reset(&m_quit_packet);
 }
 
 CMMALVideo::~CMMALVideo()
@@ -335,6 +345,8 @@ bool CMMALVideo::CreateDeinterlace(EINTERLACEMETHOD interlace_method)
   assert(!m_deint);
   assert(m_dec_output == m_dec->output[0]);
 
+  StopThread();
+
   status = mmal_port_disable(m_dec_output);
   if (status != MMAL_SUCCESS)
   {
@@ -413,7 +425,7 @@ bool CMMALVideo::CreateDeinterlace(EINTERLACEMETHOD interlace_method)
 
   m_dec_output = m_deint->output[0];
   m_interlace_method = interlace_method;
-
+  Create();
   return true;
 }
 
@@ -426,6 +438,8 @@ bool CMMALVideo::DestroyDeinterlace()
 
   assert(m_deint);
   assert(m_dec_output == m_deint->output[0]);
+
+  StopThread();
 
   status = mmal_port_disable(m_dec_output);
   if (status != MMAL_SUCCESS)
@@ -469,6 +483,7 @@ bool CMMALVideo::DestroyDeinterlace()
 
   m_dec_output = m_dec->output[0];
   m_interlace_method = VS_INTERLACEMETHOD_NONE;
+  Create();
   return true;
 }
 
@@ -706,6 +721,7 @@ bool CMMALVideo::Open(CDVDStreamInfo &hints, CDVDCodecOptions &options, MMALVide
   m_speed = DVD_PLAYSPEED_NORMAL;
   // start from assuming all recent frames had valid pts
   m_history_valid_pts = ~0;
+  Create();
 
   return true;
 }
@@ -715,7 +731,6 @@ void CMMALVideo::Dispose()
   // we are happy to exit, but let last shared pointer being deleted trigger the destructor
   bool done = false;
   m_finished = true;
-  Reset();
   pthread_mutex_lock(&m_output_mutex);
   if (!m_output_busy)
     done = true;
@@ -753,8 +768,6 @@ int CMMALVideo::Decode(uint8_t* pData, int iSize, double dts, double pts)
   MMAL_BUFFER_HEADER_T *buffer;
   MMAL_STATUS_T status;
 
-  while (buffer = mmal_queue_get(m_dec_output_pool->queue), buffer)
-    Recycle(buffer);
   // we need to queue then de-queue the demux packet, seems silly but
   // mmal might not have an input buffer available when we are called
   // and we must store the demuxer packet and try again later.
@@ -781,9 +794,6 @@ int CMMALVideo::Decode(uint8_t* pData, int iSize, double dts, double pts)
 
   while (1)
   {
-     while (buffer = mmal_queue_get(m_dec_output_pool->queue), buffer)
-       Recycle(buffer);
-
      space = mmal_queue_length(m_dec_input_pool->queue) * m_dec_input->buffer_size;
      if (!demuxer_bytes && !m_demux_queue.empty())
      {
@@ -882,8 +892,6 @@ int CMMALVideo::Decode(uint8_t* pData, int iSize, double dts, double pts)
            demuxer_content = NULL;
            continue;
          }
-         while (buffer = mmal_queue_get(m_dec_output_pool->queue), buffer)
-           Recycle(buffer);
        }
     }
     if (!demuxer_bytes)
@@ -922,11 +930,22 @@ int CMMALVideo::Decode(uint8_t* pData, int iSize, double dts, double pts)
   return ret;
 }
 
+void CMMALVideo::StopThread()
+{
+  // shutdown thread
+  if (m_dec_output_pool)
+  {
+    mmal_queue_put(m_dec_output_pool->queue, &m_quit_packet);
+    m_sync.Wait();
+  }
+}
+
+
 void CMMALVideo::Reset(void)
 {
   if (g_advancedSettings.CanLogComponent(LOGVIDEO))
     CLog::Log(LOGDEBUG, "%s::%s", CLASSNAME, __func__);
-
+  StopThread();
   if (m_dec_input && m_dec_input->is_enabled)
     mmal_port_disable(m_dec_input);
   if (m_deint_connection && m_deint_connection->is_enabled)
@@ -975,6 +994,8 @@ void CMMALVideo::Reset(void)
   m_preroll = !m_hints.stills && (m_speed == DVD_PLAYSPEED_NORMAL || m_speed == DVD_PLAYSPEED_PAUSE);
   m_codecControlFlags = 0;
   m_history_valid_pts = ~0;
+  if (!m_finished)
+    Create();
 }
 
 void CMMALVideo::SetSpeed(int iSpeed)
