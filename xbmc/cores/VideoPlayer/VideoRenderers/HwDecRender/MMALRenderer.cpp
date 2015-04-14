@@ -33,6 +33,7 @@
 #include "windowing/WindowingFactory.h"
 #include "cores/VideoPlayer/DVDCodecs/Video/MMALCodec.h"
 #include "xbmc/Application.h"
+#include "guilib/GUIWindowManager.h"
 
 #define CLASSNAME "CMMALRenderer"
 
@@ -662,7 +663,10 @@ bool CMMALRenderer::Supports(ESCALINGMETHOD method)
 
 EINTERLACEMETHOD CMMALRenderer::AutoInterlaceMethod()
 {
-  return VS_INTERLACEMETHOD_MMAL_ADVANCED;
+  if (!g_graphicsContext.IsFullScreenVideo() || g_windowManager.HasDialogOnScreen())
+    return VS_INTERLACEMETHOD_MMAL_ADVANCED_HALF;
+  else
+    return VS_INTERLACEMETHOD_MMAL_ADVANCED;
 }
 
 void CMMALRenderer::SetVideoRect(const CRect& InSrcRect, const CRect& InDestRect)
