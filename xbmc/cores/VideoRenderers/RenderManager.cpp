@@ -940,6 +940,14 @@ unsigned int CXBMCRenderManager::GetOptimalBufferSize()
   return m_pRenderer->GetMaxBufferSize();
 }
 
+void *CXBMCRenderManager::PassCookie(void *cookie)
+{
+  if (m_pRenderer)
+    return m_pRenderer->PassCookie(cookie);
+  assert(0);
+}
+
+
 // Supported pixel formats, can be called before configure
 std::vector<ERenderFormat> CXBMCRenderManager::SupportedFormats()
 {

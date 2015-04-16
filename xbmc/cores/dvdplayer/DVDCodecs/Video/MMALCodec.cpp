@@ -111,7 +111,6 @@ CMMALVideo::CMMALVideo()
   m_dec_input = NULL;
   m_dec_output = NULL;
   m_dec_input_pool = NULL;
-  m_dec_output_pool = NULL;
 
   m_deint = NULL;
   m_deint_connection = NULL;
@@ -161,10 +160,6 @@ CMMALVideo::~CMMALVideo()
   if (m_dec_input_pool)
     mmal_pool_destroy(m_dec_input_pool);
   m_dec_input_pool = NULL;
-
-  if (m_dec_output_pool)
-    mmal_pool_destroy(m_dec_output_pool);
-  m_dec_output_pool = NULL;
 
   if (m_deint)
     mmal_component_destroy(m_deint);
@@ -421,7 +416,7 @@ bool CMMALVideo::CreateDeinterlace(EINTERLACEMETHOD interlace_method)
 
   m_dec_output = m_deint->output[0];
   m_interlace_method = interlace_method;
-  Prime();
+
   return true;
 }
 
@@ -477,7 +472,7 @@ bool CMMALVideo::DestroyDeinterlace()
 
   m_dec_output = m_dec->output[0];
   m_interlace_method = VS_INTERLACEMETHOD_NONE;
-  Prime();
+
   return true;
 }
 
@@ -708,21 +703,14 @@ bool CMMALVideo::Open(CDVDStreamInfo &hints, CDVDCodecOptions &options, MMALVide
     return false;
   }
 
-  m_dec_output_pool = mmal_port_pool_create(m_dec_output, m_dec_output->buffer_num, m_dec_output->buffer_size);
-  if(!m_dec_output_pool)
-  {
-    CLog::Log(LOGERROR, "%s::%s Failed to create pool for decode output port (status=%x %s)", CLASSNAME, __func__, status, mmal_status_to_string(status));
-    return false;
-  }
-
   if (!SendCodecConfigData())
     return false;
 
-  Prime();
   m_startframe = false;
   m_preroll = !m_hints.stills;
   m_speed = DVD_PLAYSPEED_NORMAL;
 
+  g_renderManager.PassCookie(this);
   return true;
 }
 
@@ -730,6 +718,7 @@ void CMMALVideo::Dispose()
 {
   // we are happy to exit, but let last shared pointer being deleted trigger the destructor
   bool done = false;
+  g_renderManager.PassCookie(NULL);
   m_finished = true;
   Reset();
   pthread_mutex_lock(&m_output_mutex);
@@ -905,13 +894,6 @@ int CMMALVideo::Decode(uint8_t* pData, int iSize, double dts, double pts)
   return ret;
 }
 
-void CMMALVideo::Prime()
-{
-  MMAL_BUFFER_HEADER_T *buffer;
-  while (buffer = mmal_queue_get(m_dec_output_pool->queue), buffer)
-    Recycle(buffer);
-}
-
 void CMMALVideo::Reset(void)
 {
   if (g_advancedSettings.CanLogComponent(LOGVIDEO))
@@ -957,10 +939,8 @@ void CMMALVideo::Reset(void)
   pthread_mutex_unlock(&m_output_mutex);
 
   if (!m_finished)
-  {
     SendCodecConfigData();
-    Prime();
-  }
+
   m_startframe = false;
   m_decoderPts = DVD_NOPTS_VALUE;
   m_preroll = !m_hints.stills && (m_speed == DVD_PLAYSPEED_NORMAL || m_speed == DVD_PLAYSPEED_PAUSE);

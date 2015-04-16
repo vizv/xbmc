@@ -40,6 +40,7 @@
 
 class CBaseTexture;
 class CMMALVideoBuffer;
+class CMMALVideo;
 
 struct DVDVideoPicture;
 
@@ -90,6 +91,7 @@ public:
   virtual bool         IsGuiLayer() { return false; }
 
   void vout_input_port_cb(MMAL_PORT_T *port, MMAL_BUFFER_HEADER_T *buffer);
+  virtual void        *PassCookie(void *cookie);
 protected:
   int m_iYV12RenderBuffer;
   int m_NumYV12Buffers;
@@ -116,8 +118,10 @@ protected:
   MMAL_QUEUE_T     *m_release_queue;
   CEvent            m_sync;
   MMAL_BUFFER_HEADER_T m_quit_packet;
+  CMMALVideo *m_mmal_video;
 
   bool init_vout(ERenderFormat format);
   void ReleaseBuffers();
   void UnInitMMAL();
+  void Prime();
 };

@@ -40,6 +40,50 @@
 #define MMAL_DEBUG_VERBOSE
 #endif
 
+
+
+void CMMALRenderer::Prime()
+{
+  #if defined(MMAL_DEBUG_VERBOSE)
+  CLog::Log(LOGDEBUG, "%s::%s format:%d dec:%p pool:%p", CLASSNAME, __func__, m_format, m_mmal_video, m_vout_input_pool);
+  #endif
+
+  if (m_format != RENDER_FMT_MMAL || !m_vout_input_pool)
+    return;
+
+  MMAL_BUFFER_HEADER_T *buffer;
+  while (buffer = mmal_queue_get(m_vout_input_pool->queue), buffer)
+  {
+    CLog::Log(LOGDEBUG, "%s::%s buffer:%p mmal_video:%p", CLASSNAME, __func__, buffer, m_mmal_video);
+    if (m_mmal_video)
+    {
+      m_mmal_video->Recycle(buffer);
+    }
+    else
+    {
+      mmal_buffer_header_release(buffer);
+      break;
+    }
+  }
+}
+
+void *CMMALRenderer::PassCookie(void *cookie)
+{
+  m_mmal_video = (CMMALVideo *)cookie;
+  #if defined(MMAL_DEBUG_VERBOSE)
+  CLog::Log(LOGDEBUG, "%s::%s cookie:%p", CLASSNAME, __func__, cookie);
+  #endif
+
+  if (m_mmal_video)
+  {
+    bool formatChanged = m_format != RENDER_FMT_MMAL;
+    m_format = RENDER_FMT_MMAL;
+    m_bConfigured = init_vout(formatChanged);
+    Prime();
+  }
+  return NULL;
+}
+
 static void vout_control_port_cb(MMAL_PORT_T *port, MMAL_BUFFER_HEADER_T *buffer)
 {
   mmal_buffer_header_release(buffer);
@@ -164,14 +208,11 @@ bool CMMALRenderer::init_vout(ERenderFormat format)
     return false;
   }
 
-  if (m_format == RENDER_FMT_YUV420P)
+  m_vout_input_pool = mmal_port_pool_create(m_vout_input , m_vout_input->buffer_num, m_vout_input->buffer_size);
+  if (!m_vout_input_pool)
   {
-    m_vout_input_pool = mmal_pool_create(m_vout_input->buffer_num, m_vout_input->buffer_size);
-    if (!m_vout_input_pool)
-    {
-      CLog::Log(LOGERROR, "%s::%s Failed to create pool for decoder input port (status=%x %s)", CLASSNAME, __func__, status, mmal_status_to_string(status));
-      return false;
-    }
+    CLog::Log(LOGERROR, "%s::%s Failed to create pool for decoder input port (status=%x %s)", CLASSNAME, __func__, status, mmal_status_to_string(status));
+    return false;
   }
   return true;
 }
@@ -179,10 +220,17 @@ bool CMMALRenderer::init_vout(ERenderFormat format)
 void CMMALRenderer::Process()
 {
   MMAL_BUFFER_HEADER_T *buffer;
-  while (buffer = mmal_queue_wait(m_release_queue), buffer && buffer != &m_quit_packet)
+  while (buffer = mmal_queue_timedwait(m_release_queue, 100), buffer != &m_quit_packet)
   {
-    CMMALVideoBuffer *omvb = (CMMALVideoBuffer *)buffer->user_data;
-    omvb->Release();
+    if (buffer)
+    {
+      CMMALVideoBuffer *omvb = (CMMALVideoBuffer *)buffer->user_data;
+      omvb->Release();
+    }
+    else
+    {
+      Prime();
+    }
   }
   m_sync.Set();
 }
@@ -382,7 +430,7 @@ void CMMALRenderer::RenderUpdate(bool clear, DWORD flags, DWORD alpha)
 #endif
       // we only want to upload frames once
       if (omvb->mmal_buffer->flags & MMAL_BUFFER_HEADER_FLAG_USER1)
-        return;
+        goto done;
       omvb->Acquire();
       omvb->mmal_buffer->flags |= MMAL_BUFFER_HEADER_FLAG_USER1 | MMAL_BUFFER_HEADER_FLAG_USER2;
       mmal_port_send_buffer(m_vout_input, omvb->mmal_buffer);
@@ -397,7 +445,7 @@ void CMMALRenderer::RenderUpdate(bool clear, DWORD flags, DWORD alpha)
     {
       // we only want to upload frames once
       if (buffer->mmal_buffer->flags & MMAL_BUFFER_HEADER_FLAG_USER1)
-        return;
+        goto done;
       // sanity check it is not on display
       buffer->mmal_buffer->flags |= MMAL_BUFFER_HEADER_FLAG_USER1 | MMAL_BUFFER_HEADER_FLAG_USER2;
       mmal_port_send_buffer(m_vout_input, buffer->mmal_buffer);
@@ -406,6 +454,8 @@ void CMMALRenderer::RenderUpdate(bool clear, DWORD flags, DWORD alpha)
       CLog::Log(LOGDEBUG, "%s::%s - No buffer to update", CLASSNAME, __func__);
   }
   else assert(0);
+done:
+  Prime();
 }
 
 void CMMALRenderer::FlipPage(int source)
@@ -467,6 +517,8 @@ void CMMALRenderer::UnInitMMAL()
     m_vout_input = NULL;
   }
 
+  ReleaseBuffers();
+
   if (m_vout_input_pool)
   {
     mmal_pool_destroy(m_vout_input_pool);
@@ -478,7 +530,6 @@ void CMMALRenderer::UnInitMMAL()
     mmal_component_release(m_vout);
     m_vout = NULL;
   }
-  ReleaseBuffers();
 
   m_RenderUpdateCallBackFn = NULL;
   m_RenderUpdateCallBackCtx = NULL;

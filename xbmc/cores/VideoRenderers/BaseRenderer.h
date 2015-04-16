@@ -112,6 +112,11 @@ public:
 
   static void SettingOptionsRenderMethodsFiller(const CSetting *setting, std::vector< std::pair<std::string, int> > &list, int &current, void *data);
 
+  /**
+   * Magic api for communicating between codec and renderer
+   */
+  virtual void *PassCookie(void *cookie) { return NULL; }
+
 protected:
   void       ChooseBestResolution(float fps);
   bool       FindResolutionFromOverride(float fps, float& weight, bool fallback);

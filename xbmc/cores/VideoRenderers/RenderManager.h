@@ -195,6 +195,11 @@ public:
    */
   void DiscardBuffer();
 
+  /**
+   * Magic api for communicating between codec and renderer
+   */
+  void *PassCookie(void *cookie);
+
 protected:
 
   void PresentSingle(bool clear, DWORD flags, DWORD alpha);
