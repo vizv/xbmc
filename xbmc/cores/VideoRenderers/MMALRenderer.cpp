@@ -44,6 +44,7 @@
 
 void CMMALRenderer::Prime()
 {
+  CSingleLock lock(m_sharedSection);
   #if defined(MMAL_DEBUG_VERBOSE)
   CLog::Log(LOGDEBUG, "%s::%s format:%d dec:%p pool:%p", CLASSNAME, __func__, m_format, m_mmal_video, m_vout_input_pool);
   #endif
@@ -69,6 +70,7 @@ void CMMALRenderer::Prime()
 
 void *CMMALRenderer::PassCookie(void *cookie)
 {
+  CSingleLock lock(m_sharedSection);
   m_mmal_video = (CMMALVideo *)cookie;
   #if defined(MMAL_DEBUG_VERBOSE)
   CLog::Log(LOGDEBUG, "%s::%s cookie:%p", CLASSNAME, __func__, cookie);
@@ -90,6 +92,7 @@ static void vout_control_port_cb(MMAL_PORT_T *port, MMAL_BUFFER_HEADER_T *buffer
 
 void CMMALRenderer::vout_input_port_cb(MMAL_PORT_T *port, MMAL_BUFFER_HEADER_T *buffer)
 {
+  CSingleLock lock(m_sharedSection);
   #if defined(MMAL_DEBUG_VERBOSE)
   CMMALVideoBuffer *omvb = (CMMALVideoBuffer *)buffer->user_data;
   CLog::Log(LOGDEBUG, "%s::%s port:%p buffer %p (%p), len %d cmd:%x f:%x", CLASSNAME, __func__, port, buffer, omvb, buffer->length, buffer->cmd, buffer->flags);
@@ -116,6 +119,7 @@ static void vout_input_port_cb_static(MMAL_PORT_T *port, MMAL_BUFFER_HEADER_T *b
 
 bool CMMALRenderer::init_vout(ERenderFormat format)
 {
+  CSingleLock lock(m_sharedSection);
   bool formatChanged = m_format != format;
   MMAL_STATUS_T status;
 
@@ -254,6 +258,7 @@ CMMALRenderer::CMMALRenderer()
 
 CMMALRenderer::~CMMALRenderer()
 {
+  CSingleLock lock(m_sharedSection);
   CLog::Log(LOGDEBUG, "%s::%s", CLASSNAME, __func__);
   // shutdown thread
   mmal_queue_put(m_release_queue, &m_quit_packet);
@@ -276,6 +281,7 @@ void CMMALRenderer::AddProcessor(CMMALVideoBuffer *buffer, int index)
 
 bool CMMALRenderer::Configure(unsigned int width, unsigned int height, unsigned int d_width, unsigned int d_height, float fps, unsigned flags, ERenderFormat format, unsigned extended_format, unsigned int orientation)
 {
+  CSingleLock lock(m_sharedSection);
   ReleaseBuffers();
 
   m_sourceWidth  = width;
@@ -306,6 +312,7 @@ bool CMMALRenderer::Configure(unsigned int width, unsigned int height, unsigned 
 
 int CMMALRenderer::GetImage(YV12Image *image, int source, bool readonly)
 {
+  CSingleLock lock(m_sharedSection);
 #if defined(MMAL_DEBUG_VERBOSE)
   CLog::Log(LOGDEBUG, "%s::%s - %p %d %d", CLASSNAME, __func__, image, source, readonly);
 #endif
@@ -403,6 +410,7 @@ void CMMALRenderer::Update()
 
 void CMMALRenderer::RenderUpdate(bool clear, DWORD flags, DWORD alpha)
 {
+  CSingleLock lock(m_sharedSection);
   int source = m_iYV12RenderBuffer;
 #if defined(MMAL_DEBUG_VERBOSE)
   CLog::Log(LOGDEBUG, "%s::%s - %d %x %d %d", CLASSNAME, __func__, clear, flags, alpha, source);
@@ -463,6 +471,7 @@ done:
 
 void CMMALRenderer::FlipPage(int source)
 {
+  CSingleLock lock(m_sharedSection);
   if (!m_bConfigured || m_format == RENDER_FMT_BYPASS)
     return;
 
@@ -475,6 +484,7 @@ void CMMALRenderer::FlipPage(int source)
 
 unsigned int CMMALRenderer::PreInit()
 {
+  CSingleLock lock(m_sharedSection);
   m_bConfigured = false;
   UnInit();
 
@@ -500,12 +510,14 @@ unsigned int CMMALRenderer::PreInit()
 
 void CMMALRenderer::ReleaseBuffers()
 {
+  CSingleLock lock(m_sharedSection);
   for (int i=0; i<NUM_BUFFERS; i++)
     ReleaseBuffer(i);
 }
 
 void CMMALRenderer::UnInitMMAL()
 {
+  CSingleLock lock(m_sharedSection);
   CLog::Log(LOGDEBUG, "%s::%s", CLASSNAME, __func__);
   if (m_vout)
   {
@@ -622,6 +634,7 @@ EINTERLACEMETHOD CMMALRenderer::AutoInterlaceMethod()
 
 void CMMALRenderer::SetVideoRect(const CRect& InSrcRect, const CRect& InDestRect)
 {
+  CSingleLock lock(m_sharedSection);
   assert(g_graphicsContext.GetStereoView() != RENDER_STEREO_VIEW_RIGHT);
 
   if (!m_vout_input)
