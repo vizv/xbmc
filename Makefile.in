@@ -199,6 +199,14 @@ else
   INSTALL_FILTER+= .*screensaver\.rsxs.*
 endif
 
+SS_DIRS=
+ifneq (@DISABLE_GLESSCREENSAVERS@,1)
+  SS_DIRS+= xbmc/screensavers/gles/solarwinds
+  SS_DIRS+= xbmc/screensavers/gles/shadertoy
+else
+  INSTALL_FILTER+= .*screensaver\.gles.*
+endif
+
 ifneq (@DISABLE_SPECTRUM@,1)
   VIS_DIRS+= xbmc/visualizations/OpenGLSpectrum
 else
@@ -378,7 +386,13 @@ endif
 $(VIS_DIRS): force exports $(EGLHELPERS)
 	$(MAKE) -C $@
 
-$(SS_DIRS): force exports
+ifeq (@USE_OPENGLES@,1)
+GLESHELPERS=xbmc/screensavers/gles/gleshelpers.a
+$(GLESHELPERS): force exports
+	$(MAKE) -C xbmc/screensavers/gles
+endif
+
+$(SS_DIRS): force exports $(GLESHELPERS)
 	$(MAKE) -C $@
 
 visualizations: $(VIS_DIRS)
