@@ -229,6 +229,12 @@ else
   INSTALL_FILTER+= .*visualization\.goom.*
 endif
 
+ifneq (@DISABLE_SHADERTOY@,1)
+  VIS_DIRS+= xbmc/visualizations/ShaderToy
+else
+  INSTALL_FILTER+= .*visualization\.shadertoy.*
+endif
+
 LIBADDON_DIRS=\
 	lib/addons/library.xbmc.addon \
 	lib/addons/library.xbmc.codec \

@@ -174,6 +174,8 @@ spectrum_enabled="== SPECTRUM enabled =="
 spectrum_disabled="== SPECTRUM disabled =="
 goom_enabled="== GOOM enabled. =="
 goom_disabled="== GOOM disabled. =="
+shadertoy_enabled="== SHADERTOY enabled =="
+shadertoy_disabled="== SHADERTOY disabled =="
 alsa_disabled="== ALSA support disabled. =="
 dbus_disabled="== DBUS support disabled. =="
 rsxs_enabled="== RSXS enabled. =="
@@ -331,6 +333,12 @@ AC_ARG_ENABLE([goom],
   [enable GOOM visualisation (default is no)])],
   [use_goom=$enableval],
   [use_goom=no])
+
+AC_ARG_ENABLE([shadertoy],
+  [AS_HELP_STRING([--enable-shadertoy],
+  [enable ShaderToy visualisation (default is yes)])],
+  [use_shadertoy=$enableval],
+  [use_shadertoy=yes])
 
 AC_ARG_ENABLE([rsxs],
   [AS_HELP_STRING([--enable-rsxs],
@@ -1453,6 +1461,15 @@ else
   DISABLE_GOOM=1
 fi
 
+# SHADERTOY
+if test "$use_shadertoy" = "yes"; then
+  AC_MSG_NOTICE($shadertoy_enabled)
+    DISABLE_SHADERTOY=0
+else
+  AC_MSG_NOTICE($shadertoy_disabled)
+  DISABLE_SHADERTOY=1
+fi
+
 # RSXS
 if test "$use_rsxs" = "no" || test "$use_gl" = "no"; then
   AC_MSG_NOTICE($rsxs_disabled)
@@ -2133,6 +2150,12 @@ else
   final_message="$final_message\n  GOOM:\t\tNo"
 fi
 
+if test "$use_shadertoy" = "yes"; then
+  final_message="$final_message\n  ShaderToy:\tYes"
+else
+  final_message="$final_message\n  ShaderToy:\tNo"
+fi
+
 if test "$use_rsxs" = "yes"; then
   final_message="$final_message\n  RSXS:\t\tYes"
 else
@@ -2501,6 +2524,7 @@ OUTPUT_FILES="Makefile \
     xbmc/visualizations/OpenGLSpectrum/Makefile \
     xbmc/visualizations/fishBMC/Makefile \
     xbmc/visualizations/WaveForm/Makefile \
+    xbmc/visualizations/ShaderToy/Makefile \
     xbmc/windowing/Makefile \
     xbmc/windowing/egl/Makefile \
     lib/addons/library.xbmc.addon/Makefile \
@@ -2594,6 +2618,7 @@ AC_SUBST(SDL_DEFINES)
 AC_SUBST(BUILD_DVDCSS)
 AC_SUBST(DISABLE_WAVEFORM)
 AC_SUBST(DISABLE_SPECTRUM)
+AC_SUBST(DISABLE_SHADERTOY)
 AC_SUBST(DISABLE_GOOM)
 AC_SUBST(DISABLE_RSXS)
 AC_SUBST(DISABLE_FISHBMC)
