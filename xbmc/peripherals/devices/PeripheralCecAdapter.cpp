@@ -52,6 +52,10 @@ using namespace std;
 #define LOCALISED_ID_TV           36037
 #define LOCALISED_ID_AVR          36038
 #define LOCALISED_ID_TV_AVR       36039
+#define LOCALISED_ID_NO_ACTION    36045
+#define LOCALISED_ID_KEEP_AUDIO   36046
+#define LOCALISED_ID_PAUSE        36047
+
 #define LOCALISED_ID_NONE         231
 
 /* time in seconds to suppress source activation after receiving OnStop */
@@ -1197,7 +1201,7 @@ void CPeripheralCecAdapter::CecSourceActivated(void *cbParam, const CEC::cec_log
   if (activated == 1)
     g_application.WakeUpScreenSaverAndDPMS();
 
-  if (adapter->GetSettingBool("pause_playback_on_deactivate"))
+  if (adapter->GetSettingInt("pause_playback_on_deactivate") != LOCALISED_ID_NO_ACTION)
   {
     bool bShowingSlideshow = (g_windowManager.GetActiveWindow() == WINDOW_SLIDESHOW);
     CGUIWindowSlideShow *pSlideShow = bShowingSlideshow ? (CGUIWindowSlideShow *)g_windowManager.GetWindow(WINDOW_SLIDESHOW) : NULL;
@@ -1210,7 +1214,8 @@ void CPeripheralCecAdapter::CecSourceActivated(void *cbParam, const CEC::cec_log
     else if (bPausedAndActivated)
       adapter->m_bPlaybackPaused = false;
 
-    if (bPlayingAndDeactivated || bPausedAndActivated)
+    if ((bPlayingAndDeactivated || bPausedAndActivated)
+      && adapter->GetSettingInt("pause_playback_on_deactivate") == LOCALISED_ID_PAUSE)
     {
       if (pSlideShow)
         // pause/resume slideshow
@@ -1218,6 +1223,14 @@ void CPeripheralCecAdapter::CecSourceActivated(void *cbParam, const CEC::cec_log
       else
         // pause/resume player
         CApplicationMessenger::Get().MediaPause();
+    }
+    // setting is "Stop video, keep audio" so just check if we play Video and player
+    // is not paused - trigger STOP. if we are paused, assume that as user's wish to continue
+    // later
+    else if (adapter->GetSettingInt("pause_playback_on_deactivate") == LOCALISED_ID_KEEP_AUDIO
+          && g_application.m_pPlayer->IsPlayingVideo() && !g_application.m_pPlayer->IsPausedPlayback())
+    {
+      CApplicationMessenger::Get().MediaStop();
     }
   }
 }
