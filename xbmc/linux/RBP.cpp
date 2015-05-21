@@ -46,7 +46,7 @@ CRBP::~CRBP()
 
 void CRBP::InitializeSettings()
 {
-  if (g_advancedSettings.m_cacheMemBufferSize == ~0U)
+  if (m_initialized && g_advancedSettings.m_cacheMemBufferSize == ~0U)
     g_advancedSettings.m_cacheMemBufferSize = m_arm_mem < 256 ? 1024 * 1024 * 2 : 1024 * 1024 * 20;
 }
 
