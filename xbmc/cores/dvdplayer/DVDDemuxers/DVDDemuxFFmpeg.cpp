@@ -1278,6 +1278,8 @@ CDemuxStream* CDVDDemuxFFmpeg::AddStream(int iId)
           // check for metadata in file if detection in stream failed
         if (stereoMode.empty())
           stereoMode = GetStereoModeFromMetadata(m_pFormatContext->metadata);
+        if (stereoMode.empty() && pStream->codec->codec_tag == AV_CODEC_ID_H264MVC)
+          stereoMode = "top_bottom";
         if (!stereoMode.empty())
           st->stereo_mode = stereoMode;
 

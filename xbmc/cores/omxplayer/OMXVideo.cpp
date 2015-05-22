@@ -421,7 +421,7 @@ bool COMXVideo::Open(CDVDStreamInfo &hints, OMXClock *clock, EDEINTERLACEMODE de
           break;
       }
     }
-    if (CSettings::Get().GetBool("videoplayer.supportmvc"))
+    if (CSettings::Get().GetBool("videoplayer.supportmvc") && hints.codec_tag == AV_CODEC_ID_H264MVC)
     {
       m_codingType = OMX_VIDEO_CodingMVC;
       m_video_codec_name = "omx-mvc";
