@@ -103,6 +103,7 @@ public:
   CDVDPlayerAudio(CDVDClock* pClock, CDVDMessageQueue& parent);
   virtual ~CDVDPlayerAudio();
 
+  bool SetPriority(const int iPriority) { return CThread::SetPriority(iPriority); }
   bool OpenStream(CDVDStreamInfo &hints);
   void CloseStream(bool bWaitForBuffers);
 

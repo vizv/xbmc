@@ -87,6 +87,7 @@ private:
 public:
   OMXPlayerVideo(OMXClock *av_clock, CDVDOverlayContainer* pOverlayContainer, CDVDMessageQueue& parent);
   ~OMXPlayerVideo();
+  bool SetPriority(const int iPriority) { return CThread::SetPriority(iPriority); }
   bool OpenStream(CDVDStreamInfo &hints);
   void SendMessage(CDVDMsg* pMsg, int priority = 0) { m_messageQueue.Put(pMsg, priority); }
   void FlushMessages()                              { m_messageQueue.Flush(); }

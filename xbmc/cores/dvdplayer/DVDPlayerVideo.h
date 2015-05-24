@@ -63,6 +63,7 @@ public:
                  , CDVDMessageQueue& parent);
   virtual ~CDVDPlayerVideo();
 
+  bool SetPriority(const int iPriority) { return CThread::SetPriority(iPriority); }
   bool OpenStream(CDVDStreamInfo &hint);
   void CloseStream(bool bWaitForBuffers);
 

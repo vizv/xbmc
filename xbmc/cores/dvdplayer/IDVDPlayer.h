@@ -55,7 +55,7 @@ class IDVDStreamPlayerVideo : public IDVDStreamPlayer
 public:
   ~IDVDStreamPlayerVideo() {}
   float GetRelativeUsage() { return 0.0f; }
-  bool SetPriority(const int iPriority) { return true; }
+  virtual bool SetPriority(const int iPriority) = 0;
   virtual bool OpenStream(CDVDStreamInfo &hint) = 0;
   virtual void CloseStream(bool bWaitForBuffers) = 0;
   virtual bool StepFrame() = 0;
@@ -96,7 +96,7 @@ class IDVDStreamPlayerAudio : public IDVDStreamPlayer
 public:
   ~IDVDStreamPlayerAudio() {}
   float GetRelativeUsage() { return 0.0f; }
-  bool SetPriority(const int iPriority) { return true; }
+  virtual bool SetPriority(const int iPriority) = 0;
   virtual bool OpenStream(CDVDStreamInfo &hints) = 0;
   virtual void CloseStream(bool bWaitForBuffers) = 0;
   virtual void SetSpeed(int speed) = 0;
