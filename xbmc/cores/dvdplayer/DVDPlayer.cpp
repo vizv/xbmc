@@ -3471,11 +3471,8 @@ bool CDVDPlayer::OpenAudioStream(CDVDStreamInfo& hint, bool reset)
   m_dvdPlayerAudio->SendMessage(new CDVDMsg(CDVDMsg::PLAYER_STARTED), 1);
 
   /* audio normally won't consume full cpu, so let it have prio */
-#ifdef TARGET_RASPBERRY_PI
-  m_dvdPlayerAudio->SetPriority(GetPriority());
-#else
-  m_dvdPlayerAudio->SetPriority(GetPriority()+1);
-#endif
+  if (!m_omxplayer_mode)
+    m_dvdPlayerAudio->SetPriority(GetPriority()+1);
   return true;
 }
 
