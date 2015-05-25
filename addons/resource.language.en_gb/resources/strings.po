@@ -16755,3 +16755,13 @@ msgstr ""
 msgctxt "#38102"
 msgid "%i ms"
 msgstr ""
+
+#: system/settings/rbp.xml
+msgctxt "#38210"
+msgid "Prefer PTS timestamps"
+msgstr ""
+
+#: system/settings/rbp.xml
+msgctxt "#38211"
+msgid "Try enabling this if you have stutter with video files"
+msgstr ""
