@@ -1,7 +1,7 @@
 From 816d7cd21973d202de1fb6baee1a67c92be3dabb Mon Sep 17 00:00:00 2001
 From: Peter de Rivaz <peter.derivaz@gmail.com>
 Date: Tue, 28 Apr 2015 16:18:40 +0100
-Subject: [PATCH 01/66] Added display output
+Subject: [PATCH 01/67] Added display output
 
 ---
  ffmpeg.c | 150 +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
@@ -203,7 +203,7 @@ index 1ba0a42..3daa2f4 100644
 From 36c183507e58ed148c08ca514df0263d31773892 Mon Sep 17 00:00:00 2001
 From: Peter de Rivaz <peter.derivaz@gmail.com>
 Date: Wed, 29 Apr 2015 16:49:43 +0100
-Subject: [PATCH 02/66] Split transform and intra prediction into commands
+Subject: [PATCH 02/67] Split transform and intra prediction into commands
 
 ---
  libavcodec/hevc.c       | 119 +++++++++++++++++++++++++++++++++++++++++++++++-
@@ -566,7 +566,7 @@ index cb369eb..df2f5a3 100644
 From f8ff7b0d8687e30b0d4c9c251cb37b98a472cff9 Mon Sep 17 00:00:00 2001
 From: Peter de Rivaz <peter.derivaz@gmail.com>
 Date: Thu, 30 Apr 2015 15:23:22 +0100
-Subject: [PATCH 03/66] Added simple VPU test code
+Subject: [PATCH 03/67] Added simple VPU test code
 
 ---
  libavcodec/Makefile             |    7 +
@@ -4786,7 +4786,7 @@ index 0000000..cdc4e4d
 From 6b5874fbc60f43550863856e757a177353e3cc24 Mon Sep 17 00:00:00 2001
 From: Peter de Rivaz <peter.derivaz@argondesign.com>
 Date: Sat, 2 May 2015 21:15:37 +0100
-Subject: [PATCH 04/66] First working version with uncached memory
+Subject: [PATCH 04/67] First working version with uncached memory
 
 ---
  libavcodec/hevc.c               |  61 +++++-
@@ -5985,7 +5985,7 @@ index 4e3c35c..814fc3c 100644
 From 5337aa258bc8bf343aa2fe18b7eba4065f6d3d6d Mon Sep 17 00:00:00 2001
 From: Peter de Rivaz <peter.derivaz@gmail.com>
 Date: Tue, 5 May 2015 09:41:23 +0100
-Subject: [PATCH 05/66] Fixed deblocking
+Subject: [PATCH 05/67] Fixed deblocking
 
 ---
  libavcodec/hevc.c | 20 +++++++++++++++++---
@@ -6060,7 +6060,7 @@ index 43edea1..c86209f 100644
 From c1321b75c893a46bdccd01d5b1a1e24c294e87a1 Mon Sep 17 00:00:00 2001
 From: Peter de Rivaz <peter.derivaz@gmail.com>
 Date: Tue, 5 May 2015 11:32:30 +0100
-Subject: [PATCH 06/66] Added 32x32 transform
+Subject: [PATCH 06/67] Added 32x32 transform
 
 ---
  libavcodec/hevc.c               |   8 +-
@@ -7123,7 +7123,7 @@ index 479ae88..90f504a 100644
 From 8e455c6d923fcaff50a01925b49db4226718a003 Mon Sep 17 00:00:00 2001
 From: Peter de Rivaz <peter.derivaz@gmail.com>
 Date: Tue, 5 May 2015 16:57:03 +0100
-Subject: [PATCH 07/66] Clear coefficients in advance
+Subject: [PATCH 07/67] Clear coefficients in advance
 
 ---
  libavcodec/hevc.c               | 129 ++++++++++++++++++++++++++++------------
@@ -7475,7 +7475,7 @@ index a660b58..388ceb2 100644
 From b5d2fef981592a93a274eeffc2f23a993c23a50d Mon Sep 17 00:00:00 2001
 From: Peter de Rivaz <peter.derivaz@gmail.com>
 Date: Wed, 6 May 2015 09:56:43 +0100
-Subject: [PATCH 08/66] Prepared inter offload
+Subject: [PATCH 08/67] Prepared inter offload
 
 ---
  libavcodec/hevc.c       | 118 +++++++++++++++++++++++++++++++++++++++++++-----
@@ -7758,7 +7758,7 @@ index 5ed952a..f2ff50d 100644
 From e201e24800310a1eea921d51ab32a42b7f7ecb3a Mon Sep 17 00:00:00 2001
 From: Peter de Rivaz <peter.derivaz@gmail.com>
 Date: Wed, 6 May 2015 11:08:50 +0100
-Subject: [PATCH 09/66] Inter prediction in separate pass
+Subject: [PATCH 09/67] Inter prediction in separate pass
 
 ---
  libavcodec/hevc.c | 93 +++++++++++++++++++++++++++++++++++++++++++++----------
@@ -7977,7 +7977,7 @@ index 2d7f0f8..e7e923b 100644
 From f39834da3d91c58a3f5fc0b5efb863acb9346579 Mon Sep 17 00:00:00 2001
 From: Peter de Rivaz <peter.derivaz@gmail.com>
 Date: Wed, 6 May 2015 13:03:50 +0100
-Subject: [PATCH 10/66] Added VPU thread
+Subject: [PATCH 10/67] Added VPU thread
 
 ---
  libavcodec/hevc.c    |  11 +++--
@@ -8235,7 +8235,7 @@ index 814fc3c..7dc661a 100644
 From 3b09da27d0dc4d9abd9f394ed28fca2272f07bc2 Mon Sep 17 00:00:00 2001
 From: Peter de Rivaz <peter.derivaz@gmail.com>
 Date: Wed, 6 May 2015 14:02:38 +0100
-Subject: [PATCH 11/66] Corrected movement of head pointer
+Subject: [PATCH 11/67] Corrected movement of head pointer
 
 ---
  libavcodec/hevc.c    |  2 +-
@@ -8332,7 +8332,7 @@ index 7dc661a..3526fce 100644
 From 79d54d7bdf1881bb32eef125ff834210690ad422 Mon Sep 17 00:00:00 2001
 From: Peter de Rivaz <peter.derivaz@gmail.com>
 Date: Wed, 6 May 2015 15:03:37 +0100
-Subject: [PATCH 12/66] Added different signal when tail moves
+Subject: [PATCH 12/67] Added different signal when tail moves
 
 ---
  libavcodec/rpi_qpu.c | 11 ++++++-----
@@ -8395,7 +8395,7 @@ index 966a042..8e8805c 100644
 From dc26eeb4465e170cf2308c1be39edd9799c67dad Mon Sep 17 00:00:00 2001
 From: Peter de Rivaz <peter.derivaz@gmail.com>
 Date: Thu, 7 May 2015 08:57:11 +0100
-Subject: [PATCH 13/66] Add option to test for gpu_idle
+Subject: [PATCH 13/67] Add option to test for gpu_idle
 
 ---
  libavcodec/hevc.c    |  3 ++-
@@ -8466,7 +8466,7 @@ index 8e8805c..1da2edc 100644
 From c408a0b8b97e441020d5d8104c6b8df9e3846cbf Mon Sep 17 00:00:00 2001
 From: Peter de Rivaz <peter.derivaz@gmail.com>
 Date: Thu, 7 May 2015 11:01:35 +0100
-Subject: [PATCH 14/66] Added deblocking pass
+Subject: [PATCH 14/67] Added deblocking pass
 
 ---
  libavcodec/hevc.c        | 33 +++++++++++++++++++++++++++------
@@ -8621,7 +8621,7 @@ index 1da2edc..2dd2a8e 100644
 From 90f3c780e432e3f6b4d7d6206c26750735711167 Mon Sep 17 00:00:00 2001
 From: Peter de Rivaz <peter.derivaz@gmail.com>
 Date: Thu, 7 May 2015 16:47:47 +0100
-Subject: [PATCH 15/66] Added option to disable deblocking for non-ref frames
+Subject: [PATCH 15/67] Added option to disable deblocking for non-ref frames
 
 ---
  libavcodec/hevc_filter.c | 11 ++++++++++-
@@ -8663,7 +8663,7 @@ index b51400a..c275b0c 100644
 From e060a6ec18fd935cda37b777f0c775edefd81c88 Mon Sep 17 00:00:00 2001
 From: Peter de Rivaz <peter.derivaz@gmail.com>
 Date: Mon, 11 May 2015 10:00:27 +0100
-Subject: [PATCH 16/66] Moved buffers to VPU memory
+Subject: [PATCH 16/67] Moved buffers to VPU memory
 
 ---
  libavcodec/hevc_filter.c | 15 ++++++++++++-
@@ -8833,7 +8833,7 @@ index b4399fd..0489002 100644
 From f20bb282db00dd5259539baf13a3b477211446f4 Mon Sep 17 00:00:00 2001
 From: Peter de Rivaz <peter.derivaz@gmail.com>
 Date: Mon, 11 May 2015 14:04:37 +0100
-Subject: [PATCH 17/66] Prepared QPU execute code
+Subject: [PATCH 17/67] Prepared QPU execute code
 
 ---
  libavcodec/hevc.c               | 229 ++++++++++++++++++++++++++++++++++------
@@ -9352,7 +9352,7 @@ index 3526fce..2b22d98 100644
 From 2b80c5efe1d9513e853389d9ca36c02bc9b1b609 Mon Sep 17 00:00:00 2001
 From: Peter de Rivaz <peter.derivaz@gmail.com>
 Date: Wed, 13 May 2015 11:47:23 +0100
-Subject: [PATCH 18/66] Drafted chroma interpolation on QPUs
+Subject: [PATCH 18/67] Drafted chroma interpolation on QPUs
 
 ---
  libavcodec/hevc.c          |   7 ++--
@@ -9719,7 +9719,7 @@ index 2214745..b670b12 100644
 From 16b66c639afd860f6090504cf3b69e767f386bed Mon Sep 17 00:00:00 2001
 From: Peter de Rivaz <peter.derivaz@gmail.com>
 Date: Wed, 13 May 2015 13:54:11 +0100
-Subject: [PATCH 19/66] Fixed chroma inter prediction
+Subject: [PATCH 19/67] Fixed chroma inter prediction
 
 ---
  libavcodec/hevc.c          |    8 +-
@@ -13637,7 +13637,7 @@ index b670b12..e28f54e 100644
 From 3ed7dc9a4909bcbb2acd1a7c7976ebda90070fd0 Mon Sep 17 00:00:00 2001
 From: Peter de Rivaz <peter.derivaz@gmail.com>
 Date: Wed, 13 May 2015 14:37:32 +0100
-Subject: [PATCH 20/66] Removed unused luma functions
+Subject: [PATCH 20/67] Removed unused luma functions
 
 ---
  libavcodec/hevc.c          |    4 +-
@@ -16027,7 +16027,7 @@ index e28f54e..7f08c25 100644
 From 5f8685766c1783d2dad2022be54641cc8af3adbc Mon Sep 17 00:00:00 2001
 From: Peter de Rivaz <peter.derivaz@gmail.com>
 Date: Wed, 13 May 2015 14:54:25 +0100
-Subject: [PATCH 21/66] Moved chroma P1 to QPUs
+Subject: [PATCH 21/67] Moved chroma P1 to QPUs
 
 ---
  libavcodec/hevc.c | 38 ++++++++++++++++++++++++++++++++++++++
@@ -16089,7 +16089,7 @@ index f34c4f9..8ded17f 100644
 From 92c6f3d90f5f094952cf56ee20abaf4bdc9b791d Mon Sep 17 00:00:00 2001
 From: Peter de Rivaz <peter.derivaz@gmail.com>
 Date: Wed, 13 May 2015 15:13:47 +0100
-Subject: [PATCH 22/66] Added B prediction - not quite right
+Subject: [PATCH 22/67] Added B prediction - not quite right
 
 ---
  libavcodec/hevc.c          |  58 ++++++++++++++++++++++++
@@ -16412,7 +16412,7 @@ index 7f08c25..fa14313 100644
 From 42ea18baa3e21cf307ff6c24a9d7ce8599ba9152 Mon Sep 17 00:00:00 2001
 From: Peter de Rivaz <peter.derivaz@gmail.com>
 Date: Wed, 13 May 2015 16:12:58 +0100
-Subject: [PATCH 23/66] Round up display size
+Subject: [PATCH 23/67] Round up display size
 
 ---
  ffmpeg.c | 12 +++++++-----
@@ -16461,7 +16461,7 @@ index 3daa2f4..53e32da 100644
 From 7220de63a20664cc359862be05ec42cbb39e9926 Mon Sep 17 00:00:00 2001
 From: Peter de Rivaz <peter.derivaz@gmail.com>
 Date: Thu, 14 May 2015 08:15:55 +0100
-Subject: [PATCH 24/66] Added flush for SAO
+Subject: [PATCH 24/67] Added flush for SAO
 
 ---
  libavcodec/hevc.c        |  2 +-
@@ -16560,7 +16560,7 @@ index 3150cd0..b2b665d 100644
 From d5aaff403f0324cb2891e603033d54cb1cad0104 Mon Sep 17 00:00:00 2001
 From: Peter de Rivaz <peter.derivaz@gmail.com>
 Date: Thu, 14 May 2015 08:16:33 +0100
-Subject: [PATCH 25/66] Fixed compilation bug
+Subject: [PATCH 25/67] Fixed compilation bug
 
 ---
  libavcodec/hevc_filter.c | 2 +-
@@ -16586,7 +16586,7 @@ index b2b665d..9fb08bc 100644
 From 322292d4ad884160368b31f1686c443e89e77742 Mon Sep 17 00:00:00 2001
 From: Peter de Rivaz <peter.derivaz@gmail.com>
 Date: Thu, 14 May 2015 09:17:28 +0100
-Subject: [PATCH 26/66] Stopped using acceleration in unsupported cases
+Subject: [PATCH 26/67] Stopped using acceleration in unsupported cases
 
 ---
  libavcodec/hevc.c       | 15 +++++++--------
@@ -16660,7 +16660,7 @@ index f2ff50d..7096e31 100644
 From 3fdfede788f6b9b24cbf7f25accca0c9b0446f2a Mon Sep 17 00:00:00 2001
 From: Peter de Rivaz <peter.derivaz@gmail.com>
 Date: Thu, 14 May 2015 09:42:16 +0100
-Subject: [PATCH 27/66] Split B prediction into two passes
+Subject: [PATCH 27/67] Split B prediction into two passes
 
 ---
  libavcodec/hevc.c          |   1 +
@@ -17603,7 +17603,7 @@ index fa14313..2e66dbe 100644
 From fa22ad1e02289984c825f5b374d033616f740a15 Mon Sep 17 00:00:00 2001
 From: Peter de Rivaz <peter.derivaz@gmail.com>
 Date: Thu, 14 May 2015 10:04:55 +0100
-Subject: [PATCH 28/66] Switch to using 16bit temp buffers
+Subject: [PATCH 28/67] Switch to using 16bit temp buffers
 
 ---
  libavcodec/hevc.c          |  2 +-
@@ -17688,7 +17688,7 @@ index 2e66dbe..ded5e40 100644
 From 4e85b51c508d8b87a01b2781bc91d9011cd23a4c Mon Sep 17 00:00:00 2001
 From: Peter de Rivaz <peter.derivaz@gmail.com>
 Date: Thu, 14 May 2015 10:30:44 +0100
-Subject: [PATCH 29/66] Corrected B prediction: matching md5 sum for hobbit50
+Subject: [PATCH 29/67] Corrected B prediction: matching md5 sum for hobbit50
 
 ---
  libavcodec/rpi_shader.c    | 815 ++++++++++++++++++++++-----------------------
@@ -18665,7 +18665,7 @@ index ded5e40..23d674e 100644
 From 83abd40ab91c01ca0f0b9452e9c4ae46a65f786a Mon Sep 17 00:00:00 2001
 From: Peter de Rivaz <peter.derivaz@gmail.com>
 Date: Thu, 14 May 2015 10:55:07 +0100
-Subject: [PATCH 30/66] P prediction uses 4 tap filters
+Subject: [PATCH 30/67] P prediction uses 4 tap filters
 
 ---
  libavcodec/hevc.c          |  50 ++--
@@ -19559,7 +19559,7 @@ index 23d674e..9bbd9b5 100644
 From 4498cf03e4cd2ebd91182c56e27776246ebc44ea Mon Sep 17 00:00:00 2001
 From: Peter de Rivaz <peter.derivaz@gmail.com>
 Date: Thu, 14 May 2015 11:03:51 +0100
-Subject: [PATCH 31/66] Optimised B0 pass
+Subject: [PATCH 31/67] Optimised B0 pass
 
 ---
  libavcodec/rpi_shader.c    | 424 +++++++++++++++++++++------------------------
@@ -20129,7 +20129,7 @@ index 9bbd9b5..26f1c13 100644
 From 68489e3fe29f45b5fffbe0ef83261f81a2cf76cd Mon Sep 17 00:00:00 2001
 From: Peter de Rivaz <peter.derivaz@gmail.com>
 Date: Thu, 14 May 2015 11:12:43 +0100
-Subject: [PATCH 32/66] Optimised B pass
+Subject: [PATCH 32/67] Optimised B pass
 
 ---
  libavcodec/rpi_shader.c    | 202 ++++++++++++++++++++-------------------------
@@ -20475,7 +20475,7 @@ index 26f1c13..ab1ec62 100644
 From 8707b7f572de7e8c9486a89704e59d0a73107495 Mon Sep 17 00:00:00 2001
 From: Peter de Rivaz <peter.derivaz@gmail.com>
 Date: Thu, 14 May 2015 11:17:09 +0100
-Subject: [PATCH 33/66] Used P delay slots more efficiently
+Subject: [PATCH 33/67] Used P delay slots more efficiently
 
 ---
  libavcodec/rpi_shader.c    | 437 ++++++++++++++++++++++-----------------------
@@ -21009,7 +21009,7 @@ index ab1ec62..846d08e 100644
 From d7ee73d306a896120ee56ad7f17cf5d2b5f31657 Mon Sep 17 00:00:00 2001
 From: Peter de Rivaz <peter.derivaz@gmail.com>
 Date: Thu, 14 May 2015 11:22:25 +0100
-Subject: [PATCH 34/66] Improved use of delay slots
+Subject: [PATCH 34/67] Improved use of delay slots
 
 ---
  libavcodec/rpi_shader.c    | 503 ++++++++++++++++++++++-----------------------
@@ -21643,7 +21643,7 @@ index 846d08e..13eb0d8 100644
 From 935a97c6759a37acd6385f573e47c07105ed3b4a Mon Sep 17 00:00:00 2001
 From: Peter de Rivaz <peter.derivaz@gmail.com>
 Date: Thu, 14 May 2015 11:31:23 +0100
-Subject: [PATCH 35/66] Avoid writeback of first B results
+Subject: [PATCH 35/67] Avoid writeback of first B results
 
 ---
  libavcodec/rpi_shader.c    | 229 ++++++++++++++++++++++-----------------------
@@ -21955,7 +21955,7 @@ index 13eb0d8..23b085f 100644
 From 6a891a5ba87b121dec4fe6b6574dc520c1c24c09 Mon Sep 17 00:00:00 2001
 From: Peter de Rivaz <peter.derivaz@gmail.com>
 Date: Thu, 14 May 2015 11:36:24 +0100
-Subject: [PATCH 36/66] Cutdown size of chroma prediction commands
+Subject: [PATCH 36/67] Cutdown size of chroma prediction commands
 
 ---
  libavcodec/hevc.c          |  17 +-
@@ -22679,7 +22679,7 @@ index 23b085f..4aed168 100644
 From e4a1e383624cdf66bbc75a55d21250d4dcbf291f Mon Sep 17 00:00:00 2001
 From: Peter de Rivaz <peter.derivaz@gmail.com>
 Date: Thu, 14 May 2015 11:41:09 +0100
-Subject: [PATCH 37/66] Commented reason for lack of saturation
+Subject: [PATCH 37/67] Commented reason for lack of saturation
 
 ---
  libavcodec/rpi_hevc_transform.s | 2 +-
@@ -22705,7 +22705,7 @@ index 1a4dfb5..6a1959f 100644
 From c48c15b459ec2b37090ba7b6bcba3cd2c45e0a2d Mon Sep 17 00:00:00 2001
 From: popcornmix <popcornmix@gmail.com>
 Date: Thu, 14 May 2015 15:21:33 +0100
-Subject: [PATCH 38/66] ffmpeg: Fix align up of width/height
+Subject: [PATCH 38/67] ffmpeg: Fix align up of width/height
 
 ---
  ffmpeg.c | 20 +++++++++++---------
@@ -22768,7 +22768,7 @@ index 53e32da..9974a6d 100644
 From 46136ac05a4624db81283446802cace435583231 Mon Sep 17 00:00:00 2001
 From: popcornmix <popcornmix@gmail.com>
 Date: Thu, 14 May 2015 15:21:49 +0100
-Subject: [PATCH 39/66] hevc: don't redirect when not rpi_enabled
+Subject: [PATCH 39/67] hevc: don't redirect when not rpi_enabled
 
 ---
  libavcodec/hevc.c | 2 +-
@@ -22794,7 +22794,7 @@ index 747f949..ad2b613 100644
 From 204034c90e808f01828dfe6e94c7ae5282e5c126 Mon Sep 17 00:00:00 2001
 From: popcornmix <popcornmix@gmail.com>
 Date: Thu, 14 May 2015 15:22:02 +0100
-Subject: [PATCH 40/66] Use /dev/vcio for mailbox access
+Subject: [PATCH 40/67] Use /dev/vcio for mailbox access
 
 ---
  libavcodec/rpi_mailbox.c | 2 +-
@@ -22820,7 +22820,7 @@ index 536896f..77a56dd 100644
 From 8fd411d06b9b765de45771312e434b505ed0edcd Mon Sep 17 00:00:00 2001
 From: popcornmix <popcornmix@gmail.com>
 Date: Thu, 14 May 2015 15:25:25 +0100
-Subject: [PATCH 41/66] Use vcsm for all memory allocations
+Subject: [PATCH 41/67] Use vcsm for all memory allocations
 
 ---
  libavcodec/rpi_qpu.c | 180 +++++++++++++++++++--------------------------------
@@ -23131,7 +23131,7 @@ index 59f5494..729cdb3 100644
 From 8a856c68652f93a7a18a5695fea8d9ee2105fb20 Mon Sep 17 00:00:00 2001
 From: popcornmix <popcornmix@gmail.com>
 Date: Thu, 14 May 2015 15:43:17 +0100
-Subject: [PATCH 42/66] Enable EARLY_MALLOC and fix sps access bug
+Subject: [PATCH 42/67] Enable EARLY_MALLOC and fix sps access bug
 
 ---
  libavcodec/hevc.c | 5 +++--
@@ -23167,7 +23167,7 @@ index ad2b613..ce56587 100644
 From 267bdbea842c97f8d50c9ef371a024fd3532f138 Mon Sep 17 00:00:00 2001
 From: popcornmix <popcornmix@gmail.com>
 Date: Thu, 14 May 2015 16:40:51 +0100
-Subject: [PATCH 43/66] Add copy of av_mod_uintp2 for use with stable ffmpeg
+Subject: [PATCH 43/67] Add copy of av_mod_uintp2 for use with stable ffmpeg
 
 ---
  libavcodec/hevc.c | 8 ++++++++
@@ -23199,7 +23199,7 @@ index ce56587..55c3b55 100644
 From 064b50bc79e6250bbda83d0290df5e34606e6420 Mon Sep 17 00:00:00 2001
 From: popcornmix <popcornmix@gmail.com>
 Date: Thu, 14 May 2015 17:03:26 +0100
-Subject: [PATCH 44/66] Fix build with RPI not defined
+Subject: [PATCH 44/67] Fix build with RPI not defined
 
 ---
  libavcodec/hevc_cabac.c  | 2 ++
@@ -23245,7 +23245,7 @@ index 9fb08bc..23fe07f 100644
 From 9e2369c992f660e2bf576773c36337c7a88e27b0 Mon Sep 17 00:00:00 2001
 From: popcornmix <popcornmix@gmail.com>
 Date: Thu, 14 May 2015 17:59:34 +0100
-Subject: [PATCH 45/66] Disable RPI_INTER_QPU for now
+Subject: [PATCH 45/67] Disable RPI_INTER_QPU for now
 
 ---
  libavcodec/hevc.h | 2 +-
@@ -23271,7 +23271,7 @@ index 70303cc..d2a33a4 100644
 From d572474bb167bba862d96973c73102e79028ff8f Mon Sep 17 00:00:00 2001
 From: Peter de Rivaz <peter.derivaz@gmail.com>
 Date: Mon, 18 May 2015 11:11:02 +0100
-Subject: [PATCH 46/66] Added support for weighted prediction in P frames
+Subject: [PATCH 46/67] Added support for weighted prediction in P frames
 
 ---
  libavcodec/hevc.c          |  51 +++-
@@ -24129,7 +24129,7 @@ index 4aed168..0a65ab5 100644
 From c3d17faaa66607dd672cce1c95d391115574d964 Mon Sep 17 00:00:00 2001
 From: popcornmix <popcornmix@gmail.com>
 Date: Wed, 20 May 2015 12:10:58 +0100
-Subject: [PATCH 47/66] ffmpeg: Fix for display seg fault on exit
+Subject: [PATCH 47/67] ffmpeg: Fix for display seg fault on exit
 
 ---
  ffmpeg.c | 3 ++-
@@ -24156,7 +24156,7 @@ index 9974a6d..22ffad4 100644
 From 1f0494aa3cd7660fba35f78d43e6bd5c04fece5e Mon Sep 17 00:00:00 2001
 From: popcornmix <popcornmix@gmail.com>
 Date: Thu, 21 May 2015 16:49:03 +0100
-Subject: [PATCH 48/66] Protect access to next_picture in display code
+Subject: [PATCH 48/67] Protect access to next_picture in display code
 
 ---
  ffmpeg.c | 6 ++++--
@@ -24188,7 +24188,7 @@ index 22ffad4..5457de0 100644
 From c360d84d1b8440284584f7a02b36960c9e46f0ae Mon Sep 17 00:00:00 2001
 From: popcornmix <popcornmix@gmail.com>
 Date: Wed, 20 May 2015 15:19:08 +0100
-Subject: [PATCH 49/66] Revert "Disable RPI_INTER_QPU for now"
+Subject: [PATCH 49/67] Revert "Disable RPI_INTER_QPU for now"
 
 This reverts commit 9e2369c992f660e2bf576773c36337c7a88e27b0.
 ---
@@ -24215,7 +24215,7 @@ index d2a33a4..70303cc 100644
 From 28831948e9ef9ad2680bf9f96038115173a20795 Mon Sep 17 00:00:00 2001
 From: Peter de Rivaz <peter.derivaz@gmail.com>
 Date: Tue, 19 May 2015 08:43:30 +0100
-Subject: [PATCH 50/66] Improved ordering of tasks
+Subject: [PATCH 50/67] Improved ordering of tasks
 
 ---
  libavcodec/hevc.c | 8 ++++----
@@ -24252,7 +24252,7 @@ index fa34e48..79d339c 100644
 From a66c0524c90a8ebc98892e6db10fb525dc90ef67 Mon Sep 17 00:00:00 2001
 From: Peter de Rivaz <peter.derivaz@gmail.com>
 Date: Wed, 20 May 2015 19:58:19 +0100
-Subject: [PATCH 51/66] Drafted Luma inter prediction
+Subject: [PATCH 51/67] Drafted Luma inter prediction
 
 ---
  libavcodec/rpi_shader.qasm | 594 ++++++++++++++++++++++++++++++++++++++++++---
@@ -25019,7 +25019,7 @@ index 0a65ab5..a0348a0 100644
 From 5d4b54a7c634337eca7ba9196733b7472616baf0 Mon Sep 17 00:00:00 2001
 From: Peter de Rivaz <peter.derivaz@gmail.com>
 Date: Wed, 20 May 2015 19:58:30 +0100
-Subject: [PATCH 52/66] Added support for fast cache flush in deblocker
+Subject: [PATCH 52/67] Added support for fast cache flush in deblocker
 
 ---
  libavcodec/hevc_filter.c   |   46 +-
@@ -26281,7 +26281,7 @@ index cdc4e4d..95b3125 100644
 From 39b3d57f305924f9d300f9255cd79eac75d94adb Mon Sep 17 00:00:00 2001
 From: Peter de Rivaz <peter.derivaz@gmail.com>
 Date: Wed, 20 May 2015 21:12:55 +0100
-Subject: [PATCH 53/66] Added multi mailbox - not working
+Subject: [PATCH 53/67] Added multi mailbox - not working
 
 ---
  libavcodec/hevc.c        | 42 +++++++++++++++++++++++++++++----
@@ -26574,7 +26574,7 @@ index 88965e5..9e5ebe7 100644
 From 6f00be575fdeb8b49fd579476d6678b1f6584704 Mon Sep 17 00:00:00 2001
 From: popcornmix <popcornmix@gmail.com>
 Date: Thu, 21 May 2015 16:50:02 +0100
-Subject: [PATCH 54/66] Pass qpu number in as uniform
+Subject: [PATCH 54/67] Pass qpu number in as uniform
 
 ---
  libavcodec/hevc.c          |    2 +-
@@ -28013,7 +28013,7 @@ index a0348a0..38abba2 100644
 From 29a28ace9468fdd6ae7bb494461f6774007d4313 Mon Sep 17 00:00:00 2001
 From: popcornmix <popcornmix@gmail.com>
 Date: Sat, 23 May 2015 13:20:21 +0100
-Subject: [PATCH 55/66] Add new cache flushing routine
+Subject: [PATCH 55/67] Add new cache flushing routine
 
 ---
  libavcodec/hevc.c          |  8 +++--
@@ -28269,7 +28269,7 @@ index 95b3125..94e6e79 100644
 From 477157d759ddeea05aea53028cc02ce932cc0748 Mon Sep 17 00:00:00 2001
 From: popcornmix <popcornmix@gmail.com>
 Date: Sat, 23 May 2015 21:10:10 +0100
-Subject: [PATCH 56/66] Fix multi mailbox extra transform call
+Subject: [PATCH 56/67] Fix multi mailbox extra transform call
 
 ---
  libavcodec/hevc.c | 2 ++
@@ -28296,7 +28296,7 @@ index 1792150..b504e01 100644
 From 8ec39cb10406d52530c146de8e17ca7812e80ff1 Mon Sep 17 00:00:00 2001
 From: Peter de Rivaz <peter.derivaz@gmail.com>
 Date: Wed, 27 May 2015 16:44:29 +0100
-Subject: [PATCH 57/66] Added support for running luma prediction on QPUs
+Subject: [PATCH 57/67] Added support for running luma prediction on QPUs
 
 ---
  libavcodec/hevc.c          |  249 ++++++++-
@@ -31638,7 +31638,7 @@ index 38abba2..8e720ed 100644
 From 10311e46d627359d50771d963674e20e7c1c4f25 Mon Sep 17 00:00:00 2001
 From: Seppo Tomperi <seppo.tomperi@vtt.fi>
 Date: Mon, 8 Dec 2014 13:24:40 +0200
-Subject: [PATCH 58/66] added ARM NEON optimized SAO band offset
+Subject: [PATCH 58/67] added ARM NEON optimized SAO band offset
 
 ---
  libavcodec/arm/Makefile            |   3 +-
@@ -31957,7 +31957,7 @@ index 0000000..1f0ad64
 From 67c810380c34f625bfc7aec9b0fbbaa4143efc4f Mon Sep 17 00:00:00 2001
 From: Seppo Tomperi <seppo.tomperi@vtt.fi>
 Date: Wed, 27 May 2015 18:10:20 +0100
-Subject: [PATCH 59/66] added NEON optimized sao edge for eo1 width 64
+Subject: [PATCH 59/67] added NEON optimized sao edge for eo1 width 64
 
 ---
  libavcodec/arm/hevcdsp_init_neon.c |  47 ++++++++++++
@@ -32205,7 +32205,7 @@ index 1f0ad64..5ec2de9 100644
 From a110945ff7724922719fbaaa509e01db5a4d725b Mon Sep 17 00:00:00 2001
 From: Seppo Tomperi <seppo.tomperi@vtt.fi>
 Date: Tue, 16 Dec 2014 16:28:25 +0200
-Subject: [PATCH 60/66] Added SAO edge offset for ARM NEON w32 and w64
+Subject: [PATCH 60/67] Added SAO edge offset for ARM NEON w32 and w64
 
 ---
  libavcodec/arm/hevcdsp_init_neon.c |  46 +++-
@@ -32826,7 +32826,7 @@ index 5ec2de9..4687012 100644
 From 2a71a8839e9221e45207e428adb19278a2de8a67 Mon Sep 17 00:00:00 2001
 From: Seppo Tomperi <seppo.tomperi@vtt.fi>
 Date: Fri, 19 Dec 2014 09:44:10 +0200
-Subject: [PATCH 61/66] Improved SAO band NEON opimizations made SAO buffer 16
+Subject: [PATCH 61/67] Improved SAO band NEON opimizations made SAO buffer 16
  byte aligned added alignment hints to loads and stores optimized register
  usage in SAO band neon assembly
 
@@ -33102,7 +33102,7 @@ index 4687012..ac21013 100644
 From 38d3a7ea7788d3d1a6a315474db301b0e4cc7da3 Mon Sep 17 00:00:00 2001
 From: Seppo Tomperi <seppo.tomperi@vtt.fi>
 Date: Mon, 29 Dec 2014 15:00:49 +0200
-Subject: [PATCH 62/66] better code reuse in NEON SAO band
+Subject: [PATCH 62/67] better code reuse in NEON SAO band
 
 ---
  libavcodec/arm/hevcdsp_init_neon.c |  16 ++--
@@ -33338,7 +33338,7 @@ index ac21013..8852550 100644
 From ffa8cdda4d9e8da5340a15666215a4e77752bcea Mon Sep 17 00:00:00 2001
 From: Seppo Tomperi <seppo.tomperi@vtt.fi>
 Date: Wed, 7 Jan 2015 15:27:38 +0200
-Subject: [PATCH 63/66] More SAO NEON optimizations Now uses only 8 bit
+Subject: [PATCH 63/67] More SAO NEON optimizations Now uses only 8 bit
  integers for SAO calculations
 
 ---
@@ -34234,7 +34234,7 @@ index 8852550..5fc482b 100644
 From 3862e4797159feae6729de0d552cad6be225fb75 Mon Sep 17 00:00:00 2001
 From: Seppo Tomperi <seppo.tomperi@vtt.fi>
 Date: Thu, 8 Jan 2015 09:58:55 +0200
-Subject: [PATCH 64/66] small optimization to SAO BAND. correct path for
+Subject: [PATCH 64/67] small optimization to SAO BAND. correct path for
  bit_depth_template.c
 
 ---
@@ -34280,7 +34280,7 @@ index 5fc482b..710b32b 100644
 From 5c91f7396e179baa11ce1e52bb6ec7256ef33321 Mon Sep 17 00:00:00 2001
 From: Seppo Tomperi <seppo.tomperi@vtt.fi>
 Date: Fri, 9 Jan 2015 10:28:52 +0200
-Subject: [PATCH 65/66] Added height check for SAO NEON optimizations. Faster
+Subject: [PATCH 65/67] Added height check for SAO NEON optimizations. Faster
  SAO band NEON Some reordering to use NEON pipelines more efficiently
 
 ---
@@ -34552,7 +34552,7 @@ index 710b32b..08f50b8 100644
 From 527359eaa4e1a82c9ca0c1be8d153e1338cf0469 Mon Sep 17 00:00:00 2001
 From: Seppo Tomperi <seppo.tomperi@vtt.fi>
 Date: Mon, 2 Feb 2015 16:08:27 +0200
-Subject: [PATCH 66/66] Further SAO NEON optimisations
+Subject: [PATCH 66/67] Further SAO NEON optimisations
 
 ---
  libavcodec/arm/hevcdsp_init_neon.c |  16 +--
@@ -34960,6 +34960,31 @@ index 08f50b8..9c7808d 100644
          // inputs for next loop iteration
          // a
          vext.8  q0, q2, q3, #1
+-- 
+1.9.1
+
+
+From f06543fd30c83c18a2de794de3ccf9cc5191f379 Mon Sep 17 00:00:00 2001
+From: popcornmix <popcornmix@gmail.com>
+Date: Thu, 28 May 2015 15:47:31 +0100
+Subject: [PATCH 67/67] hack: allocate larger buffer to avoid heap corruption
+
+---
+ libavcodec/utils.c | 1 +
+ 1 file changed, 1 insertion(+)
+
+diff --git a/libavcodec/utils.c b/libavcodec/utils.c
+index 58fd4f5..bea1635 100644
+--- a/libavcodec/utils.c
++++ b/libavcodec/utils.c
+@@ -535,6 +535,7 @@ static AVBufferRef *rpi_buffer_alloc(int size)
+     if (!p)
+         return NULL;
+         
++    size *= 2;
+     if (gpu_malloc_cached(size,p)<0)  // Change this line to choose cached or uncached memory.  The caching here refers to the ARM data cache.
+         return NULL;
+ 
 -- 
 1.9.1
 
