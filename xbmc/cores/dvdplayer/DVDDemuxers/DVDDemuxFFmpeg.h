@@ -25,7 +25,6 @@
 #include "threads/SystemClock.h"
 #include <map>
 #include <vector>
-#include <queue>
 
 extern "C" {
 #include "libavformat/avformat.h"
@@ -154,8 +153,6 @@ protected:
   double   m_currentPts; // used for stream length estimation
   bool     m_bMatroska;
   bool     m_bAVI;
-  bool     m_bSSIF;
-  std::queue<DemuxPacket*> m_SSIFqueue;
   int      m_speed;
   unsigned m_program;
   XbmcThreads::EndTime  m_timeout;
