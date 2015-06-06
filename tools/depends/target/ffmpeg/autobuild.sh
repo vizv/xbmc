@@ -128,6 +128,7 @@ cd "ffmpeg-${VERSION}" || exit 2
 tar --strip-components=1 -xf $MYDIR/${ARCHIVE}
 
 patch -p1 < ../ffmpeg_Speed_up_wtv_index_creation.patch
+patch -p1 < ../0001-mpeg4video-Signal-unsupported-GMC-with-more-than-one.patch
 
 CFLAGS="$CFLAGS" CXXFLAGS="$CXXFLAGS" LDFLAGS="$LDFLAGS" \
 ./configure --prefix=$FFMPEG_PREFIX \
