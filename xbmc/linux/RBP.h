@@ -41,6 +41,8 @@
 #include "threads/CriticalSection.h"
 #include "threads/Event.h"
 
+struct gpu_mem_ptr_s;
+
 class CRBP
 {
 public:
@@ -80,6 +82,17 @@ private:
   CEvent     m_vsync;
   class DllLibOMXCore;
   CCriticalSection m_critSection;
+
+  struct gpu_mem_ptr_s *m_p;
+  int m_mb;
+  int m_x;
+  int m_y;
+  bool m_enabled;
+  public:
+  void init_cursor();
+  void set_cursor(const void *pixels, int width, int height, int hotspot_x, int hotspot_y);
+  void update_cursor(int x, int y, bool enabled);
+  void uninit_cursor();
 };
 
 extern CRBP g_RBP;
