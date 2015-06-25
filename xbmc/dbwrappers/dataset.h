@@ -26,7 +26,6 @@
  *
  **********************************************************************/
 
-
 #ifndef _DATASET_H
 #define _DATASET_H
 
@@ -240,8 +239,48 @@ protected:
    Essentually field idobject must present in the
    result set (select_sql statement) */
 
+   bool guess_enabled;
+   unsigned int current_guess;
 
+   struct GUESSFIELD    //Struct to store a guessed field access list
+   {
+     GUESSFIELD(const char *name):resultIndex(~0), strName(name){};
+     bool operator < (const GUESSFIELD &other) const {return strName < other.strName;};
+     unsigned int resultIndex;
+     std::string strName;
+   };
+   
+   struct GSS
+   {
+     GSS(const std::vector<GUESSFIELD> &c):c(c){};
+     bool operator()(const unsigned int &v,const GUESSFIELD &o)const
+     {
+       return c[v] < o;
+     };
+     bool operator()(const unsigned int &v1,const unsigned int &v2)const
+     {
+       return c[v1] < c[v2];
+     };
+     bool operator()(const GUESSFIELD &o,const unsigned int &v)const
+     {
+       return o< c[v];
+     };
+   private:
+     const std::vector<GUESSFIELD> &c;
+   }; 
 
+   std::vector<GUESSFIELD> guessed_Fields;
+   std::vector<unsigned int> guessed_Sorter;
+/* We build up a access list which holds a translation of strings to indices.
+   Assumption for the usage is, that rows of a resultset are normally accessed in 
+   always the same field order.
+   We first look into this list and If we don't get a match we use the
+   slower but more flexible field_value access
+   For the case the retrieval is against our assumtion, guessed_soter is
+   to speedup the search   */
+
+   /* Get the column index from a string field_value request */
+   bool get_guess(const char *f_name);
 
 /* Arrays for searching */
 //  StringList names, values;
@@ -287,8 +326,9 @@ public:
 /* status active is OK query */
   virtual bool isActive(void) { return active; }
 
-  virtual void setSqlParams(const char *sqlFrmt, sqlType t, ...); 
-
+  virtual void setSqlParams(const char *sqlFrmt, sqlType t, ...);
+  
+  virtual bool enable_guess(bool enable);
 
 /* error handling */
 //  virtual void halt(const char *msg);

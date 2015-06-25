@@ -116,7 +116,7 @@ public:
    * @param strQuery The query to execute.
    * @return True if the query was executed successfully, false otherwise.
    */
-  bool ResultQuery(const std::string &strQuery);
+  bool ResultQuery(const std::string &strQuery, bool enable_guess = false);
 
   /*!
    * @brief Start a multiple execution queue. Any ExecuteQuery() function

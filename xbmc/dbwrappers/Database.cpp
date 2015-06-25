@@ -233,7 +233,7 @@ bool CDatabase::ExecuteQuery(const std::string &strQuery)
   return bReturn;
 }
 
-bool CDatabase::ResultQuery(const std::string &strQuery)
+bool CDatabase::ResultQuery(const std::string &strQuery, bool enable_guess /* = false */)
 {
   bool bReturn = false;
 
@@ -244,6 +244,7 @@ bool CDatabase::ResultQuery(const std::string &strQuery)
 
     std::string strPreparedQuery = PrepareSQL(strQuery.c_str());
 
+    m_pDS->enable_guess(enable_guess);
     bReturn = m_pDS->query(strPreparedQuery.c_str());
   }
   catch (...)

@@ -173,7 +173,7 @@ int CEpgDatabase::Get(CEpgContainer &container)
   int iReturn(-1);
 
   std::string strQuery = PrepareSQL("SELECT idEpg, sName, sScraperName FROM epg;");
-  if (ResultQuery(strQuery))
+  if (ResultQuery(strQuery, true))
   {
     iReturn = 0;
 
@@ -205,7 +205,7 @@ int CEpgDatabase::Get(CEpg &epg)
   int iReturn(-1);
 
   std::string strQuery = PrepareSQL("SELECT * FROM epgtags WHERE idEpg = %u;", epg.EpgID());
-  if (ResultQuery(strQuery))
+  if (ResultQuery(strQuery, true))
   {
     iReturn = 0;
     try

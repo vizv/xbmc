@@ -29,6 +29,7 @@
 #include "dataset.h"
 #include "utils/log.h"
 #include <cstring>
+#include <algorithm>
 
 #ifndef __GNUC__
 #pragma warning (disable:4800)
@@ -93,6 +94,8 @@ Dataset::Dataset():
   frecno = 0;
   fbof = feof = true;
   autocommit = true;
+  guess_enabled = false;
+  current_guess = ~0;
 
   fields_object = new Fields();
 
@@ -110,6 +113,8 @@ Dataset::Dataset(Database *newDb):
   frecno = 0;
   fbof = feof = true;
   autocommit = true;
+  guess_enabled = false;
+  current_guess = ~0;
 
   fields_object = new Fields();
 
@@ -157,7 +162,16 @@ void Dataset::setSqlParams(const char *sqlFrmt, sqlType t, ...) {
   }
 }
 
-
+bool Dataset::enable_guess(bool enable)
+{
+  if(guess_enabled)
+  {
+    guessed_Fields.clear();
+    guessed_Sorter.clear();
+  }
+  guess_enabled = enable;
+  current_guess = ~0;
+};
 
 void Dataset::set_select_sql(const char *sel_sql) {
  select_sql = sel_sql;
@@ -321,25 +335,64 @@ bool Dataset::set_field_value(const char *f_name, const field_value &value) {
   //  return false;
 }
 
+/********* GUESS SECTION START *********/
+bool Dataset::get_guess(const char *f_name) {
+  if(guess_enabled && !(ds_state == dsEdit || ds_state == dsInsert))
+  {
+    if(~current_guess)
+    {
+      unsigned int next(current_guess+1 >= guessed_Fields.size()?0:current_guess+1);
+      if(guessed_Fields[next].strName == f_name) //Yes, our assumption hits.
+      {
+        current_guess=next;
+        return true;
+      }
+    }
+    // guess not found on the expected way, either first row strange retrival order
+    GUESSFIELD tmp(f_name);
+    std::vector<unsigned int>::iterator ins(lower_bound(guessed_Sorter.begin(), guessed_Sorter.end(), tmp, GSS(guessed_Fields)));
+    if(ins == guessed_Sorter.end() || (tmp <  guessed_Fields[*ins])) //new entry
+    {
+      //Insert the new item just behind last retrieved item
+      //In general this should be always end(), but could be different
+      guessed_Sorter.insert(ins, ++current_guess);
+      guessed_Fields.insert(guessed_Fields.begin()+current_guess,tmp);
+
+    }
+    else //entry already existing!
+    {
+      current_guess = *ins;
+      return true;
+    }
+  }
+  return false; //invalid
+}
+/********* GUESS SECTION END *********/
 
 const field_value Dataset::get_field_value(const char *f_name) {
+  //Lets try to reuse a string ->index conversation
+  if(get_guess(f_name))
+    return get_field_value(static_cast<int>(guessed_Fields[current_guess].resultIndex));
+
   const char* name=strstr(f_name, ".");
   if (name) name++;
   if (ds_state != dsInactive) {
     if (ds_state == dsEdit || ds_state == dsInsert){
       for (unsigned int i=0; i < edit_object->size(); i++)
-		if (str_compare((*edit_object)[i].props.name.c_str(), f_name)==0) {
-	  		return (*edit_object)[i].val;
-			}
+        if (str_compare((*edit_object)[i].props.name.c_str(), f_name)==0) {
+          return (*edit_object)[i].val;
+        }
       throw DbErrors("Field not found: %s",f_name);
-       }
+    }
     else
       for (unsigned int i=0; i < fields_object->size(); i++) 
-			if (str_compare((*fields_object)[i].props.name.c_str(), f_name)==0 || (name && str_compare((*fields_object)[i].props.name.c_str(), name)==0)) {
-	  			return (*fields_object)[i].val;
-			}
+        if (str_compare((*fields_object)[i].props.name.c_str(), f_name)==0 || (name && str_compare((*fields_object)[i].props.name.c_str(), name)==0)) {
+          if(guess_enabled)
+            guessed_Fields[current_guess].resultIndex = i;
+          return (*fields_object)[i].val;
+        }
       throw DbErrors("Field not found: %s",f_name);
-       }
+  }
   throw DbErrors("Dataset state is Inactive");
   //field_value fv;
   //return fv;
