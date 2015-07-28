@@ -60,6 +60,19 @@ CRenderInfo CMMALRenderer::GetRenderInfo()
   return info;
 }
 
+void CMMALRenderer::SendQueuedBuffers(int from)
+{
+  if (!m_render_queue.empty())
+  {
+    MMAL_BUFFER_HEADER_T *mmal_buffer = m_render_queue.front();
+    #if defined(MMAL_DEBUG_VERBOSE)
+    CLog::Log(LOGDEBUG, "%s::%s buffer:%p from:%d size:%d", CLASSNAME, __func__, mmal_buffer, from, m_render_queue.size());
+    #endif
+    mmal_port_send_buffer(m_vout_input, mmal_buffer);
+    m_render_queue.pop();
+  }
+}
+
 static void vout_control_port_cb(MMAL_PORT_T *port, MMAL_BUFFER_HEADER_T *buffer)
 {
   mmal_buffer_header_release(buffer);
@@ -196,6 +209,7 @@ bool CMMALRenderer::init_vout(ERenderFormat format)
 }
 
 CMMALRenderer::CMMALRenderer()
+: CThread("CMMALRenderer")
 {
   CLog::Log(LOGDEBUG, "%s::%s", CLASSNAME, __func__);
   m_vout = NULL;
@@ -208,6 +222,7 @@ CMMALRenderer::CMMALRenderer()
   m_bMMALConfigured = false;
   m_iYV12RenderBuffer = 0;
   m_sharpness = -2.0f;
+  Create();
 }
 
 CMMALRenderer::~CMMALRenderer()
@@ -339,12 +354,19 @@ void CMMALRenderer::ReleaseImage(int source, bool preserve)
 
 void CMMALRenderer::Reset()
 {
+  CSingleLock lock(m_sharedSection);
+  m_iYV12RenderBuffer = 0;
+  while (!m_render_queue.empty())
+    SendQueuedBuffers(2);
   CLog::Log(LOGDEBUG, "%s::%s", CLASSNAME, __func__);
 }
 
 void CMMALRenderer::Flush()
 {
+  CSingleLock lock(m_sharedSection);
   m_iYV12RenderBuffer = 0;
+  while (!m_render_queue.empty())
+    SendQueuedBuffers(2);
   CLog::Log(LOGDEBUG, "%s::%s", CLASSNAME, __func__);
 }
 
@@ -402,7 +424,7 @@ void CMMALRenderer::RenderUpdate(bool clear, DWORD flags, DWORD alpha)
         return;
       omvb->Acquire();
       omvb->mmal_buffer->flags |= MMAL_BUFFER_HEADER_FLAG_USER1 | MMAL_BUFFER_HEADER_FLAG_USER2;
-      mmal_port_send_buffer(m_vout_input, omvb->mmal_buffer);
+      m_render_queue.push(omvb->mmal_buffer);
     }
     else
       CLog::Log(LOGDEBUG, "%s::%s - No buffer to update", CLASSNAME, __func__);
@@ -417,7 +439,7 @@ void CMMALRenderer::RenderUpdate(bool clear, DWORD flags, DWORD alpha)
         return;
       // sanity check it is not on display
       buffer->mmal_buffer->flags |= MMAL_BUFFER_HEADER_FLAG_USER1 | MMAL_BUFFER_HEADER_FLAG_USER2;
-      mmal_port_send_buffer(m_vout_input, buffer->mmal_buffer);
+      m_render_queue.push(buffer->mmal_buffer);
     }
     else
       CLog::Log(LOGDEBUG, "%s::%s - No buffer to update", CLASSNAME, __func__);
@@ -702,4 +724,23 @@ void CMMALRenderer::SetVideoRect(const CRect& InSrcRect, const CRect& InDestRect
   CLog::Log(LOGDEBUG, "%s::%s %d,%d,%d,%d -> %d,%d,%d,%d t:%x", CLASSNAME, __func__,
       region.src_rect.x, region.src_rect.y, region.src_rect.width, region.src_rect.height,
       region.dest_rect.x, region.dest_rect.y, region.dest_rect.width, region.dest_rect.height, region.transform);
+}
+
+void CMMALRenderer::Process()
+{
+  while(!m_bStop)
+  {
+    g_RBP.WaitVsync();
+#if defined(MMAL_DEBUG_VERBOSE)
+    CLog::Log(LOGNOTICE, "%s::%s WaitVsync", CLASSNAME, __func__);
+#endif
+    {
+      CSingleLock lock(m_sharedSection);
+      if (m_render_queue.size() > 2)
+        while (!m_render_queue.empty())
+          SendQueuedBuffers(0);
+      else
+        SendQueuedBuffers(0);
+    }
+  }
 }

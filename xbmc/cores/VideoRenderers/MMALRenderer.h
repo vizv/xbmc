@@ -29,6 +29,8 @@
 #include "cores/dvdplayer/DVDStreamInfo.h"
 #include "guilib/Geometry.h"
 #include "BaseRenderer.h"
+#include <queue>
+#include "threads/Thread.h"
 
 #include <interface/mmal/mmal.h>
 #include <interface/mmal/util/mmal_util.h>
@@ -42,7 +44,7 @@ class CMMALVideoBuffer;
 
 struct DVDVideoPicture;
 
-class CMMALRenderer : public CBaseRenderer
+class CMMALRenderer : public CBaseRenderer, public CThread
 {
   struct YUVBUFFER
   {
@@ -111,8 +113,11 @@ protected:
   MMAL_COMPONENT_T *m_vout;
   MMAL_PORT_T *m_vout_input;
   MMAL_POOL_T *m_vout_input_pool;
+  std::queue<MMAL_BUFFER_HEADER_T *> m_render_queue;
 
   bool init_vout(ERenderFormat format);
   void ReleaseBuffers();
   void UnInitMMAL();
+  void SendQueuedBuffers(int from);
+  virtual void Process();
 };
