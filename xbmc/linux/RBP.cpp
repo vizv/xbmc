@@ -34,6 +34,7 @@
 #include <sys/ioctl.h>
 #include <linux/ioctl.h>
 #include "rpi_user_vcsm.h"
+#include "utils/TimeUtils.h"
 
 #define MAJOR_NUM 100
 #define IOCTL_MBOX_PROPERTY _IOWR(MAJOR_NUM, 0, char *)
@@ -56,6 +57,8 @@ CRBP::CRBP()
   m_enabled = 0;
   m_mb = mbox_open();
   vcsm_init();
+  m_vsync_count = 0;
+  m_last_vsync = 0;
 }
 
 CRBP::~CRBP()
@@ -73,7 +76,7 @@ void CRBP::InitializeSettings()
 
 bool CRBP::Initialize()
 {
-  CSingleLock lock (m_critSection);
+  CSingleLock lock(m_critSection);
   if (m_initialized)
     return true;
 
@@ -133,11 +136,62 @@ void CRBP::LogFirmwareVerison()
   CLog::Log(LOGNOTICE, "Config:\n%s", response);
 }
 
+static void vsync_callback_static(DISPMANX_UPDATE_HANDLE_T u, void *arg)
+{
+  CRBP *rbp = reinterpret_cast<CRBP*>(arg);
+  rbp->VSyncCallback();
+}
+
+void CRBP::VSyncCallback()
+{
+  CSingleLock lock(m_vsync_lock);
+  m_vsync_count++;
+  m_last_vsync = CurrentHostCounter();
+  m_vsync_cond.notifyAll();
+}
+
+unsigned int CRBP::VsyncCount()
+{
+  CSingleLock lock(m_vsync_lock);
+  return m_vsync_count;
+}
+
+int64_t CRBP::LastVsync()
+{
+  CSingleLock lock(m_vsync_lock);
+  return m_last_vsync;
+}
+
+unsigned int CRBP::WaitVsync(unsigned int target)
+{
+  CSingleLock vlock(m_vsync_lock);
+  DISPMANX_DISPLAY_HANDLE_T display = m_display;
+  XbmcThreads::EndTime delay(50);
+  if (target == ~0U)
+    target = m_vsync_count+1;
+  while (!delay.IsTimePast())
+  {
+    CSingleLock lock(m_critSection);
+    if (m_vsync_count >= target)
+      break;
+    lock.Leave();
+    if (!m_vsync_cond.wait(vlock, delay.MillisLeft()))
+      break;
+  }
+  if (m_vsync_count < target)
+    CLog::Log(LOGDEBUG, "CRBP::%s no  vsync %d/%d display:%x(%x) delay:%d", __FUNCTION__, m_vsync_count, target, m_display, display, delay.MillisLeft());
+
+  return m_vsync_count;
+}
+
 DISPMANX_DISPLAY_HANDLE_T CRBP::OpenDisplay(uint32_t device)
 {
+  CSingleLock lock(m_critSection);
   if (m_display == DISPMANX_NO_HANDLE)
   {
     m_display = vc_dispmanx_display_open( 0 /*screen*/ );
+    int s = vc_dispmanx_vsync_callback(m_display, vsync_callback_static, (void *)this);
+    assert(s == 0);
     init_cursor();
   }
   return m_display;
@@ -145,16 +199,20 @@ DISPMANX_DISPLAY_HANDLE_T CRBP::OpenDisplay(uint32_t device)
 
 void CRBP::CloseDisplay(DISPMANX_DISPLAY_HANDLE_T display)
 {
+  CSingleLock lock(m_critSection);
   assert(display == m_display);
+  int s = vc_dispmanx_vsync_callback(m_display, NULL, NULL);
+  assert(s == 0);
+  uninit_cursor();
   vc_dispmanx_display_close(m_display);
   m_display = DISPMANX_NO_HANDLE;
-  uninit_cursor();
 }
 
 void CRBP::GetDisplaySize(int &width, int &height)
 {
+  CSingleLock lock(m_critSection);
   DISPMANX_MODEINFO_T info;
-  if (vc_dispmanx_display_get_info(m_display, &info) == 0)
+  if (m_display != DISPMANX_NO_HANDLE && vc_dispmanx_display_get_info(m_display, &info) == 0)
   {
     width = info.width;
     height = info.height;
@@ -183,13 +241,13 @@ unsigned char *CRBP::CaptureDisplay(int width, int height, int *pstride, bool sw
     flags |= DISPMANX_SNAPSHOT_PACK;
 
   stride = ((width + 15) & ~15) * 4;
-  image = new unsigned char [height * stride];
 
-  if (image)
+  CSingleLock lock(m_critSection);
+  if (m_display != DISPMANX_NO_HANDLE)
   {
+    image = new unsigned char [height * stride];
     resource = vc_dispmanx_resource_create( VC_IMAGE_RGBA32, width, height, &vc_image_ptr );
 
-    assert(m_display != DISPMANX_NO_HANDLE);
     vc_dispmanx_snapshot(m_display, resource, (DISPMANX_TRANSFORM_T)flags);
 
     vc_dispmanx_rect_set(&rect, 0, 0, width, height);
@@ -200,35 +258,6 @@ unsigned char *CRBP::CaptureDisplay(int width, int height, int *pstride, bool sw
     *pstride = stride;
   return image;
 }
-
-
-static void vsync_callback(DISPMANX_UPDATE_HANDLE_T u, void *arg)
-{
-  CEvent *sync = (CEvent *)arg;
-  sync->Set();
-}
-
-void CRBP::WaitVsync()
-{
-  int s;
-  DISPMANX_DISPLAY_HANDLE_T m_display = vc_dispmanx_display_open( 0 /*screen*/ );
-  if (m_display == DISPMANX_NO_HANDLE)
-  {
-    CLog::Log(LOGDEBUG, "CRBP::%s skipping while display closed", __func__);
-    return;
-  }
-  m_vsync.Reset();
-  s = vc_dispmanx_vsync_callback(m_display, vsync_callback, (void *)&m_vsync);
-  if (s == 0)
-  {
-    m_vsync.WaitMSec(1000);
-  }
-  else assert(0);
-  s = vc_dispmanx_vsync_callback(m_display, NULL, NULL);
-  assert(s == 0);
-  vc_dispmanx_display_close( m_display );
-}
-
 
 void CRBP::Deinitialize()
 {
@@ -260,6 +289,7 @@ void CRBP::Deinitialize()
 
 double CRBP::AdjustHDMIClock(double adjust)
 {
+  CSingleLock lock(m_critSection);
   char response[80];
   vc_gencmd(response, sizeof response, "hdmi_adjust_clock %f", adjust);
   char *p = strchr(response, '=');
