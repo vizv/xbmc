@@ -880,7 +880,7 @@ int CMMALVideo::Decode(uint8_t* pData, int iSize, double dts, double pts)
   {
     ret |= VC_PICTURE;
     // renderer is low - give priority to returning pictures
-    if (m_codecControlFlags & DVD_CODEC_CTRL_DRAIN)
+    if (0 && m_codecControlFlags & DVD_CODEC_CTRL_DRAIN)
       ret &= ~VC_BUFFER;
   }
   if (!ret)
