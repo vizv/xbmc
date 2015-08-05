@@ -493,6 +493,8 @@ void CVideoPlayerAudio::Process()
       if (ALLOW_AUDIO(m_speed) && !m_stalled && m_syncState == IDVDStreamPlayer::SYNC_INSYNC)
       {
         m_stalled = true;
+        // avoid busy spinning here
+        Sleep(10);
       }
 
       continue;
