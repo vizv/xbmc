@@ -36,6 +36,9 @@
 #include <iomanip>
 #include <math.h>
 
+// allow audio for slow and fast speeds (but not rewind/fastforward)
+#define ALLOW_AUDIO(speed) ((speed) > 0 && (speed) < 2*DVD_PLAYSPEED_NORMAL)
+
 /* for sync-based resampling */
 #define PROPORTIONAL 20.0
 #define PROPREF       0.01
@@ -326,14 +329,14 @@ int CDVDPlayerAudio::DecodeFrame(DVDAudioFrame &audioframe)
     int priority = 1;
     //Do we want a new audio frame?
     if (m_started == false                /* when not started */
-    ||  m_speed   == DVD_PLAYSPEED_NORMAL /* when playing normally */
+    ||  ALLOW_AUDIO(m_speed)              /* when playing normally */
     ||  m_speed   <  DVD_PLAYSPEED_PAUSE  /* when rewinding */
     || (m_speed   >  DVD_PLAYSPEED_NORMAL && m_audioClock < m_pClock->GetClock())) /* when behind clock in ff */
       priority = 0;
 
     // consider stream stalled if queue is empty
     // we can't sync audio to clock with an empty queue
-    if (m_speed == DVD_PLAYSPEED_NORMAL)
+    if (ALLOW_AUDIO(m_speed))
     {
       timeout = 0;
     }
@@ -435,7 +438,7 @@ int CDVDPlayerAudio::DecodeFrame(DVDAudioFrame &audioframe)
     {
       double speed = static_cast<CDVDMsgInt*>(pMsg)->m_value;
 
-      if (speed == DVD_PLAYSPEED_NORMAL)
+      if (ALLOW_AUDIO(speed))
       {
         if (speed != m_speed)
         {
@@ -519,7 +522,7 @@ void CDVDPlayerAudio::Process()
     int result = DecodeFrame(audioframe);
 
     //Drop when not playing normally
-    if(m_speed   != DVD_PLAYSPEED_NORMAL
+    if(!ALLOW_AUDIO(m_speed)
     && m_started == true)
     {
       result |= DECODE_FLAG_DROP;
@@ -536,7 +539,7 @@ void CDVDPlayerAudio::Process()
     if( result & DECODE_FLAG_TIMEOUT )
     {
       // Flush as the audio output may keep looping if we don't
-      if(m_speed == DVD_PLAYSPEED_NORMAL && !m_stalled)
+      if(ALLOW_AUDIO(m_speed) && !m_stalled)
       {
         m_dvdAudio.Drain();
         m_dvdAudio.Flush();
@@ -617,7 +620,7 @@ void CDVDPlayerAudio::Process()
     if( m_dvdAudio.GetPlayingPts() == DVD_NOPTS_VALUE )
       continue;
 
-    if( m_speed != DVD_PLAYSPEED_NORMAL )
+    if( !ALLOW_AUDIO(m_speed) )
       continue;
 
     if (packetadded)
