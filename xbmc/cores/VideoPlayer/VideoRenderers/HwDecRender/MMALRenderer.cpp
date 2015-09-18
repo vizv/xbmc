@@ -33,7 +33,6 @@
 #include "windowing/WindowingFactory.h"
 #include "cores/VideoPlayer/DVDCodecs/Video/MMALCodec.h"
 #include "xbmc/Application.h"
-#include "guilib/GUIWindowManager.h"
 
 #define CLASSNAME "CMMALRenderer"
 
@@ -656,8 +655,6 @@ EINTERLACEMETHOD CMMALRenderer::AutoInterlaceMethod()
 {
   if (m_format == RENDER_FMT_YUV420P)
     return VS_INTERLACEMETHOD_DEINTERLACE_HALF;
-  if (!g_graphicsContext.IsFullScreenVideo() || g_windowManager.HasDialogOnScreen())
-    return VS_INTERLACEMETHOD_MMAL_BOB_HALF;
   return m_sourceWidth * m_sourceHeight <= 576 * 720 ? VS_INTERLACEMETHOD_MMAL_ADVANCED : VS_INTERLACEMETHOD_MMAL_BOB;
 }
 
