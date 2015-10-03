@@ -19,10 +19,11 @@ if(NOT MMAL_FOUND)
   find_library(BCM_LIBRARY bcm_host)
   find_library(VCHIQ_LIBRARY vchiq_arm)
   find_library(VCOS_LIBRARY vcos)
+  find_library(VCSM_LIBRARY vcsm)
 
   set(MMAL_LIBRARIES ${MMAL_LIBRARY} ${MMALCORE_LIBRARY} ${MMALUTIL_LIBRARY}
                      ${MMALCLIENT_LIBRARY} ${MMALCOMPONENT_LIBRARY}
-                     ${BCM_LIBRARY} ${VCHIQ_LIBRARY} ${VCOS_LIBRARY}
+                     ${BCM_LIBRARY} ${VCHIQ_LIBRARY} ${VCOS_LIBRARY} ${VCSM_LIBRARY}
       CACHE STRING "mmal libraries" FORCE)
 endif()
 
