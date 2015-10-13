@@ -54,6 +54,9 @@
 #if defined(HAS_IMXVPU)
 #include "HwDecRender/RendererIMX.h"
 #endif
+#if defined(HAS_LIBAMCODEC)
+#include "HwDecRender/RendererAML.h"
+#endif
 #if defined(HAVE_LIBOPENMAX)
 #include "HWDecRender/RendererOMX.h"
 #endif
@@ -64,7 +67,7 @@
 #endif
 
 #if defined(TARGET_ANDROID)
-#include "HWDecRender/RendererMediaCodec.h"
+#include "HwDecRender/RendererMediaCodec.h"
 #endif
 
 #include "RenderCapture.h"
@@ -133,11 +136,11 @@ static std::string GetRenderFormatName(ERenderFormat format)
     case RENDER_FMT_VAAPINV12: return "VAAPI_NV12";
     case RENDER_FMT_OMXEGL:    return "OMXEGL";
     case RENDER_FMT_CVBREF:    return "BGRA";
-    case RENDER_FMT_EGLIMG:    return "EGLIMG";
     case RENDER_FMT_BYPASS:    return "BYPASS";
     case RENDER_FMT_MEDIACODEC:return "MEDIACODEC";
     case RENDER_FMT_IMXMAP:    return "IMXMAP";
     case RENDER_FMT_MMAL:      return "MMAL";
+    case RENDER_FMT_AML:       return "AMLCODEC";
     case RENDER_FMT_NONE:      return "NONE";
   }
   return "UNKNOWN";
@@ -695,6 +698,12 @@ void CRenderManager::CreateRenderer()
       m_pRenderer = new CWinRenderer();
 #endif
     }
+    else if (m_format == RENDER_FMT_AML)
+    {
+#if defined(HAS_LIBAMCODEC)
+      m_pRenderer = new CRendererAML;
+#endif
+    }
     else if (m_format != RENDER_FMT_NONE)
     {
 #if defined(HAS_MMAL)
@@ -1192,7 +1201,6 @@ int CRenderManager::AddVideoPicture(DVDVideoPicture& pic)
        || pic.format == RENDER_FMT_CVBREF
        || pic.format == RENDER_FMT_VAAPI
        || pic.format == RENDER_FMT_VAAPINV12
-       || pic.format == RENDER_FMT_EGLIMG
        || pic.format == RENDER_FMT_MEDIACODEC
        || pic.format == RENDER_FMT_IMXMAP
        || pic.format == RENDER_FMT_MMAL)
