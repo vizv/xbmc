@@ -5,8 +5,8 @@ APP_NAME=$(shell awk '/APP_NAME/ {print tolower($$2)}' $(VERSION.TXT))
 
 SOURCE=../../../../
 
-export CXXFLAGS+=-O3
-export CFLAGS+=-O3
+#export CXXFLAGS+=-O3
+#export CFLAGS+=-O3
 
 ifeq ($(CROSS_COMPILING),yes)
   CONFIG_EXTRA += -DWITH_ARCH=$(HOST) -DWITH_CPU=$(CPU) -DENABLE_INTERNAL_FFMPEG=ON -DENABLE_INTERNAL_CROSSGUID=OFF
