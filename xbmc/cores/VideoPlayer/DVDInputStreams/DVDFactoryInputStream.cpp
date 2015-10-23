@@ -37,6 +37,9 @@
 #include "URL.h"
 #include "filesystem/File.h"
 #include "utils/URIUtils.h"
+#include "filesystem/Directory.h"
+#include "settings/Settings.h"
+#include "utils/log.h"
 
 
 CDVDInputStream* CDVDFactoryInputStream::CreateInputStream(IVideoPlayer* pPlayer, const std::string& file, const std::string& content, bool contentlookup)
@@ -44,6 +47,37 @@ CDVDInputStream* CDVDFactoryInputStream::CreateInputStream(IVideoPlayer* pPlayer
   CFileItem item(file.c_str(), false);
 
   item.SetMimeType(content);
+
+  if (CSettings::GetInstance().GetBool("videoplayer.supportmvc"))
+  {
+    std::string ssif_file;
+    if (URIUtils::IsProtocol(file, "bluray"))
+    {
+      CURL url(file);
+      ssif_file = url.GetHostName();
+    }
+    else if(URIUtils::HasExtension(file, ".iso|.img"))
+    {
+      CURL url("udf://");
+      url.SetHostName(file);
+      ssif_file = url.Get();
+    }
+    if (!ssif_file.empty())
+    {
+      CURL url3(ssif_file.append("BDMV/STREAM/SSIF"));
+      CFileItemList _3ditems;
+      XFILE::CDirectory::GetDirectory(url3, _3ditems, XFILE::CDirectory::CHints(), true);
+      if (!_3ditems.IsEmpty())
+      {
+        _3ditems.Sort(SortByTrackNumber,  SortOrderDescending);
+        _3ditems.Sort(SortBySize, SortOrderDescending);
+        std::string newfile = _3ditems[0]->GetPath();
+        CLog::Log(LOGNOTICE, "CDVDFactoryInputStream::CreateInputStream - <f1> %s <f2> %s <ssif> %s", CURL::Decode(file).c_str(), CURL::Decode(newfile).c_str(), ssif_file.c_str());
+        return (new CDVDInputStreamFile(newfile.c_str()));
+      }
+    }
+    CLog::Log(LOGNOTICE, "CDVDFactoryInputStream::CreateInputStream - <f1> %s <ssif> %s", CURL::Decode(file).c_str(), ssif_file.c_str());
+  }
 
   if(item.IsDiscImage())
   {
