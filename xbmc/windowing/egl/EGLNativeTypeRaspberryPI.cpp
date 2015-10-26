@@ -593,8 +593,8 @@ bool CEGLNativeTypeRaspberryPI::ProbeResolutions(std::vector<RESOLUTION_INFO> &r
 
   if(GETFLAGS_GROUP(m_desktopRes.dwFlags) && GETFLAGS_MODE(m_desktopRes.dwFlags))
   {
-    GetSupportedModes(HDMI_RES_GROUP_CEA, resolutions);
     GetSupportedModes(HDMI_RES_GROUP_DMT, resolutions);
+    GetSupportedModes(HDMI_RES_GROUP_CEA, resolutions);
   }
   {
     AddUniqueResolution(m_desktopRes, resolutions);
