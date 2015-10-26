@@ -110,7 +110,7 @@
         </setting>
         <setting id="audiooutput.latency" type="integer" label="38100" help="38101">
           <level>3</level>
-          <default>100</default>
+          <default>50</default>
           <constraints>
             <minimum>50</minimum>
             <step>50</step>
