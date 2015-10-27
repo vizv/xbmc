@@ -192,7 +192,6 @@ protected:
   CURL m_url;
   BitstreamStats m_stats;
   std::string m_content;
-  CFileItem m_item;
   bool m_contentLookup;
   bool m_realtime;
 };

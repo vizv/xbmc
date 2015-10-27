@@ -114,8 +114,6 @@ bool CDVDInputStreamPVRManager::Open(const char* strFile, const std::string& con
       CLog::Log(LOGERROR, "CDVDInputStreamPVRManager::Open - unable to create input stream for [%s]", transFile.c_str());
       return false;
     }
-    else
-      m_pOtherStream->SetFileItem(m_item);
 
     if (!m_pOtherStream->Open(transFile.c_str(), content, contentLookup))
     {

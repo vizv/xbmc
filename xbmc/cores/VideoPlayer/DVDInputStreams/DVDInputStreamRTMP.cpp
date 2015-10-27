@@ -178,6 +178,8 @@ bool CDVDInputStreamRTMP::Open(const char* strFile, const std::string& content, 
    * in case librtmp needs them again.
    */
   m_optionvalues.clear();
+#if 0
+  // todo: find a better solution
   for (int i=0; options[i].name; i++)
   {
     std::string tmp = m_item.GetProperty(options[i].name).asString();
@@ -189,7 +191,7 @@ bool CDVDInputStreamRTMP::Open(const char* strFile, const std::string& content, 
       m_libRTMP.SetOpt(m_rtmp, &options[i].key, &av_tmp);
     }
   }
-
+#endif
   if (!m_libRTMP.Connect(m_rtmp, NULL) || !m_libRTMP.ConnectStream(m_rtmp, 0))
     return false;
 

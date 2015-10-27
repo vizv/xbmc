@@ -815,8 +815,6 @@ bool CVideoPlayer::OpenInputStream()
     CLog::Log(LOGERROR, "CVideoPlayer::OpenInputStream - unable to create input stream for [%s]", m_filename.c_str());
     return false;
   }
-  else
-    m_pInputStream->SetFileItem(m_item);
 
   if (!m_pInputStream->Open(m_filename.c_str(), m_mimetype, m_item.ContentLookup()))
   {
