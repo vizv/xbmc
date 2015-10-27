@@ -50,10 +50,4 @@ bool CDVDInputStream::Open(const char* strFile, const std::string &content, bool
 void CDVDInputStream::Close()
 {
   m_strFileName = "";
-  m_item.Reset();
-}
-
-void CDVDInputStream::SetFileItem(const CFileItem& item)
-{
-  m_item = item;
 }
