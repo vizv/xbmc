@@ -759,7 +759,7 @@ bool CVideoPlayer::OpenInputStream()
     return false;
   }
 
-  if (!m_pInputStream->Open(m_filename.c_str(), m_mimetype, m_item.ContentLookup()))
+  if (!m_pInputStream->Open(m_mimetype, m_item.ContentLookup()))
   {
     CLog::Log(LOGERROR, "CVideoPlayer::OpenInputStream - error opening [%s]", m_filename.c_str());
     return false;
