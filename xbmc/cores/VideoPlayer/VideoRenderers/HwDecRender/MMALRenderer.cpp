@@ -244,7 +244,6 @@ CMMALRenderer::CMMALRenderer()
   m_iYV12RenderBuffer = 0;
   m_inflight = 0;
   m_sharpness = -2.0f;
-  m_vsyncCount = ~0;
 }
 
 CMMALRenderer::~CMMALRenderer()
@@ -422,25 +421,6 @@ void CMMALRenderer::Update()
   ManageDisplay();
 }
 
-void CMMALRenderer::SubmitFrame(MMAL_BUFFER_HEADER_T *buffer)
-{
-  if (!CSettings::GetInstance().GetBool("videoplayer.usedisplayasclock"))
-  {
-    if (fabs(m_fps - g_graphicsContext.GetFPS()) < 1e-2)
-    {
-      #if defined(MMAL_DEBUG_VERBOSE)
-      CLog::Log(LOGDEBUG, "%s::%s - buffer:%p vfps:%.3f dfps:%.3f vsync:%d dsync:%d", CLASSNAME, __func__, buffer, m_fps, g_graphicsContext.GetFPS(), m_vsyncCount, CSettings::GetInstance().GetBool("videoplayer.usedisplayasclock"));
-      #endif
-      CSingleExit lock(g_graphicsContext);
-      m_vsyncCount = g_RBP.WaitVsync(m_vsyncCount) + 1;
-      #if defined(MMAL_DEBUG_VERBOSE)
-      CLog::Log(LOGDEBUG, "%s::%s - done vsync:%d", CLASSNAME, __func__, m_vsyncCount);
-      #endif
-    }
-  }
-  mmal_port_send_buffer(m_vout_input, buffer);
-}
-
 void CMMALRenderer::RenderUpdate(bool clear, DWORD flags, DWORD alpha)
 {
   CSingleLock lock(m_sharedSection);
@@ -485,7 +465,7 @@ void CMMALRenderer::RenderUpdate(bool clear, DWORD flags, DWORD alpha)
         return;
       omvb->Acquire();
       omvb->mmal_buffer->flags |= MMAL_BUFFER_HEADER_FLAG_USER1 | MMAL_BUFFER_HEADER_FLAG_USER2;
-      SubmitFrame(omvb->mmal_buffer);
+      mmal_port_send_buffer(m_vout_input, omvb->mmal_buffer);
     }
     else
       CLog::Log(LOGDEBUG, "%s::%s - No buffer to update", CLASSNAME, __func__);
@@ -504,7 +484,7 @@ void CMMALRenderer::RenderUpdate(bool clear, DWORD flags, DWORD alpha)
       omvb->Acquire();
       omvb->mmal_buffer->flags |= MMAL_BUFFER_HEADER_FLAG_USER1 | MMAL_BUFFER_HEADER_FLAG_USER2;
       omvb->mmal_buffer->user_data = omvb;
-      SubmitFrame(omvb->mmal_buffer);
+      mmal_port_send_buffer(m_vout_input, omvb->mmal_buffer);
     }
     else
       CLog::Log(LOGDEBUG, "%s::%s - No buffer to update: clear:%d flags:%x alpha:%d source:%d", CLASSNAME, __func__, clear, flags, alpha, source);
