@@ -310,6 +310,7 @@ class CAdvancedSettings : public ISettingCallback, public ISettingsHandler
     int m_playlistRetries;
     int m_playlistTimeout;
     bool m_GLRectangleHack;
+    bool m_GLMipmapping;
     int m_iSkipLoopFilter;
     float m_ForcedSwapTime; /* if nonzero, set's the explicit time in ms to allocate for buffer swap */
 
