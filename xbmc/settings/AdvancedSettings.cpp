@@ -336,6 +336,7 @@ void CAdvancedSettings::Initialize()
   m_playlistRetries = 100;
   m_playlistTimeout = 20; // 20 seconds timeout
   m_GLRectangleHack = false;
+  m_GLMipmapping = false;
   m_iSkipLoopFilter = 0;
   m_RestrictCapsMask = 0;
   m_sleepBeforeFlip = 0;
@@ -820,6 +821,8 @@ void CAdvancedSettings::ParseSettingsFile(const std::string &file)
   XMLUtils::GetInt(pRootElement, "playlisttimeout", m_playlistTimeout, 0, 5000);
 
   XMLUtils::GetBoolean(pRootElement,"glrectanglehack", m_GLRectangleHack);
+  XMLUtils::GetBoolean(pRootElement,"glmipmapping", m_GLMipmapping);
+
   XMLUtils::GetInt(pRootElement,"skiploopfilter", m_iSkipLoopFilter, -16, 48);
 
   XMLUtils::GetUInt(pRootElement,"restrictcapsmask", m_RestrictCapsMask);
