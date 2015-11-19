@@ -24,6 +24,7 @@
 #include "utils/log.h"
 #include "utils/GLUtils.h"
 #include "guilib/TextureManager.h"
+#include "settings/AdvancedSettings.h"
 
 #if defined(HAS_GL) || defined(HAS_GLES)
 
@@ -70,7 +71,16 @@ void CGLTexture::LoadToGPU()
   glBindTexture(GL_TEXTURE_2D, m_texture);
 
   // Set the texture's stretching properties
-  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+  if (g_advancedSettings.m_GLMipmapping)
+  {
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_GENERATE_MIPMAP, GL_TRUE);
+  }
+  else
+  {
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+  }
+
   glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
   glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
   glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
