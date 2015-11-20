@@ -74,7 +74,9 @@ void CGLTexture::LoadToGPU()
   if (g_advancedSettings.m_GLMipmapping)
   {
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
+#ifndef HAS_GLES
     glTexParameteri(GL_TEXTURE_2D, GL_GENERATE_MIPMAP, GL_TRUE);
+#endif
   }
   else
   {
@@ -182,6 +184,9 @@ void CGLTexture::LoadToGPU()
   }
   glTexImage2D(GL_TEXTURE_2D, 0, internalformat, m_textureWidth, m_textureHeight, 0,
     pixelformat, GL_UNSIGNED_BYTE, m_pixels);
+
+  if (g_advancedSettings.m_GLMipmapping)
+    glGenerateMipmap(GL_TEXTURE_2D);
 
 #endif
   VerifyGLState();
