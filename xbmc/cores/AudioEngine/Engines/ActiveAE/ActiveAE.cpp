@@ -46,16 +46,13 @@ void CEngineStats::Reset(unsigned int sampleRate, bool pcm)
   m_bufferedSamples = 0;
   m_suspended = false;
   m_hasDSP = false;
-  m_playingPTS = 0;
-  m_clockId = 0;
   m_pcmOutput = pcm;
 }
 
-void CEngineStats::UpdateSinkDelay(const AEDelayStatus& status, int samples, int64_t pts, int clockId)
+void CEngineStats::UpdateSinkDelay(const AEDelayStatus& status, int samples)
 {
   CSingleLock lock(m_lock);
   m_sinkDelay = status;
-  m_playingPTS = (clockId == m_clockId) ? pts : 0;
   if (samples > m_bufferedSamples)
   {
     CLog::Log(LOGERROR, "CEngineStats::UpdateSinkDelay - inconsistency in buffer time");
@@ -153,31 +150,6 @@ float CEngineStats::GetCacheTime(CActiveAEStream *stream)
 float CEngineStats::GetCacheTotal(CActiveAEStream *stream)
 {
   return MAX_CACHE_LEVEL + m_sinkCacheTotal;
-}
-
-int64_t CEngineStats::GetPlayingPTS()
-{
-  CSingleLock lock(m_lock);
-  if (m_playingPTS == 0)
-    return 0;
-
-  int64_t pts = m_playingPTS + m_sinkDelay.GetDelay()*1000;
-
-  if (pts < 0)
-    return 0;
-
-  return pts;
-}
-
-int CEngineStats::Discontinuity(bool reset)
-{
-  CSingleLock lock(m_lock);
-  m_playingPTS = 0;
-  if (reset)
-    m_clockId = 0;
-  else
-    m_clockId++;
-  return m_clockId;
 }
 
 float CEngineStats::GetWaterLevel()
@@ -1354,7 +1326,6 @@ CActiveAEStream* CActiveAE::CreateStream(MsgStreamNew *streamMsg)
   stream->m_statsLock = m_stats.GetLock();
   stream->m_fadingSamples = 0;
   stream->m_started = false;
-  stream->m_clockId = m_stats.Discontinuity(true);
   stream->m_resampleMode = 0;
   stream->m_syncClock = CActiveAEStream::STARTSYNC;
 
@@ -2172,7 +2143,6 @@ bool CActiveAE::RunStages()
           // set pts of last sample
           buf->pkt_start_offset = buf->pkt->nb_samples;
           buf->timestamp = out->timestamp;
-          buf->clockId = out->clockId;
 
           out->Return();
           out = buf;
