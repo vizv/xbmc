@@ -919,6 +919,7 @@ unsigned int CActiveAESink::OutputSamples(CSampleBuffer* samples)
   }
 
   AEDelayStatus status;
+  int framesOrPackets;
 
   while(frames > 0)
   {
@@ -933,7 +934,10 @@ unsigned int CActiveAESink::OutputSamples(CSampleBuffer* samples)
         m_extError = true;
         CLog::Log(LOGERROR, "CActiveAESink::OutputSamples - failed");
         status.SetDelay(0);
-        m_stats->UpdateSinkDelay(status, frames, 0);
+        framesOrPackets = frames;
+        if (m_requestedFormat.m_dataFormat == AE_FMT_RAW)
+          framesOrPackets = 1;
+        m_stats->UpdateSinkDelay(status, samples->pool ? framesOrPackets : 0);
         return 0;
       }
       else
@@ -944,25 +948,23 @@ unsigned int CActiveAESink::OutputSamples(CSampleBuffer* samples)
       m_extError = true;
       CLog::Log(LOGERROR, "CActiveAESink::OutputSamples - sink returned error");
       status.SetDelay(0);
-      m_stats->UpdateSinkDelay(status, samples->pool ? maxFrames : 0, 0);
+      framesOrPackets = frames;
+      if (m_requestedFormat.m_dataFormat == AE_FMT_RAW)
+        framesOrPackets = 1;
+      m_stats->UpdateSinkDelay(status, samples->pool ? framesOrPackets : 0);
       return 0;
     }
     frames -= written;
 
     m_sink->GetDelay(status);
 
-    int64_t pts = 0;
-    if (samples->timestamp)
-    {
-      int pastSamples = samples->pkt->nb_samples - samples->pkt_start_offset;
-      pts = samples->timestamp + pastSamples/m_sinkFormat.m_sampleRate*1000;
-      pts -= m_sinkLatency;
-      if (pts < 0)
-        pts = 0;
-    }
-    int framesOrPacktes = (m_requestedFormat.m_dataFormat == AE_FMT_RAW) ? 1 : written;
-    m_stats->UpdateSinkDelay(status, samples->pool ? framesOrPacktes : 0, pts, samples->clockId);
+    if (m_requestedFormat.m_dataFormat != AE_FMT_RAW)
+      m_stats->UpdateSinkDelay(status, samples->pool ? written : 0);
   }
+
+  if (m_requestedFormat.m_dataFormat == AE_FMT_RAW)
+    m_stats->UpdateSinkDelay(status, 1);
+
   return status.delay * 1000;
 }
 
