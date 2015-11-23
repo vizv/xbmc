@@ -1,5 +1,5 @@
 /*
- *      Copyright (C) 2005-2013 Team XBMC
+ *      Copyright (C) 2005-2015 Team XBMC
  *      http://xbmc.org
  *
  *  This Program is free software; you can redistribute it and/or modify
@@ -24,7 +24,6 @@
 #include "utils/log.h"
 #include "utils/GLUtils.h"
 #include "guilib/TextureManager.h"
-#include "settings/AdvancedSettings.h"
 
 #if defined(HAS_GL) || defined(HAS_GLES)
 
@@ -71,7 +70,7 @@ void CGLTexture::LoadToGPU()
   glBindTexture(GL_TEXTURE_2D, m_texture);
 
   // Set the texture's stretching properties
-  if (g_advancedSettings.m_GLMipmapping)
+  if (IsMipmapped())
   {
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
 #ifndef HAS_GLES
@@ -185,8 +184,10 @@ void CGLTexture::LoadToGPU()
   glTexImage2D(GL_TEXTURE_2D, 0, internalformat, m_textureWidth, m_textureHeight, 0,
     pixelformat, GL_UNSIGNED_BYTE, m_pixels);
 
-  if (g_advancedSettings.m_GLMipmapping)
+  if (IsMipmapped())
+  {
     glGenerateMipmap(GL_TEXTURE_2D);
+  }
 
 #endif
   VerifyGLState();
