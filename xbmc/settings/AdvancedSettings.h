@@ -302,7 +302,6 @@ class CAdvancedSettings : public ISettingCallback, public ISettingsHandler
     int m_playlistRetries;
     int m_playlistTimeout;
     bool m_GLRectangleHack;
-    bool m_GLMipmapping;
     int m_iSkipLoopFilter;
 
     unsigned int m_RestrictCapsMask;
