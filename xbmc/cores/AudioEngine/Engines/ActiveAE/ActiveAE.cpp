@@ -3094,8 +3094,14 @@ IAEStream *CActiveAE::MakeStream(AEAudioFormat &audioFormat, unsigned int option
 
   AEAudioFormat format = audioFormat;
   format.m_frames = format.m_sampleRate / 10;
-  format.m_frameSize = format.m_channelLayout.Count() *
-                       (CAEUtil::DataFormatToBits(format.m_dataFormat) >> 3);
+
+  if (format.m_dataFormat != AE_FMT_RAW)
+  {
+    format.m_frameSize = format.m_channelLayout.Count() *
+                         (CAEUtil::DataFormatToBits(format.m_dataFormat) >> 3);
+  }
+  else
+    format.m_frameSize = 1;
 
   MsgStreamNew msg;
   msg.format = format;
