@@ -18009,10 +18009,10 @@ msgctxt "#36554"
 msgid "This category contains the settings for how picture rendering is handled."
 msgstr ""
 
-#. Description of setting "Pictures -> Rendering -> High Quality Downscaling" with label #36553
+#. Description of setting "Pictures -> Rendering -> High quality downscaling" with label #36553
 #: system/settings/settings.xml
 msgctxt "#36555"
-msgid "Perform high quality downscaling of thumbnails and pictures."
+msgid "Enable high quality downscaling of pictures."
 msgstr ""
 
 
