@@ -75,6 +75,9 @@ public:
 
   bool HasAlpha() const;
 
+  void SetMipmapping(bool mipmapping);
+  bool IsMipmapped() const;
+
   virtual void CreateTextureObject() = 0;
   virtual void DestroyTextureObject() = 0;
   virtual void LoadToGPU() = 0;
@@ -128,6 +131,7 @@ protected:
   unsigned int m_format;
   int m_orientation;
   bool m_hasAlpha;
+  bool m_mipmapping;
 };
 
 #if defined(HAS_OMXPLAYER)
