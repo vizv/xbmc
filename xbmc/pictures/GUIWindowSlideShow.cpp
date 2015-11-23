@@ -1143,7 +1143,14 @@ void CGUIWindowSlideShow::OnLoadPic(int iPic, int iSlideNumber, const std::strin
       delete pTexture;
       return;
     }
+
     CLog::Log(LOGDEBUG, "Finished background loading slot %d, %d: %s", iPic, iSlideNumber, m_slides->Get(iSlideNumber)->GetPath().c_str());
+
+    if (CSettings::GetInstance().GetBool(CSettings::SETTING_PICTURES_HIGHQUALITYDOWNSCALING))
+    {
+      // activate mipmapping when high quality downscaling is 'on'
+      pTexture->SetMipmapping(true);
+    }
     m_Image[iPic].SetTexture(iSlideNumber, pTexture, GetDisplayEffect(iSlideNumber));
     m_Image[iPic].SetOriginalSize(pTexture->GetOriginalWidth(), pTexture->GetOriginalHeight(), bFullSize);
     
