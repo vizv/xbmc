@@ -17710,6 +17710,7 @@ msgctxt "#36461"
 msgid "Notification event describe regular processes and actions performed by the system or the user."
 msgstr ""
 
+
 #empty strings from id 36462 to 36499
 
 #. Description of setting "Videos -> Library -> Hide watched videos in recently added list."
@@ -17990,6 +17991,33 @@ msgctxt "#36599"
 msgid "Video dithering output precision in bits. Use the highest setting that doesn't show banding. The default of 8 is recommended for most systems. If your GPU is set to scale the output RGB levels or you use a laptop screen, a 7 or 6 bit setting may eliminate more banding. Lower settings are available for testing purposes only to make it easy to see whether dithering is applied and that the dither noise pixel size matches the display resolution."
 msgstr ""
 
+#. Label of a category for changing picture rendering properties
+#: system/settings/settings.xml
+msgctxt "#36552"
+msgid "Rendering"
+msgstr ""
+
+#. Label of a setting, allow the user to specifiy high quality downscaling of pictures
+#: system/settings/settings.xml
+msgctxt "#36553"
+msgid "High quality downscaling"
+msgstr ""
+
+#. Description of settings category "Pictures -> Rendering" with label #36552
+#: system/settings/settings.xml
+msgctxt "#36554"
+msgid "This category contains the settings for how picture rendering is handled."
+msgstr ""
+
+#. Description of setting "Pictures -> Rendering -> High Quality Downscaling" with label #36553
+#: system/settings/settings.xml
+msgctxt "#36555"
+msgid "Perform high quality downscaling of thumbnails and pictures."
+msgstr ""
+
+
+
+#empty strings from id 36554 to 36599
 #reserved strings 365XX
 
 #. Description of settings category "Music -> Library" with label #14022

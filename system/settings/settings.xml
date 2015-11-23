@@ -2018,6 +2018,15 @@
         </setting>
       </group>
     </category>
+    <category id="rendering" label="36552" help="36554">
+        <group id="1">
+          <setting id="pictures.highqualitydownscaling" type="boolean" label="36553" help="36555">
+            <level>1</level>
+            <default>false</default>
+            <control type="toggle" />
+          </setting>
+        </group>
+    </category>
   </section>
   <section id="weather" label="8" help="36315">
     <category id="weather" label="16000" help="36316">
