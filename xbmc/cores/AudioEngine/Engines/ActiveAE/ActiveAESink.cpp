@@ -962,7 +962,7 @@ unsigned int CActiveAESink::OutputSamples(CSampleBuffer* samples)
       m_stats->UpdateSinkDelay(status, samples->pool ? written : 0);
   }
 
-  if (m_requestedFormat.m_dataFormat == AE_FMT_RAW)
+  if (m_requestedFormat.m_dataFormat == AE_FMT_RAW && samples->pool)
     m_stats->UpdateSinkDelay(status, 1);
 
   return status.delay * 1000;
