@@ -430,9 +430,9 @@ bool CBaseTexture::HasAlpha() const
   return m_hasAlpha;
 }
 
-void CBaseTexture::SetMipmapping(bool mipmapping)
+void CBaseTexture::SetMipmapping()
 {
-  m_mipmapping = mipmapping;
+  m_mipmapping = true;
 }
 
 bool CBaseTexture::IsMipmapped() const

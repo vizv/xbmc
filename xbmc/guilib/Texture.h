@@ -75,7 +75,7 @@ public:
 
   bool HasAlpha() const;
 
-  void SetMipmapping(bool mipmapping);
+  void SetMipmapping();
   bool IsMipmapped() const;
 
   virtual void CreateTextureObject() = 0;
