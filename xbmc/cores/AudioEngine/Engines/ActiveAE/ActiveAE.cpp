@@ -74,7 +74,10 @@ void CEngineStats::AddSamples(int samples, std::list<CActiveAEStream*> &streams)
     std::deque<CSampleBuffer*>::iterator itBuf;
     for(itBuf=(*it)->m_processingSamples.begin(); itBuf!=(*it)->m_processingSamples.end(); ++itBuf)
     {
-      delay += (float)(*itBuf)->pkt->nb_samples / (*itBuf)->pkt->config.sample_rate;
+      if (m_pcmOutput)
+        delay += (float)(*itBuf)->pkt->nb_samples / (*itBuf)->pkt->config.sample_rate;
+      else
+        delay += m_sinkFormat.m_streamInfo.GetDuration() / 1000;
     }
     delay += (*it)->m_resampleBuffers->GetDelay();
     (*it)->m_bufferedTime = delay;
