@@ -895,7 +895,21 @@ unsigned int CActiveAESink::OutputSamples(CSampleBuffer* samples)
 
   if (m_requestedFormat.m_dataFormat == AE_FMT_RAW && m_needIecPack && samples->pool)
   {
-    m_packer->Pack(m_sinkFormat.m_streamInfo, buffer[0], frames);
+    if (m_sinkFormat.m_streamInfo.m_type == CAEStreamInfo::STREAM_TYPE_TRUEHD)
+    {
+      int offset;
+      int len;
+      m_packer->GetBuffer();
+      for (int i=0; i<24; i++)
+      {
+        offset = i*2560;
+        len = (*(buffer[0] + offset+2560-2) << 8) + *(buffer[0] + offset+2560-1);
+        m_packer->Pack(m_sinkFormat.m_streamInfo, buffer[0] + offset, len);
+      }
+    }
+    else
+      m_packer->Pack(m_sinkFormat.m_streamInfo, buffer[0], frames);
+
     unsigned int size = m_packer->GetSize();
     packBuffer = m_packer->GetBuffer();
     buffer = &packBuffer;
