@@ -132,7 +132,6 @@ protected:
   double            m_demuxerPts;
   double            m_decoderPts;
   int               m_speed;
-  bool              m_preroll;
   int               m_codecControlFlags;
 
   CCriticalSection m_sharedSection;

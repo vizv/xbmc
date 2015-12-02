@@ -128,7 +128,6 @@ CMMALVideo::CMMALVideo()
 
   m_demux_queue_length = 0;
   m_es_format = mmal_format_alloc();
-  m_preroll = true;
   m_speed = DVD_PLAYSPEED_NORMAL;
   m_codecControlFlags = 0;
   m_fps = 0.0f;
@@ -734,7 +733,6 @@ bool CMMALVideo::Open(CDVDStreamInfo &hints, CDVDCodecOptions &options)
     return false;
 
   Prime();
-  m_preroll = !m_hints.stills;
   m_speed = DVD_PLAYSPEED_NORMAL;
 
   return true;
@@ -898,10 +896,7 @@ int CMMALVideo::Decode(uint8_t* pData, int iSize, double dts, double pts)
   bool want_buffer = mmal_queue_length(m_dec_input_pool->queue) > 0 && !m_demux_queue_length && !full;
   int ret = VC_BUFFER;
 
-  if (m_preroll && (!want_buffer || m_output_ready.size() >= GetAllowedReferences()))
-    m_preroll = false;
-
-  if (!m_output_ready.empty() && !m_preroll)
+  if (!m_output_ready.empty())
   {
     ret |= VC_PICTURE;
     // renderer is low - give priority to returning pictures
@@ -910,7 +905,7 @@ int CMMALVideo::Decode(uint8_t* pData, int iSize, double dts, double pts)
   }
 
   if (g_advancedSettings.CanLogComponent(LOGVIDEO))
-    CLog::Log(LOGDEBUG, "%s::%s - ret(%x) pics(%d) demux_queue(%d) space(%d) queued(%.2f) (%.2f:%.2f) preroll(%d) flags(%x) full(%d)", CLASSNAME, __func__, ret, m_output_ready.size(), m_demux_queue_length, mmal_queue_length(m_dec_input_pool->queue) * m_dec_input->buffer_size, queued*1e-6, m_demuxerPts*1e-6, m_decoderPts*1e-6, m_preroll, m_codecControlFlags, full);
+    CLog::Log(LOGDEBUG, "%s::%s - ret(%x) pics(%d) demux_queue(%d) space(%d) queued(%.2f) (%.2f:%.2f) flags(%x) full(%d)", CLASSNAME, __func__, ret, m_output_ready.size(), m_demux_queue_length, mmal_queue_length(m_dec_input_pool->queue) * m_dec_input->buffer_size, queued*1e-6, m_demuxerPts*1e-6, m_decoderPts*1e-6, m_codecControlFlags, full);
 
   if (full)
   {
@@ -985,7 +980,6 @@ void CMMALVideo::Reset(void)
   }
   m_decoderPts = DVD_NOPTS_VALUE;
   m_demuxerPts = DVD_NOPTS_VALUE;
-  m_preroll = !m_hints.stills && (m_speed == DVD_PLAYSPEED_NORMAL || m_speed == DVD_PLAYSPEED_PAUSE);
   m_codecControlFlags = 0;
 }
 
