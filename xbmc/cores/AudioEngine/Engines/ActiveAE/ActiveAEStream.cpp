@@ -278,8 +278,8 @@ unsigned int CActiveAEStream::AddData(uint8_t* const *data, unsigned int offset,
             m_currentBuffer->pkt->nb_samples += 2560;
             uint8_t highByte = (minFrames >> 8) & 0xFF;
             uint8_t lowByte = minFrames & 0xFF;
-            memcpy(m_currentBuffer->pkt->data[0]+m_currentBuffer->pkt->nb_samples-2, &highByte, 1);
-            memcpy(m_currentBuffer->pkt->data[0]+m_currentBuffer->pkt->nb_samples-1, &lowByte, 1);
+            *(m_currentBuffer->pkt->data[0]+m_currentBuffer->pkt->nb_samples-2) = highByte;
+            *(m_currentBuffer->pkt->data[0]+m_currentBuffer->pkt->nb_samples-1) = lowByte;
             m_bufferedTime += m_format.m_streamInfo.GetDuration() / 1000 / 24;
             if (m_currentBuffer->pkt->nb_samples / 2560 == 24)
               rawPktComplete = true;
