@@ -112,6 +112,8 @@ CMMALVideo::CMMALVideo()
 
   m_interlace_mode = MMAL_InterlaceProgressive;
   m_interlace_method = VS_INTERLACEMETHOD_NONE;
+  m_decoderPts = DVD_NOPTS_VALUE;
+  m_demuxerPts = DVD_NOPTS_VALUE;
 
   m_dec = NULL;
   m_dec_input = NULL;
@@ -257,6 +259,11 @@ void CMMALVideo::dec_output_port_cb(MMAL_PORT_T *port, MMAL_BUFFER_HEADER_T *buf
   {
     if (buffer->length > 0)
     {
+      if (buffer->pts != MMAL_TIME_UNKNOWN)
+        m_decoderPts = buffer->pts;
+      else if (buffer->dts != MMAL_TIME_UNKNOWN)
+        m_decoderPts = buffer->dts;
+
       assert(!(buffer->flags & MMAL_BUFFER_HEADER_FLAG_DECODEONLY));
       CMMALVideoBuffer *omvb = NULL;
       bool wanted = true;
@@ -824,6 +831,17 @@ int CMMALVideo::Decode(uint8_t* pData, int iSize, double dts, double pts)
     if (!iSize)
       break;
   }
+  if (pts != DVD_NOPTS_VALUE)
+    m_demuxerPts = pts;
+  else if (dts != DVD_NOPTS_VALUE)
+    m_demuxerPts = dts;
+
+  if (m_demuxerPts != DVD_NOPTS_VALUE && m_decoderPts == DVD_NOPTS_VALUE)
+    m_decoderPts = m_demuxerPts;
+
+  // we've built up quite a lot of data in decoder - try to throttle it
+  double queued = m_decoderPts != DVD_NOPTS_VALUE && m_demuxerPts != DVD_NOPTS_VALUE ? m_demuxerPts - m_decoderPts : 0.0;
+  bool full = queued > DVD_MSEC_TO_TIME(1000);
   int ret = 0;
 
   if (!m_output_ready.empty())
@@ -833,7 +851,7 @@ int CMMALVideo::Decode(uint8_t* pData, int iSize, double dts, double pts)
   else ret |= VC_BUFFER;
 
   if (g_advancedSettings.CanLogComponent(LOGVIDEO))
-    CLog::Log(LOGDEBUG, "%s::%s - ret(%x) pics(%d) flags(%x)", CLASSNAME, __func__, ret, m_output_ready.size(), m_codecControlFlags);
+    CLog::Log(LOGDEBUG, "%s::%s - ret(%x) pics(%d) queued(%.2f) (%.2f:%.2f) flags(%x) full(%d)", CLASSNAME, __func__, ret, m_output_ready.size(), queued*1e-6, m_demuxerPts*1e-6, m_decoderPts*1e-6, m_codecControlFlags, full);
 
   return ret;
 }
@@ -895,6 +913,8 @@ void CMMALVideo::Reset(void)
     SendCodecConfigData();
     Prime();
   }
+  m_decoderPts = DVD_NOPTS_VALUE;
+  m_demuxerPts = DVD_NOPTS_VALUE;
   m_codecControlFlags = 0;
 }
 
