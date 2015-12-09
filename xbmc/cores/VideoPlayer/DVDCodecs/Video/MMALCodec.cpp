@@ -539,6 +539,10 @@ bool CMMALVideo::Open(CDVDStreamInfo &hints, CDVDCodecOptions &options)
     hints.codec == AV_CODEC_ID_THEORA || hints.codec == AV_CODEC_ID_MJPEG || hints.codec == AV_CODEC_ID_MJPEGB || hints.codec == AV_CODEC_ID_VC1 || hints.codec == AV_CODEC_ID_WMV3))
     return false;
 
+  // This occurs at start of m2ts files before streams have been fully identified - just ignore
+  if (!hints.width)
+    return false;
+
   // we always qualify even if DVDFactoryCodec does this too.
   if (!CSettings::GetInstance().GetBool(CSettings::SETTING_VIDEOPLAYER_USEMMAL) || hints.software)
     return false;
