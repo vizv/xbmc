@@ -16083,7 +16083,51 @@ msgctxt "#35064"
 msgid "Pair your controllers with the various input devices of different game systems."
 msgstr ""
 
-#empty strings from id 35065 to 35073
+#: system/settings/settings.xml
+msgctxt "#35065"
+msgid "%i"
+msgstr ""
+
+#: system/settings/settings.xml
+msgctxt "#35066"
+msgid "Number of keyboard players"
+msgstr ""
+
+#: system/settings/settings.xml
+msgctxt "#35067"
+msgid "Emulated controllers let you control additional players using the keyboard. This is intended for devices that use keyboard drivers, but you can also see how many people fit around a keyboard!"
+msgstr ""
+
+#: system/settings/settings.xml
+msgctxt "#35067"
+msgid "Configure input for game add-ons."
+msgstr ""
+
+#: system/settings/settings.xml
+msgctxt "#35069"
+msgid "Configure keyboard player 1"
+msgstr ""
+
+#: system/settings/settings.xml
+msgctxt "#35070"
+msgid "Configure keyboard player 2"
+msgstr ""
+
+#: system/settings/settings.xml
+msgctxt "#35071"
+msgid "Configure keyboard player 3"
+msgstr ""
+
+#: system/settings/settings.xml
+msgctxt "#35072"
+msgid "Configure keyboard player 4"
+msgstr ""
+
+#. Name of the keyboard-emulated controller in the list of peripherals
+#: xbmc/peripherals/bus/virtual/PeripheralBusApplication.cpp
+msgctxt "#35073"
+msgid "Keyboard player"
+msgstr ""
 
 #. Label for buttons that appear on the face of the controller. Used in the controller mapping dialog.
 msgctxt "#35074"
@@ -16203,7 +16247,12 @@ msgctxt "#35102"
 msgid "Disable joystick when this device is present"
 msgstr ""
 
-#empty strings from id 35103 to 35198
+#empty strings from id 35103 to 35197
+
+#: system/settings/settings.xml
+msgctxt "#35198"
+msgid "Keyboard"
+msgstr ""
 
 #: system/settings/settings.xml
 msgctxt "#35199"

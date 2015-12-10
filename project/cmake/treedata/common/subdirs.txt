@@ -17,6 +17,8 @@ xbmc/guilib                                     guilib
 xbmc/input                                      input
 xbmc/input/joysticks                            input/joysticks
 xbmc/input/joysticks/generic                    input/joysticks/generic
+xbmc/input/keyboard                             input/keyboard
+xbmc/input/keyboard/generic                     input/keyboard/generic
 xbmc/listproviders                              listproviders
 xbmc/media                                      media
 xbmc/messaging                                  messaging
