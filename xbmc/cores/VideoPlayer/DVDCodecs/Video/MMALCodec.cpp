@@ -859,13 +859,27 @@ int CMMALVideo::Decode(uint8_t* pData, int iSize, double dts, double pts)
   int ret = 0;
 
   if (!m_output_ready.empty())
-  {
     ret |= VC_PICTURE;
+  if (mmal_queue_length(m_dec_input_pool->queue) > 0)
+    ret |= VC_BUFFER;
+
+  bool slept = false;
+  if (!ret)
+  {
+    slept = true;
+    {
+      // otherwise we busy spin
+      CSingleExit unlock(m_sharedSection);
+      Sleep(10);
+    }
+    if (!m_output_ready.empty())
+      ret |= VC_PICTURE;
+    if (mmal_queue_length(m_dec_input_pool->queue) > 0)
+      ret |= VC_BUFFER;
   }
-  else ret |= VC_BUFFER;
 
   if (g_advancedSettings.CanLogComponent(LOGVIDEO))
-    CLog::Log(LOGDEBUG, "%s::%s - ret(%x) pics(%d) queued(%.2f) (%.2f:%.2f) flags(%x) full(%d)", CLASSNAME, __func__, ret, m_output_ready.size(), queued*1e-6, m_demuxerPts*1e-6, m_decoderPts*1e-6, m_codecControlFlags, full);
+    CLog::Log(LOGDEBUG, "%s::%s - ret(%x) pics(%d) inputs(%d) slept(%d) queued(%.2f) (%.2f:%.2f) flags(%x) full(%d)", CLASSNAME, __func__, ret, m_output_ready.size(), mmal_queue_length(m_dec_input_pool->queue), slept, queued*1e-6, m_demuxerPts*1e-6, m_decoderPts*1e-6, m_codecControlFlags, full);
 
   return ret;
 }
