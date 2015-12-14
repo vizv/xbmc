@@ -1399,7 +1399,7 @@ void CVideoPlayer::Process()
     if ((!m_VideoPlayerAudio->AcceptsData() && m_CurrentAudio.id >= 0) ||
         (!m_VideoPlayerVideo->AcceptsData() && m_CurrentVideo.id >= 0))
     {
-      if (m_pDemuxer)
+      if (m_pDemuxer && m_playSpeed == DVD_PLAYSPEED_PAUSE)
       {
         m_pDemuxer->SetSpeed(DVD_PLAYSPEED_PAUSE);
       }
