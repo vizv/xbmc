@@ -18282,6 +18282,16 @@ msgctxt "#38030"
 msgid "This option uses frame-packing to output full resolution for 3D through HDMI.[CR]Enabling this improves quality of Multiview Video Coding (MVC) videos, but may not be supported by all displays."
 msgstr ""
 
+#: system/settings/rbp.xml
+msgctxt "#38114"
+msgid "Use GPU for jpeg acceleration"
+msgstr ""
+
+#: system/settings/rbp.xml
+msgctxt "#38115"
+msgid "This option uses the GPU for encoding and decoding jpegs"
+msgstr ""
+
 #: system/settings/settings.xml
 msgctxt "#38007"
 msgid "Boost centre channel when downmixing"
