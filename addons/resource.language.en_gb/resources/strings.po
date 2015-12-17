@@ -18604,6 +18604,16 @@ msgctxt "#38041"
 msgid "Mixer"
 msgstr "" 
 
+#: system/settings/rbp.xml
+msgctxt "#38114"
+msgid "Use GPU for jpeg acceleration"
+msgstr ""
+
+#: system/settings/rbp.xml
+msgctxt "#38115"
+msgid "This option uses the GPU for encoding and decoding jpegs"
+msgstr ""
+
 #: system/settings/settings.xml
 msgctxt "#38007"
 msgid "Boost centre channel when downmixing"
