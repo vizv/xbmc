@@ -63,7 +63,6 @@ void CGUIVideoControl::Render()
       CRect old = g_graphicsContext.GetScissors();
       CRect region = GetRenderRegion();
       region.Intersect(old);
-      g_graphicsContext.BeginPaint();
       g_graphicsContext.SetScissors(region);
 #ifdef HAS_IMXVPU
       g_graphicsContext.Clear((16 << 16)|(8 << 8)|16);
@@ -71,7 +70,6 @@ void CGUIVideoControl::Render()
       g_graphicsContext.Clear(0);
 #endif
       g_graphicsContext.SetScissors(old);
-      g_graphicsContext.EndPaint();
     }
     else
       g_application.m_pPlayer->Render(false, alpha);

@@ -833,7 +833,6 @@ void CSlideShowPic::Render(float *x, float *y, CBaseTexture* pTexture, color_t c
   }
 
 #elif defined(HAS_GL)
-  g_graphicsContext.BeginPaint();
   if (pTexture)
   {
     int unit = 0;
@@ -912,9 +911,7 @@ void CSlideShowPic::Render(float *x, float *y, CBaseTexture* pTexture, color_t c
   glVertex3f(x[3], y[3], 0);
 
   glEnd();
-  g_graphicsContext.EndPaint();
 #elif defined(HAS_GLES)
-  g_graphicsContext.BeginPaint();
   if (pTexture)
   {
     pTexture->LoadToGPU();
@@ -980,8 +977,6 @@ void CSlideShowPic::Render(float *x, float *y, CBaseTexture* pTexture, color_t c
   glDisableVertexAttribArray(tex0Loc);
 
   g_Windowing.DisableGUIShader();
-
-  g_graphicsContext.EndPaint();
 #else
 // SDL render
   g_Windowing.BlitToScreen(m_pImage, NULL, NULL);

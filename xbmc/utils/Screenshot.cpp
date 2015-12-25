@@ -133,7 +133,6 @@ bool CScreenshotSurface::capture()
 
 #elif defined(HAS_GL) || defined(HAS_GLES)
 
-  g_graphicsContext.BeginPaint();
   g_windowManager.Render();
 #ifndef HAS_GLES
   glReadBuffer(GL_BACK);
@@ -153,7 +152,6 @@ bool CScreenshotSurface::capture()
 #else
   glReadPixels(viewport[0], viewport[1], viewport[2], viewport[3], GL_BGRA, GL_UNSIGNED_BYTE, (GLvoid*)surface);
 #endif
-  g_graphicsContext.EndPaint();
 
   //make a new buffer and copy the read image to it with the Y axis inverted
   m_buffer = new unsigned char[m_stride * m_height];
