@@ -27,6 +27,7 @@
 #include "Application.h"
 #include "settings/AdvancedSettings.h"
 #include "windowing/WindowingFactory.h"
+#include "guilib/GUIWindowManager.h"
 #include "utils/log.h"
 #include "utils/StringUtils.h"
 
@@ -90,7 +91,7 @@ void CDummyVideoPlayer::Process()
       g_graphicsContext.Clear();
       g_graphicsContext.SetRenderingResolution(g_graphicsContext.GetResInfo(), false);
       Render();
-      g_application.RenderNoPresent();
+      g_windowManager.Render();
     }
     g_graphicsContext.Unlock();
   }
