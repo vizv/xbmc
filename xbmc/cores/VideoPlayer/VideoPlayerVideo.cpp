@@ -546,7 +546,10 @@ void CVideoPlayerVideo::Process()
 
         if (iDecoderState & VC_BUFFER)
           break;
-        
+
+        codecControl &= ~DVD_CODEC_CTRL_DROP;
+        m_pVideoCodec->SetCodecControl(codecControl);
+
         // the decoder didn't need more data, flush the remaning buffer
         iDecoderState = m_pVideoCodec->Decode(NULL, 0, DVD_NOPTS_VALUE, DVD_NOPTS_VALUE);
       }
