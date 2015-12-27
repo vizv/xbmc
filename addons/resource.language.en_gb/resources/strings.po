@@ -18228,17 +18228,17 @@ msgctxt "#38026"
 msgid "Decode the stereo stream from 3D files"
 msgstr ""
 
-#: system/settings/rbp.xml
+#: system/settings/rbp.xml. Description of setting "Decode the stereo stream from 3D files" with label #38026
 msgctxt "#38027"
-msgid "This option decodes frames for both eyes from video containing Multiview Video Coding (MVC) as typically found on 3D Blu-ray. Disabling may improve performance if you don't require 3D"
+msgid "This option decodes frames for both eyes from video containing Multiview Video Coding (MVC) as typically found on 3D Blu-ray. Disabling may improve performance if you don't require 3D."
 msgstr ""
 
 #: system/settings/rbp.xml
-msgctxt "#38208"
-msgid "Enable Full HD HDMI modes for 3D"
+msgctxt "#38028"
+msgid "Enable Full HD HDMI modes for stereoscopic 3D"
 msgstr ""
 
-#: system/settings/rbp.xml
+#: system/settings/rbp.xml. Description of setting "Enable Full HD HDMI modes for stereoscopic 3D" with label #38028
 msgctxt "#38029"
 msgid "This option uses frame-packing to output full resolution for 3D through HDMI"
 msgstr ""
