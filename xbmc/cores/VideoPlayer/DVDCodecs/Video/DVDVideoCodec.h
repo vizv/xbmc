@@ -142,12 +142,12 @@ struct DVDVideoUserData
 #define DVP_FLAG_ALLOCATED          0x00000004  //< Set to indicate that this has allocated data
 #define DVP_FLAG_INTERLACED         0x00000008  //< Set to indicate that this frame is interlaced
 
-#define DVP_FLAG_NOSKIP             0x00000010  //< indicate this picture should never be dropped
-#define DVP_FLAG_DROPPED            0x00000020  //< indicate that this picture has been dropped in decoder stage, will have no data
+#define DVP_FLAG_DROPPED            0x00000010  //< indicate that this picture has been dropped in decoder stage, will have no data
 
 #define DVD_CODEC_CTRL_SKIPDEINT    0x01000000  //< indicate that this picture was requested to have been dropped in deint stage
 #define DVD_CODEC_CTRL_NO_POSTPROC  0x02000000  //< see GetCodecStats
 #define DVD_CODEC_CTRL_DRAIN        0x04000000  //< see GetCodecStats
+#define DVD_CODEC_CTRL_DROP         0x08000000  //< this frame is going to be dropped in output
 
 // DVP_FLAG 0x00000100 - 0x00000f00 is in use by libmpeg2!
 
