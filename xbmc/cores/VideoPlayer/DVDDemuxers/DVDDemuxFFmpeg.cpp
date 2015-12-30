@@ -866,7 +866,10 @@ DemuxPacket* CDVDDemuxFFmpeg::Read()
         pPacket->iStreamId = m_pkt.pkt.stream_index;
       }
       m_pkt.result = -1;
-      memset(&m_pkt.pkt, 0, sizeof(AVPacket));
+      if (pPacket && pPacket->pkt)
+        memset(&m_pkt.pkt, 0, sizeof(AVPacket));
+      else
+        av_free_packet(&m_pkt.pkt);
     }
   }
   } // end of lock scope
