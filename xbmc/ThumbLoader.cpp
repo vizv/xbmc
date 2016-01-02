@@ -22,6 +22,7 @@
 #include "filesystem/File.h"
 #include "FileItem.h"
 #include "TextureCache.h"
+#include "utils/log.h"
 
 using namespace XFILE;
 
@@ -50,7 +51,9 @@ std::string CThumbLoader::GetCachedImage(const CFileItem &item, const std::strin
 {
   if (!item.GetPath().empty() && m_textureDatabase->Open())
   {
+    CLog::Log(LOGDEBUG,"%s - %s %s", __FUNCTION__, item.GetPath().c_str(), type.c_str());
     std::string image = m_textureDatabase->GetTextureForPath(item.GetPath(), type);
+    CLog::Log(LOGDEBUG,"%s - %s %s image=%s", __FUNCTION__, item.GetPath().c_str(), type.c_str(), image.c_str());
     m_textureDatabase->Close();
     return image;
   }

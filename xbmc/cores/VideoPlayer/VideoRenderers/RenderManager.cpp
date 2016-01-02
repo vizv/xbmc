@@ -344,7 +344,7 @@ bool CRenderManager::Configure(DVDVideoPicture& picture, float fps, unsigned fla
 
   if (!m_stateEvent.WaitMSec(1000))
   {
-    CLog::Log(LOGWARNING, "CRenderManager::Configure - timeout waiting for configure");
+    CLog::Log(LOGWARNING, "CRenderManager::Configure - timeout waiting for configure m_renderState=%d m_presentstep=%d", m_renderState, m_presentstep);
     return false;
   }
 

@@ -2752,6 +2752,7 @@ void CApplication::FrameMove(bool processEvents, bool processGUI)
 {
   MEASURE_FUNCTION;
 
+  CLog::Log(LOGDEBUG, "%s(%d,%d)", __FUNCTION__, processEvents, processGUI);
   if (processEvents)
   {
     // currently we calculate the repeat time (ie time from last similar keypress) just global as fps
@@ -4201,11 +4202,13 @@ bool CApplication::OnMessage(CGUIMessage& message)
 
   case GUI_MSG_PLAYBACK_STARTED:
     {
+      CLog::LogF(LOGDEBUG,"GUI_MSG_PLAYBACK_STARTED 1");
 #ifdef TARGET_DARWIN_IOS
       CDarwinUtils::SetScheduling(message.GetMessage());
 #endif
       CPlayList playList = g_playlistPlayer.GetPlaylist(g_playlistPlayer.GetCurrentPlaylist());
 
+      CLog::LogF(LOGDEBUG,"GUI_MSG_PLAYBACK_STARTED 2");
       // Update our infoManager with the new details etc.
       if (m_nextPlaylistItem >= 0)
       { 
@@ -4224,13 +4227,17 @@ bool CApplication::OnMessage(CGUIMessage& message)
         g_playlistPlayer.SetCurrentSong(m_nextPlaylistItem);
         *m_itemCurrentFile = *item;
       }
+      CLog::LogF(LOGDEBUG,"GUI_MSG_PLAYBACK_STARTED 3");
       g_infoManager.SetCurrentItem(*m_itemCurrentFile);
+      CLog::LogF(LOGDEBUG,"GUI_MSG_PLAYBACK_STARTED 4");
       g_partyModeManager.OnSongChange(true);
+      CLog::LogF(LOGDEBUG,"GUI_MSG_PLAYBACK_STARTED 5");
 
       CVariant param;
       param["player"]["speed"] = 1;
       param["player"]["playerid"] = g_playlistPlayer.GetCurrentPlaylist();
       CAnnouncementManager::GetInstance().Announce(Player, "xbmc", "OnPlay", m_itemCurrentFile, param);
+      CLog::LogF(LOGDEBUG,"GUI_MSG_PLAYBACK_STARTED 6");
       return true;
     }
     break;

@@ -412,8 +412,11 @@ std::string CTextureDatabase::GetTextureForPath(const std::string &url, const st
     if (url.empty())
       return "";
 
+    CLog::Log(LOGDEBUG,"%s - 1", __FUNCTION__);
     std::string sql = PrepareSQL("select texture from path where url='%s' and type='%s'", url.c_str(), type.c_str());
+    CLog::Log(LOGDEBUG,"%s - 2", __FUNCTION__);
     m_pDS->query(sql);
+    CLog::Log(LOGDEBUG,"%s - 3", __FUNCTION__);
 
     if (!m_pDS->eof())
     { // have some information
@@ -421,7 +424,9 @@ std::string CTextureDatabase::GetTextureForPath(const std::string &url, const st
       m_pDS->close();
       return texture;
     }
+    CLog::Log(LOGDEBUG,"%s - 4", __FUNCTION__);
     m_pDS->close();
+    CLog::Log(LOGDEBUG,"%s - 5", __FUNCTION__);
   }
   catch (...)
   {
