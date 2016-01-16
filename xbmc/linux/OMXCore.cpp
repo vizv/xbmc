@@ -414,40 +414,14 @@ OMX_ERRORTYPE COMXCoreComponent::FreeOutputBuffer(OMX_BUFFERHEADERTYPE *omx_buff
 
 void COMXCoreComponent::FlushAll()
 {
-  if(!m_handle || m_resource_error)
-    return;
-
-  assert(GetState() == OMX_StateExecuting);
-  SetStateForComponent(OMX_StatePause);
-
-  OMX_ERRORTYPE omx_err = OMX_SendCommand(m_handle, OMX_CommandFlush, m_input_port, NULL);
-
-  if(omx_err != OMX_ErrorNone)
-  {
-    CLog::Log(LOGERROR, "COMXCoreComponent::FlushInput - Error on component %s omx_err(0x%08x)",
-              m_componentName.c_str(), (int)omx_err);
-  }
-  omx_err = OMX_SendCommand(m_handle, OMX_CommandFlush, m_output_port, NULL);
-
-  if(omx_err != OMX_ErrorNone)
-  {
-    CLog::Log(LOGERROR, "COMXCoreComponent::FlushOutput - Error on component %s omx_err(0x%08x)",
-              m_componentName.c_str(), (int)omx_err);
-  }
-
-  WaitForCommand(OMX_CommandFlush, m_input_port);
-  WaitForCommand(OMX_CommandFlush, m_output_port);
-
-  SetStateForComponent(OMX_StateExecuting);
+  FlushInput();
+  FlushOutput();
 }
 
 void COMXCoreComponent::FlushInput()
 {
   if(!m_handle || m_resource_error)
     return;
-
-  assert(GetState() == OMX_StateExecuting);
-  SetStateForComponent(OMX_StatePause);
 
   OMX_ERRORTYPE omx_err = OMX_SendCommand(m_handle, OMX_CommandFlush, m_input_port, NULL);
 
@@ -457,16 +431,12 @@ void COMXCoreComponent::FlushInput()
               m_componentName.c_str(), (int)omx_err);
   }
   WaitForCommand(OMX_CommandFlush, m_input_port);
-  SetStateForComponent(OMX_StateExecuting);
 }
 
 void COMXCoreComponent::FlushOutput()
 {
   if(!m_handle || m_resource_error)
     return;
-
-  assert(GetState() == OMX_StateExecuting);
-  SetStateForComponent(OMX_StatePause);
 
   OMX_ERRORTYPE omx_err = OMX_SendCommand(m_handle, OMX_CommandFlush, m_output_port, NULL);
 
@@ -476,7 +446,6 @@ void COMXCoreComponent::FlushOutput()
               m_componentName.c_str(), (int)omx_err);
   }
   WaitForCommand(OMX_CommandFlush, m_output_port);
-  SetStateForComponent(OMX_StateExecuting);
 }
 
 // timeout in milliseconds
@@ -1484,6 +1453,8 @@ bool COMXCoreComponent::Deinitialize()
 
   if(m_handle)
   {
+    FlushAll();
+
     FreeOutputBuffers();
     FreeInputBuffers();
 

@@ -377,9 +377,9 @@ void CAESinkPi::Deinitialize()
   if ( m_omx_splitter.IsInitialized() )
     m_omx_splitter.FlushAll();
   if ( m_omx_render.IsInitialized() )
-    m_omx_render.FlushInput();
+    m_omx_render.FlushAll();
   if ( m_omx_render_slave.IsInitialized() )
-    m_omx_render_slave.FlushInput();
+    m_omx_render_slave.FlushAll();
 
   if ( m_omx_splitter.IsInitialized() )
     m_omx_splitter.Deinitialize();

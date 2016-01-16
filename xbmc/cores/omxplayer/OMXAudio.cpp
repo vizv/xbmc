@@ -968,9 +968,9 @@ void COMXAudio::Flush()
     m_omx_splitter.FlushAll();
 
   if ( m_omx_render_analog.IsInitialized() )
-    m_omx_render_analog.FlushInput();
+    m_omx_render_analog.FlushAll();
   if ( m_omx_render_hdmi.IsInitialized() )
-    m_omx_render_hdmi.FlushInput();
+    m_omx_render_hdmi.FlushAll();
 
   m_last_pts      = DVD_NOPTS_VALUE;
   m_submitted     = 0.0f;
