@@ -709,7 +709,6 @@ CVideoPlayer::CVideoPlayer(IPlayerCallback& callback)
   m_processInfo = CProcessInfo::CreateInstance();
   CreatePlayers();
 
-  m_displayLost = false;
   g_Windowing.Register(this);
 }
 
@@ -1347,13 +1346,6 @@ void CVideoPlayer::Process()
         m_messenger.Put(new CDVDMsgPlayerSeek(GetTime(), true, true, true, true, true));
     }
 #endif
-
-    // check display lost
-    if (m_displayLost)
-    {
-      Sleep(50);
-      continue;
-    }
 
     // handle messages send to this thread, like seek or demuxer reset requests
     HandleMessages();
@@ -5018,11 +5010,11 @@ void CVideoPlayer::VideoParamsChange()
 void CVideoPlayer::OnLostDisplay()
 {
   CLog::Log(LOGNOTICE, "VideoPlayer: OnLostDisplay received");
-  m_displayLost = true;
+  SetPlaySpeed(DVD_PLAYSPEED_PAUSE);
 }
 
 void CVideoPlayer::OnResetDisplay()
 {
   CLog::Log(LOGNOTICE, "VideoPlayer: OnResetDisplay received");
-  m_displayLost = false;
+  SetPlaySpeed(DVD_PLAYSPEED_NORMAL);
 }
