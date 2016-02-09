@@ -296,13 +296,19 @@ bool CDVDVideoCodecFFmpeg::Open(CDVDStreamInfo &hints, CDVDCodecOptions &options
     if (tryhw && m_decoderState == STATE_NONE)
     {
       m_decoderState = STATE_HW_SINGLE;
+#ifdef TARGET_RASPBERRY_PI
+      int num_threads = std::min(8 /*MAX_THREADS*/, g_cpuInfo.getCPUCount());
+      if (pCodec->id == AV_CODEC_ID_HEVC)
+        num_threads *= 2;
+      if (num_threads > 1)
+        m_pCodecContext->thread_count = num_threads;
+      m_pCodecContext->thread_safe_callbacks = 0;
+      CLog::Log(LOGDEBUG, "CDVDVideoCodecFFmpeg - open frame threaded with %d threads", num_threads);
+#endif
     }
     else
     {
       int num_threads = std::min(8 /*MAX_THREADS*/, g_cpuInfo.getCPUCount());
-#ifdef TARGET_RASPBERRY_PI
-      num_threads = num_threads > 1 ? 2 * num_threads : num_threads;
-#endif
       if( num_threads > 1)
         m_pCodecContext->thread_count = num_threads;
       m_pCodecContext->thread_safe_callbacks = 1;

@@ -389,8 +389,9 @@ bool CDecoder::GetPicture(AVCodecContext* avctx, AVFrame* frame, DVDVideoPicture
   assert(!picture->MMALBuffer->mmal_buffer);
   picture->MMALBuffer->mmal_buffer = mmal_buffer;
 
-  // need to flush ARM cache so GPU can see it
-  g_RBP.gpu_cache_flush(gmem);
+  // need to flush ARM cache so GPU can see it (HEVC will have already done this)
+  if (avctx->codec_id != AV_CODEC_ID_HEVC)
+    g_RBP.gpu_cache_flush(gmem);
 
   if (g_advancedSettings.CanLogComponent(LOGVIDEO))
     CLog::Log(LOGDEBUG, "%s::%s - mmal:%p dts:%.3f pts:%.3f buf:%p gpu:%p", CLASSNAME, __FUNCTION__, picture->MMALBuffer->mmal_buffer, 1e-6*picture->dts, 1e-6*picture->pts, picture->MMALBuffer, gmem);
