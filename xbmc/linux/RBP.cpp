@@ -39,19 +39,8 @@
 #define IOCTL_MBOX_PROPERTY _IOWR(MAJOR_NUM, 0, char *)
 #define DEVICE_FILE_NAME "/dev/vcio"
 
-typedef struct gpu_mem_ptr_s {
-  void *arm; // Pointer to memory mapped on ARM side
-  int vc_handle;   // Videocore handle of relocatable memory
-  int vcsm_handle; // Handle for use by VCSM
-  int vc;       // Address for use in GPU code
-  int numbytes; // Size of memory block
-  int suballoc;
-} GPU_MEM_PTR_T;
-
 static int mbox_open();
 static void mbox_close(int file_desc);
-static void gpu_free_internal(GPU_MEM_PTR_T *p, int mb);
-static int gpu_malloc_uncached_internal(int numbytes, GPU_MEM_PTR_T *p, int mb);
 
 CRBP::CRBP()
 {
@@ -266,7 +255,7 @@ void CRBP::Deinitialize()
   m_omx_initialized = false;
   uninit_cursor();
   if (m_mb && m_p)
-    gpu_free_internal(m_p, m_mb);
+    gpu_free(m_p);
   delete m_p;
   m_p = NULL;
   if (m_mb)
@@ -401,28 +390,54 @@ unsigned int mailbox_set_cursor_position(int file_desc, int enabled, int x, int 
    return p[5];
 }
 
-static int gpu_malloc_uncached_internal(int numbytes, GPU_MEM_PTR_T *p, int mb)
+int CRBP::gpu_malloc_cached(int numbytes, GPU_MEM_PTR_T *p)
 {
   //printf("%s %d\n", __func__, numbytes);
 
   p->numbytes = numbytes;
-  p->suballoc = 0;
-  p->vcsm_handle = vcsm_malloc_cache(numbytes, VCSM_CACHE_TYPE_NONE, (char *)"Mouse pointer");
+  p->vcsm_handle = vcsm_malloc_cache(numbytes, VCSM_CACHE_TYPE_HOST, (char *)"cached");
   assert(p->vcsm_handle);
   p->vc_handle = vcsm_vc_hdl_from_hdl(p->vcsm_handle);
   assert(p->vc_handle);
   p->arm = vcsm_lock(p->vcsm_handle);
   assert(p->arm);
-  p->vc = mem_lock(mb, p->vc_handle);
+  p->vc = mem_lock(m_mb, p->vc_handle);
   assert(p->vc);
   return 0;
 }
 
-static void gpu_free_internal(GPU_MEM_PTR_T *p, int mb)
+int CRBP::gpu_malloc_uncached(int numbytes, GPU_MEM_PTR_T *p)
 {
-  mem_unlock(mb,p->vc_handle);
+  //printf("%s %d\n", __func__, numbytes);
+
+  p->numbytes = numbytes;
+  p->vcsm_handle = vcsm_malloc_cache(numbytes, VCSM_CACHE_TYPE_NONE, (char *)"unchached");
+  assert(p->vcsm_handle);
+  p->vc_handle = vcsm_vc_hdl_from_hdl(p->vcsm_handle);
+  assert(p->vc_handle);
+  p->arm = vcsm_lock(p->vcsm_handle);
+  assert(p->arm);
+  p->vc = mem_lock(m_mb, p->vc_handle);
+  assert(p->vc);
+  return 0;
+}
+
+void CRBP::gpu_free(GPU_MEM_PTR_T *p)
+{
+  mem_unlock(m_mb,p->vc_handle);
   vcsm_unlock_ptr(p->arm);
   vcsm_free(p->vcsm_handle);
+}
+
+// Call this to clean and invalidate a region of memory
+void CRBP::gpu_cache_flush(GPU_MEM_PTR_T *p)
+{
+    struct vcsm_user_clean_invalid_s iocache = {};
+    iocache.s[0].handle = p->vcsm_handle;
+    iocache.s[0].cmd = 3; // clean+invalidate
+    iocache.s[0].addr = (int) p->arm;
+    iocache.s[0].size  = p->numbytes;
+    vcsm_clean_invalid( &iocache );
 }
 
 #define T 0
@@ -462,7 +477,7 @@ void CRBP::init_cursor()
   {
     m_p = new GPU_MEM_PTR_T;
     if (m_p)
-      gpu_malloc_uncached_internal(64 * 64 * 4, m_p, m_mb);
+      gpu_malloc_uncached(64 * 64 * 4, m_p);
   }
   if (m_mb && m_p && m_p->arm && m_p->vc)
     set_cursor(default_cursor_pixels, 16, 16, 0, 0);

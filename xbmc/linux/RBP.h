@@ -41,7 +41,15 @@
 #include "threads/CriticalSection.h"
 #include "threads/Event.h"
 
-struct gpu_mem_ptr_s;
+class GPU_MEM_PTR_T {
+public:
+  void *arm; // Pointer to memory mapped on ARM side
+  int vc_handle;   // Videocore handle of relocatable memory
+  int vcsm_handle; // Handle for use by VCSM
+  int vc;       // Address for use in GPU code
+  int numbytes; // Size of memory block
+  void *opaque;
+};
 
 class CRBP
 {
@@ -88,13 +96,17 @@ private:
   class DllLibOMXCore;
   CCriticalSection m_critSection;
 
-  struct gpu_mem_ptr_s *m_p;
+  GPU_MEM_PTR_T *m_p;
   int m_mb;
   int m_x;
   int m_y;
   bool m_enabled;
   double m_last_pll_adjust;
   public:
+  int gpu_malloc_cached(int numbytes, GPU_MEM_PTR_T *p);
+  int gpu_malloc_uncached(int numbytes, GPU_MEM_PTR_T *p);
+  void gpu_free(GPU_MEM_PTR_T *p);
+  void gpu_cache_flush(GPU_MEM_PTR_T *p);
   void init_cursor();
   void set_cursor(const void *pixels, int width, int height, int hotspot_x, int hotspot_y);
   void update_cursor(int x, int y, bool enabled);
