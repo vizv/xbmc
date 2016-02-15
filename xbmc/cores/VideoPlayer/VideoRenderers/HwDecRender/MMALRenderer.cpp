@@ -231,6 +231,7 @@ bool CMMALRenderer::init_vout(ERenderFormat format)
 }
 
 CMMALRenderer::CMMALRenderer()
+: m_sharedSection(g_RBP.GetLock())
 {
   CLog::Log(LOGDEBUG, "%s::%s", CLASSNAME, __func__);
   m_vout = NULL;

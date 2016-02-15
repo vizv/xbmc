@@ -78,6 +78,7 @@ private:
   unsigned int      m_dst_port;
   DllOMX            *m_DllOMX;
   bool              m_tunnel_set;
+  CCriticalSection &m_sharedSection;
 };
 
 class COMXCoreComponent
@@ -199,6 +200,7 @@ private:
   bool          m_flush_input;
   bool          m_flush_output;
   bool          m_resource_error;
+  CCriticalSection &m_sharedSection;
 };
 
 class COMXCore

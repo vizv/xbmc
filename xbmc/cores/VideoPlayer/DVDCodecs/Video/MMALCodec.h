@@ -126,7 +126,7 @@ protected:
   int               m_codecControlFlags;
   bool              m_dropState;
 
-  CCriticalSection m_sharedSection;
+  CCriticalSection &m_sharedSection;
   MMAL_COMPONENT_T *m_dec;
   MMAL_PORT_T *m_dec_input;
   MMAL_PORT_T *m_dec_output;

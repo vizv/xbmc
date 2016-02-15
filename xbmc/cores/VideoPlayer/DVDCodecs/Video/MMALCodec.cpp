@@ -99,6 +99,7 @@ long CMMALVideoBuffer::Release()
 #define CLASSNAME "CMMALVideo"
 
 CMMALVideo::CMMALVideo(CProcessInfo &processInfo) : CDVDVideoCodec(processInfo)
+, m_sharedSection(g_RBP.GetLock())
 {
   if (g_advancedSettings.CanLogComponent(LOGVIDEO))
     CLog::Log(LOGDEBUG, "%s::%s %p", CLASSNAME, __func__, this);

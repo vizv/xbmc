@@ -119,7 +119,7 @@ protected:
   int                       m_inflight;
   float                     m_sharpness;
 
-  CCriticalSection m_sharedSection;
+  CCriticalSection &m_sharedSection;
   MMAL_COMPONENT_T *m_vout;
   MMAL_PORT_T *m_vout_input;
   MMAL_POOL_T *m_vout_input_pool;

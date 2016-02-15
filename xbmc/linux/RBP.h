@@ -76,6 +76,7 @@ public:
   void WaitVsync();
   double AdjustHDMIClock(double adjust);
   double GetAdjustHDMIClock() { return m_last_pll_adjust; }
+  CCriticalSection &GetLock() { return m_critSection; }
 
   void SuspendVideoOutput();
   void ResumeVideoOutput();
