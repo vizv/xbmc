@@ -5,7 +5,7 @@
 
   <!-- Common configuration settings -->
   <PropertyGroup>
-    <IncludePath>$(SolutionDir)\..\BuildDependencies\include;$(SolutionDir)\..\BuildDependencies\include\python;$(IncludePath)</IncludePath>
+    <IncludePath>$(SolutionDir)\..\BuildDependencies\include;$(SolutionDir)\..\BuildDependencies\include\python;$(SolutionDir)\..\BuildDependencies\include\libbluray;$(IncludePath)</IncludePath>
     <ExecutablePath>$(SolutionDir)\..\..\tools\win32buildtools;$(ExecutablePath)</ExecutablePath>
     <LocalDebuggerEnvironment>KODI_HOME=$(SolutionDir)..\..&#xD;&#xA;PATH=$(SolutionDir)..\Win32BuildSetup\dependencies;%PATH%</LocalDebuggerEnvironment>
   </PropertyGroup>
