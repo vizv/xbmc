@@ -41,25 +41,37 @@
 #include "rendering/RenderSystem.h"
 #include "cores/VideoPlayer/VideoRenderers/BaseRenderer.h"
 
-class CMMALVideo;
 
 // a mmal video frame
-class CMMALVideoBuffer
+class CMMALBuffer
+{
+public:
+  ~CMMALBuffer() {}
+  MMAL_BUFFER_HEADER_T *mmal_buffer;
+  unsigned int m_width;
+  unsigned int m_height;
+  unsigned int m_aligned_width;
+  unsigned int m_aligned_height;
+  float m_aspect_ratio;
+  // reference counting
+  virtual CMMALBuffer* Acquire() = 0;
+  virtual long Release() = 0;
+protected:
+  long m_refs;
+};
+
+class CMMALVideo;
+class CMMALRenderer;
+
+// a mmal video frame
+class CMMALVideoBuffer : public CMMALBuffer
 {
 public:
   CMMALVideoBuffer(CMMALVideo *omv);
   virtual ~CMMALVideoBuffer();
-
-  MMAL_BUFFER_HEADER_T *mmal_buffer;
-  int width;
-  int height;
-  float m_aspect_ratio;
-  // reference counting
   CMMALVideoBuffer* Acquire();
-  long              Release();
+  long Release();
   CMMALVideo *m_omv;
-  long m_refs;
-private:
 };
 
 class CMMALVideo : public CDVDVideoCodec
@@ -97,8 +109,10 @@ protected:
   void Prime();
 
   // Video format
-  int               m_decoded_width;
-  int               m_decoded_height;
+  unsigned int      m_decoded_width;
+  unsigned int      m_decoded_height;
+  unsigned int      m_decoded_aligned_width;
+  unsigned int      m_decoded_aligned_height;
   unsigned int      m_egl_buffer_count;
   bool              m_finished;
   float             m_aspect_ratio;
@@ -131,13 +145,13 @@ protected:
   MMAL_PORT_T *m_dec_input;
   MMAL_PORT_T *m_dec_output;
   MMAL_POOL_T *m_dec_input_pool;
-  MMAL_POOL_T *m_vout_input_pool;
 
   MMAL_ES_FORMAT_T *m_es_format;
   MMAL_COMPONENT_T *m_deint;
   MMAL_CONNECTION_T *m_deint_connection;
 
   MMAL_FOURCC_T m_codingType;
+  CMMALRenderer *m_renderer;
   bool change_dec_output_format();
 };
 
