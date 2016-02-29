@@ -27,6 +27,7 @@ $(PLATFORM): $(TARBALLS_LOCATION)/$(ARCHIVE) $(DEPS)
 ifeq ($(OS),android)
 	cd $(PLATFORM); patch -p1 < ../android.patch
 endif
+	cd $(PLATFORM); patch -p1 < ../bump_to_Nevcairie_v0.9.2.patch
 	cd $(PLATFORM); ./bootstrap
 	cd $(PLATFORM); $(CONFIGURE)
 
