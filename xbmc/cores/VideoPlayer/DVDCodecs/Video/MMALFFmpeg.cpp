@@ -372,6 +372,9 @@ bool CDecoder::GetPicture(AVCodecContext* avctx, AVFrame* frame, DVDVideoPicture
   if (!ret)
     return false;
 
+  if (frame->format != AV_PIX_FMT_YUV420P || frame->buf[1] != nullptr || frame->buf[0] == nullptr)
+    return false;
+
   MMAL_BUFFER_HEADER_T *mmal_buffer = GetMmal();
   if (!mmal_buffer)
     return false;
