@@ -36673,7 +36673,7 @@ index 5aa0432..ffd13ca 100644
 From 6cf5fc5f6384350149e237d0e08823fe6c7ef387 Mon Sep 17 00:00:00 2001
 From: John Cox <jc@kynesim.co.uk>
 Date: Tue, 9 Feb 2016 11:57:40 +0000
-Subject: [PATCH] Zero copy code v6
+Subject: [PATCH 1/2] Zero copy code v6
 
 This version has GPU buffer pooling code
 ---
@@ -38059,6 +38059,80 @@ index 0000000..f0109f4
 +
 +#endif
 +
+-- 
+2.5.0
+
+
+From c78c48e76e161f3c8a7d5a73f713359efe65fabd Mon Sep 17 00:00:00 2001
+From: John Cox <jc@kynesim.co.uk>
+Date: Tue, 1 Mar 2016 14:21:25 +0000
+Subject: [PATCH 2/2] Set VPU scheduling thread to high priority after creation
+
+---
+ libavcodec/rpi_qpu.c | 48 +++++++++++++++++++++++++++++++++++++++++++++++-
+ 1 file changed, 47 insertions(+), 1 deletion(-)
+
+diff --git a/libavcodec/rpi_qpu.c b/libavcodec/rpi_qpu.c
+index b0c9bc5..ee19231 100644
+--- a/libavcodec/rpi_qpu.c
++++ b/libavcodec/rpi_qpu.c
+@@ -182,9 +182,55 @@ static int gpu_init(volatile struct GPU **gpu) {
+     err = pthread_create(&vpu_thread, NULL, vpu_start, NULL);
+     //printf("Created thread\n");
+     if (err) {
+-        printf("Failed to create vpu thread\n");
++        av_log(NULL, AV_LOG_FATAL, "Failed to create vpu thread\n");
+         return -4;
+     }
++
++    {
++      struct sched_param param = {0};
++      int policy = 0;
++
++      if (pthread_getschedparam(vpu_thread, &policy, &param) != 0)
++      {
++        av_log(NULL, AV_LOG_ERROR, "Unable to get VPU thread scheduling parameters\n");
++      }
++      else
++      {
++        av_log(NULL, AV_LOG_INFO, "VPU thread: policy=%d (%s), pri=%d\n",
++            policy,
++            policy == SCHED_RR ? "RR" : policy == SCHED_FIFO ? "FIFO" : "???" ,
++            param.sched_priority);
++
++        policy = SCHED_FIFO;
++        param.sched_priority = sched_get_priority_max(SCHED_FIFO);
++
++        av_log(NULL, AV_LOG_INFO, "Attempt to set: policy=%d (%s), pri=%d\n",
++            policy,
++            policy == SCHED_RR ? "RR" : policy == SCHED_FIFO ? "FIFO" : "???" ,
++            param.sched_priority);
++
++        if (pthread_setschedparam(vpu_thread, policy, &param) != 0)
++        {
++          av_log(NULL, AV_LOG_ERROR, "Unable to set VPU thread scheduling parameters\n");
++        }
++        else
++        {
++          if (pthread_getschedparam(vpu_thread, &policy, &param) != 0)
++          {
++            av_log(NULL, AV_LOG_ERROR, "Unable to get VPU thread scheduling parameters\n");
++          }
++          else
++          {
++            av_log(NULL, AV_LOG_INFO, "VPU thread (after): policy=%d (%s), pri=%d\n",
++                policy,
++                policy == SCHED_RR ? "RR" : policy == SCHED_FIFO ? "FIFO" : "???" ,
++                param.sched_priority);
++          }
++        }
++      }
++
++    }
++
+   }
+ #endif
+ 
 -- 
 2.5.0
 
