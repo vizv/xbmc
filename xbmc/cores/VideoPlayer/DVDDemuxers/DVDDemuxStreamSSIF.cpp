@@ -83,7 +83,7 @@ DemuxPacket* CDVDDemuxStreamSSIF::MergePacket(DemuxPacket* &srcPkt, DemuxPacket*
 DemuxPacket* CDVDDemuxStreamSSIF::GetMVCPacket()
 {
   // if input is a bluray and mvc queue is empty let's fill mvc queue firstly
-  if (m_bluRay && m_MVCqueue.empty() && !m_H264queue.empty())
+  if (m_bluRay && m_MVCqueue.size() < 100 && !m_H264queue.empty())
   {
 #if defined(DEBUG_VERBOSE)
     CLog::Log(LOGDEBUG, ">>> MVC queue is empty. Filling...", m_MVCqueue.size(), m_H264queue.size());
@@ -174,11 +174,10 @@ bool CDVDDemuxStreamSSIF::FillMVCQueue(double dtsBase)
   if (!m_bluRay)
     return false;
 
-  int count = 0;
   bool found = (dtsBase == DVD_NOPTS_VALUE);
   CDVDDemux* demux = m_bluRay->GetDemuxMVC();
 
-  while (count < 100)
+  while (m_MVCqueue.size() < 100)
   {
     DemuxPacket* mvcPacket = demux->Read();
     if (!mvcPacket)
@@ -202,7 +201,6 @@ bool CDVDDemuxStreamSSIF::FillMVCQueue(double dtsBase)
     }
 
     AddMVCExtPacket(mvcPacket);
-    count++;
   };
 
   return found;
