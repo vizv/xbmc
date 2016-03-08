@@ -11,6 +11,9 @@
 #include "OverlayRenderer.h"
 
 #include <string>
+#include <vector>
+
+#define DEBUG_OVERLAY_COUNT_MAX 6
 
 class CDVDOverlayText;
 
@@ -19,7 +22,7 @@ class CDebugRenderer
 public:
   CDebugRenderer();
   virtual ~CDebugRenderer();
-  void SetInfo(std::string &info1, std::string &info2, std::string &info3, std::string &info4);
+  void SetInfo(std::vector<std::string> &infos);
   void Render(CRect &src, CRect &dst, CRect &view);
   void Flush();
 
@@ -32,7 +35,7 @@ protected:
     void Render(int idx) override;
   };
 
-  std::string m_strDebug[4];
-  CDVDOverlayText *m_overlay[4];
+  std::string m_strDebug[DEBUG_OVERLAY_COUNT_MAX];
+  CDVDOverlayText *m_overlay[DEBUG_OVERLAY_COUNT_MAX];
   CRenderer m_overlayRenderer;
 };
