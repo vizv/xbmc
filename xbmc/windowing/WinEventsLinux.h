@@ -24,6 +24,7 @@
 #pragma once
 #include "windowing/WinEvents.h"
 #include "input/linux/LinuxInputDevices.h"
+#include "guilib/TextureManager.h"
 
 class CWinEventsLinux : public IWinEvents
 {
@@ -43,6 +44,16 @@ public:
 private:
   static bool m_initialized;
   static CLinuxInputDevices m_devices;
+#ifdef TARGET_RASPBERRY_PI
+  bool LoadXML(const std::string strFileName);
+  int64_t m_last_mouse_move_time;
+  struct
+  {
+    std::string m_filename;
+    CTextureArray m_texture;
+  } m_cursors[4];
+  int m_mouse_state;
+#endif
 };
 
 #endif
