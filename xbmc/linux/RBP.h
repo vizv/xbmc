@@ -96,6 +96,7 @@ public:
   AVRpiZcFrameGeometry GetFrameGeometry(uint32_t encoding, unsigned short video_width, unsigned short video_height);
   double AdjustHDMIClock(double adjust);
   double GetAdjustHDMIClock() { return m_actual_pll_adjust; }
+  int GenCmd(char *response, int maxlen, const char *string);
 
   void SuspendVideoOutput();
   void ResumeVideoOutput();
