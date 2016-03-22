@@ -134,6 +134,7 @@ bool CWinEventsLinux::MessagePump()
   if (!m_initialized)
   {
     m_devices.InitAvailable();
+    m_checkHotplug = std::unique_ptr<CLinuxInputDevicesCheckHotplugged>(new CLinuxInputDevicesCheckHotplugged(m_devices));
     m_initialized = true;
 #ifdef TARGET_RASPBERRY_PI
     LoadXML("Pointer.xml");
