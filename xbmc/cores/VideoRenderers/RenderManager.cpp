@@ -244,7 +244,7 @@ bool CXBMCRenderManager::Configure(unsigned int width, unsigned int height, unsi
   CSingleLock    lock2(m_presentlock);
 
   /* make sure any queued frame was fully presented */
-  XbmcThreads::EndTime endtime(5000);
+  XbmcThreads::EndTime endtime(10000);
   while(m_presentstep != PRESENT_IDLE && m_presentstep != PRESENT_READY)
   {
     if(endtime.IsTimePast())
