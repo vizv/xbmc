@@ -66,6 +66,7 @@ CPowerManager g_powerManager;
 CPowerManager::CPowerManager()
 {
   m_instance = NULL;
+  m_suspended = false;
 }
 
 CPowerManager::~CPowerManager()
@@ -271,20 +272,21 @@ void CPowerManager::OnSleep()
   g_application.StopScreenSaverTimer();
   g_application.CloseNetworkShares();
   CServiceBroker::GetActiveAE().Suspend();
+  if (dialog)
+    dialog->Close();
+
+  m_suspended = true;
 }
 
 void CPowerManager::OnWake()
 {
+  m_suspended = false;
   CLog::Log(LOGNOTICE, "%s: Running resume jobs", __FUNCTION__);
 
   g_application.getNetwork().WaitForNet();
 
   // reset out timers
   g_application.ResetShutdownTimers();
-
-  CGUIDialogBusy* dialog = g_windowManager.GetWindow<CGUIDialogBusy>(WINDOW_DIALOG_BUSY);
-  if (dialog)
-    dialog->Close(true); // force close. no closing animation, sound etc at this early stage
 
 #if defined(HAS_SDL) || defined(TARGET_WINDOWS)
   if (g_Windowing.IsFullScreen())
