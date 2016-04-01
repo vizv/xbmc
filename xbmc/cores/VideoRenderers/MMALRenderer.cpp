@@ -529,7 +529,7 @@ void CMMALRenderer::RenderUpdate(bool clear, DWORD flags, DWORD alpha)
         return;
       omvb->Acquire();
       omvb->mmal_buffer->flags |= MMAL_BUFFER_HEADER_FLAG_USER1 | MMAL_BUFFER_HEADER_FLAG_USER2;
-      if (!CSettings::GetInstance().GetBool("videoplayer.usedisplayasclock"))
+      if (!CSettings::GetInstance().GetBool("videoplayer.usedisplayasclock") && m_fps > 0.0f)
         mmal_queue_put(m_queue, omvb->mmal_buffer);
       else
         mmal_port_send_buffer(m_vout_input, omvb->mmal_buffer);
@@ -551,7 +551,7 @@ void CMMALRenderer::RenderUpdate(bool clear, DWORD flags, DWORD alpha)
       omvb->Acquire();
       omvb->mmal_buffer->flags |= MMAL_BUFFER_HEADER_FLAG_USER1 | MMAL_BUFFER_HEADER_FLAG_USER2;
       omvb->mmal_buffer->user_data = omvb;
-      if (!CSettings::GetInstance().GetBool("videoplayer.usedisplayasclock"))
+      if (!CSettings::GetInstance().GetBool("videoplayer.usedisplayasclock") && m_fps > 0.0f)
         mmal_queue_put(m_queue, omvb->mmal_buffer);
       else
         mmal_port_send_buffer(m_vout_input, omvb->mmal_buffer);
