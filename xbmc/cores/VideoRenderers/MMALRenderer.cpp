@@ -245,6 +245,7 @@ CMMALRenderer::CMMALRenderer() : CThread("MMALRenderer")
   m_inflight = 0;
   m_sharpness = -2.0f;
   m_queue = mmal_queue_create();
+  m_error = 0.0;
   Create();
 }
 
