@@ -113,6 +113,7 @@ public:
   virtual std::string GetStereoMode() = 0;
   virtual void SetSpeed(int iSpeed) = 0;
   virtual bool IsEOS() { return false; };
+  virtual bool SupportsExtention() const = 0;
 };
 
 class CDVDAudioCodec;

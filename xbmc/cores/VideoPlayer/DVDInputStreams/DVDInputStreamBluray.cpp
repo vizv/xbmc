@@ -741,6 +741,13 @@ void CDVDInputStreamBluray::ProcessEvent() {
   }
 }
 
+void CDVDInputStreamBluray::DisableExtention()
+{
+  CloseMVCDemux();
+  m_bMVCDisabled = true;
+  m_bMVCPlayback = false;
+}
+
 int CDVDInputStreamBluray::Read(uint8_t* buf, int buf_size)
 {
   int result = 0;
@@ -1295,7 +1302,7 @@ bool CDVDInputStreamBluray::ProcessItem(int playitem)
   
   m_title = m_dll->bd_get_playlist_info(m_bd, playitem, m_angle);
 
-  if (CSettings::GetInstance().GetBool("videoplayer.supportmvc"))
+  if (CSettings::GetInstance().GetBool("videoplayer.supportmvc") && !m_bMVCDisabled)
   {
     MPLS_PL * mpls = m_dll->bd_get_title_mpls(m_bd);
     if (mpls)
