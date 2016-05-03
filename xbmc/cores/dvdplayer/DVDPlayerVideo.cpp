@@ -978,12 +978,8 @@ int CDVDPlayerVideo::OutputPicture(const DVDVideoPicture* src, double pts)
 
 #ifdef HAS_VIDEO_PLAYBACK
   double config_framerate = m_bFpsInvalid ? 0.0 : m_fFrameRate;
-  double render_framerate = g_graphicsContext.GetFPS();
-  if (CSettings::GetInstance().GetInt(CSettings::SETTING_VIDEOPLAYER_ADJUSTREFRESHRATE) == ADJUST_REFRESHRATE_OFF)
-    render_framerate = config_framerate;
   bool changerefresh = !m_bFpsInvalid &&
-                       (m_output.framerate == 0.0 || fmod(m_output.framerate, config_framerate) != 0.0) &&
-                       (render_framerate != config_framerate);
+                       (m_output.framerate == 0.0 || fmod(m_output.framerate, config_framerate) != 0.0);
 
   /* check so that our format or aspect has changed. if it has, reconfigure renderer */
   if (!g_renderManager.IsConfigured()
