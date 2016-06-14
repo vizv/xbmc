@@ -73,7 +73,7 @@ void CRBP::InitializeSettings()
 
 bool CRBP::Initialize()
 {
-  CSingleLock lock (m_critSection);
+  CSingleLock lock(m_critSection);
   if (m_initialized)
     return true;
 
@@ -135,6 +135,7 @@ void CRBP::LogFirmwareVerison()
 
 DISPMANX_DISPLAY_HANDLE_T CRBP::OpenDisplay(uint32_t device)
 {
+  CSingleLock lock(m_critSection);
   if (m_display == DISPMANX_NO_HANDLE)
   {
     m_display = vc_dispmanx_display_open( 0 /*screen*/ );
@@ -145,16 +146,19 @@ DISPMANX_DISPLAY_HANDLE_T CRBP::OpenDisplay(uint32_t device)
 
 void CRBP::CloseDisplay(DISPMANX_DISPLAY_HANDLE_T display)
 {
+  CSingleLock lock(m_critSection);
+  uninit_cursor();
   assert(display == m_display);
   vc_dispmanx_display_close(m_display);
   m_display = DISPMANX_NO_HANDLE;
-  uninit_cursor();
+  m_last_pll_adjust = 1.0;
 }
 
 void CRBP::GetDisplaySize(int &width, int &height)
 {
+  CSingleLock lock(m_critSection);
   DISPMANX_MODEINFO_T info;
-  if (vc_dispmanx_display_get_info(m_display, &info) == 0)
+  if (m_display != DISPMANX_NO_HANDLE && vc_dispmanx_display_get_info(m_display, &info) == 0)
   {
     width = info.width;
     height = info.height;
@@ -183,13 +187,13 @@ unsigned char *CRBP::CaptureDisplay(int width, int height, int *pstride, bool sw
     flags |= DISPMANX_SNAPSHOT_PACK;
 
   stride = ((width + 15) & ~15) * 4;
-  image = new unsigned char [height * stride];
 
-  if (image)
+  CSingleLock lock(m_critSection);
+  if (m_display != DISPMANX_NO_HANDLE)
   {
+    image = new unsigned char [height * stride];
     resource = vc_dispmanx_resource_create( VC_IMAGE_RGBA32, width, height, &vc_image_ptr );
 
-    assert(m_display != DISPMANX_NO_HANDLE);
     vc_dispmanx_snapshot(m_display, resource, (DISPMANX_TRANSFORM_T)flags);
 
     vc_dispmanx_rect_set(&rect, 0, 0, width, height);
@@ -229,7 +233,6 @@ void CRBP::WaitVsync()
   vc_dispmanx_display_close( m_display );
 }
 
-
 void CRBP::Deinitialize()
 {
   if (m_omx_image_init)
@@ -256,17 +259,6 @@ void CRBP::Deinitialize()
     mbox_close(m_mb);
   m_mb = 0;
   vcsm_exit();
-}
-
-double CRBP::AdjustHDMIClock(double adjust)
-{
-  char response[80];
-  vc_gencmd(response, sizeof response, "hdmi_adjust_clock %f", adjust);
-  char *p = strchr(response, '=');
-  if (p)
-    m_last_pll_adjust = atof(p+1);
-  CLog::Log(LOGDEBUG, "CRBP::%s(%.4f) = %.4f", __func__, adjust, m_last_pll_adjust);
-  return m_last_pll_adjust;
 }
 
 static int mbox_property(int file_desc, void *buf)
@@ -489,6 +481,17 @@ void CRBP::uninit_cursor()
   if (!m_mb || !m_p || !m_p->m_arm || !m_p->m_vc)
     return;
   mailbox_set_cursor_position(m_mb, 0, 0, 0);
+}
+
+double CRBP::AdjustHDMIClock(double adjust)
+{
+  char response[80];
+  vc_gencmd(response, sizeof response, "hdmi_adjust_clock %f", adjust);
+  char *p = strchr(response, '=');
+  if (p)
+    m_last_pll_adjust = atof(p+1);
+  CLog::Log(LOGDEBUG, "CRBP::%s(%.4f) = %.4f", __func__, adjust, m_last_pll_adjust);
+  return m_last_pll_adjust;
 }
 
 #endif
