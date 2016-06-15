@@ -159,7 +159,7 @@ bool CWinEventsLinux::MessagePump()
     int state = CInputManager::GetInstance().GetMouseState() - 1;
     if (m_mouse_state != state)
     {
-      if (state >= 0 && state < (int)(sizeof m_cursors/sizeof *m_cursors))
+      if (state >= 0 && state < (int)(sizeof m_cursors/sizeof *m_cursors) && !m_cursors[state].m_texture.m_textures.empty())
       {
         CBaseTexture *t = (m_cursors[state].m_texture.m_textures)[0];
         if (t)
