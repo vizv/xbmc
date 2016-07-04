@@ -21,7 +21,7 @@ endif()
 find_path(EGL_INCLUDE_DIR EGL/egl.h
                           PATHS ${PC_EGL_INCLUDEDIR})
 
-find_library(EGL_LIBRARY NAMES EGL egl
+find_library(EGL_LIBRARY NAMES EGL egl brcmegl
                          PATHS ${PC_EGL_LIBDIR})
 
 set(EGL_VERSION ${PC_EGL_VERSION})

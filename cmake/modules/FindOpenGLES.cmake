@@ -17,7 +17,7 @@ endif()
 if(NOT CORE_SYSTEM_NAME STREQUAL ios)
   find_path(OPENGLES_INCLUDE_DIR GLES2/gl2.h
                                  PATHS ${PC_OPENGLES_INCLUDEDIR})
-  find_library(OPENGLES_gl_LIBRARY NAMES GLESv2
+  find_library(OPENGLES_gl_LIBRARY NAMES GLESv2 brcmGLESv2
                                    PATHS ${PC_OPENGLES_LIBDIR})
 else()
   find_library(OPENGLES_gl_LIBRARY NAMES OpenGLES
