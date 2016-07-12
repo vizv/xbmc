@@ -52,8 +52,8 @@ foreach(binding ${bindings})
 endforeach()
 
 ### processing additional tools required by the platform
-if(EXISTS ${APP_ROOT}/project/cmake/scripts/${CORE_SYSTEM_NAME}/tools/)
-  file(GLOB platform_tools ${APP_ROOT}/project/cmake/scripts/${CORE_SYSTEM_NAME}/tools/*.cmake)
+if(EXISTS ${CORE_SOURCE_DIR}/project/cmake/scripts/${CORE_SYSTEM_NAME}/tools/)
+  file(GLOB platform_tools ${CORE_SOURCE_DIR}/project/cmake/scripts/${CORE_SYSTEM_NAME}/tools/*.cmake)
   foreach(platform_tool ${platform_tools})
     get_filename_component(platform_tool_name ${platform_tool} NAME_WE)
     message(STATUS "Processing ${CORE_SYSTEM_NAME} specific tool: ${platform_tool_name}")
