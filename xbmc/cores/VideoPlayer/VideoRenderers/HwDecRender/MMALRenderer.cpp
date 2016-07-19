@@ -554,6 +554,7 @@ CMMALRenderer::CMMALRenderer() : CThread("MMALRenderer"), m_processThread(this, 
   m_frameInterval = 0.0;
   m_frameIntervalDiff = 1e5;
   m_vsync_count = ~0U;
+  m_sharpness = -2.0f;
   m_vout_width = 0;
   m_vout_height = 0;
   m_vout_aligned_width = 0;
@@ -951,6 +952,15 @@ void CMMALRenderer::RenderUpdate(bool clear, DWORD flags, DWORD alpha)
     goto exit;
   }
 
+  // if sharpness setting has changed, we should update it
+  if (m_sharpness != CMediaSettings::GetInstance().GetCurrentVideoSettings().m_Sharpness)
+  {
+    m_sharpness = CMediaSettings::GetInstance().GetCurrentVideoSettings().m_Sharpness;
+    char command[80], response[80];
+    sprintf(command, "scaling_sharpness %d", ((int)(50.0f * (m_sharpness + 1.0f) + 0.5f)));
+    vc_gencmd(response, sizeof response, command);
+  }
+
   if (omvb && omvb->mmal_buffer)
   {
     if (flags & RENDER_FLAG_TOP)
@@ -1084,7 +1094,8 @@ bool CMMALRenderer::Supports(ERENDERFEATURE feature)
       feature == RENDERFEATURE_ZOOM            ||
       feature == RENDERFEATURE_ROTATION        ||
       feature == RENDERFEATURE_VERTICAL_SHIFT  ||
-      feature == RENDERFEATURE_PIXEL_RATIO)
+      feature == RENDERFEATURE_PIXEL_RATIO     ||
+      feature == RENDERFEATURE_SHARPNESS)
     return true;
 
   return false;
