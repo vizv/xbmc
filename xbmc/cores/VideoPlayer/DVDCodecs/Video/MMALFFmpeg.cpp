@@ -60,7 +60,9 @@ CMMALYUVBuffer::CMMALYUVBuffer(std::shared_ptr<CMMALPool> pool, uint32_t mmal_en
     size_pic = (m_aligned_width * m_aligned_height * 3) >> 1;
   else if (m_encoding == MMAL_ENCODING_ARGB || m_encoding == MMAL_ENCODING_RGBA || m_encoding == MMAL_ENCODING_ABGR || m_encoding == MMAL_ENCODING_BGRA)
     size_pic = (m_aligned_width << 2) * m_aligned_height;
-  else if (m_encoding == MMAL_ENCODING_RGB16)
+  else if (m_encoding == MMAL_ENCODING_RGB24 || m_encoding == MMAL_ENCODING_BGR24)
+    size_pic = (m_aligned_width << 2) * m_aligned_height;
+  else if (m_encoding == MMAL_ENCODING_RGB16 || m_encoding == MMAL_ENCODING_BGR16)
     size_pic = (m_aligned_width << 1) * m_aligned_height;
   else assert(0);
   if (size)
@@ -145,7 +147,7 @@ int CDecoder::FFGetBuffer(AVCodecContext *avctx, AVFrame *frame, int flags)
     return avcodec_default_get_buffer2(avctx, frame, flags);
   }
 
-  uint32_t mmal_format = 0;
+  uint32_t mmal_format = MMAL_ENCODING_UNKNOWN;
   if (dec->m_fmt == AV_PIX_FMT_YUV420P)
     mmal_format = MMAL_ENCODING_I420;
   else if (dec->m_fmt == AV_PIX_FMT_ARGB)
@@ -154,11 +156,17 @@ int CDecoder::FFGetBuffer(AVCodecContext *avctx, AVFrame *frame, int flags)
     mmal_format = MMAL_ENCODING_RGBA;
   else if (dec->m_fmt == AV_PIX_FMT_ABGR)
     mmal_format = MMAL_ENCODING_ABGR;
-  else if (dec->m_fmt == AV_PIX_FMT_BGRA)
+  else if (dec->m_fmt == AV_PIX_FMT_BGRA || dec->m_fmt == AV_PIX_FMT_BGR0)
     mmal_format = MMAL_ENCODING_BGRA;
-  else if (dec->m_fmt == AV_PIX_FMT_RGB565LE)
+  else if (dec->m_fmt == AV_PIX_FMT_RGB24)
+    mmal_format = MMAL_ENCODING_RGB24;
+  else if (dec->m_fmt == AV_PIX_FMT_BGR24)
+    mmal_format = MMAL_ENCODING_BGR24;
+  else if (dec->m_fmt == AV_PIX_FMT_RGB565 || dec->m_fmt == AV_PIX_FMT_RGB565LE)
     mmal_format = MMAL_ENCODING_RGB16;
-  if (mmal_format ==  0)
+  else if (dec->m_fmt == AV_PIX_FMT_BGR565)
+    mmal_format = MMAL_ENCODING_BGR16;
+  if (mmal_format ==  MMAL_ENCODING_UNKNOWN)
     return -1;
 
   dec->m_pool->SetFormat(mmal_format, frame->width, frame->height, frame->width, frame->height, 0, dec->m_avctx);
@@ -196,13 +204,14 @@ int CDecoder::FFGetBuffer(AVCodecContext *avctx, AVFrame *frame, int flags)
     frame->data[1] = frame->data[0] + YUVBuffer->m_aligned_width * YUVBuffer->m_aligned_height;
     frame->data[2] = frame->data[1] + (YUVBuffer->m_aligned_width>>1) * (YUVBuffer->m_aligned_height>>1);
   }
-  else if (dec->m_fmt == AV_PIX_FMT_BGR0)
+  else if (dec->m_fmt == AV_PIX_FMT_ARGB || dec->m_fmt == AV_PIX_FMT_RGBA || dec->m_fmt == AV_PIX_FMT_ABGR ||
+      dec->m_fmt == AV_PIX_FMT_BGRA || dec->m_fmt == AV_PIX_FMT_BGR0 || dec->m_fmt == AV_PIX_FMT_RGB24 || dec->m_fmt == AV_PIX_FMT_BGR24)
   {
     frame->buf[0] = buf;
     frame->linesize[0] = YUVBuffer->m_aligned_width << 2;
     frame->data[0] = (uint8_t *)gmem->m_arm;
   }
-  else if (dec->m_fmt == AV_PIX_FMT_RGB565LE)
+  else if (dec->m_fmt == AV_PIX_FMT_RGB565 || dec->m_fmt == AV_PIX_FMT_RGB565LE)
   {
     frame->buf[0] = buf;
     frame->linesize[0] = YUVBuffer->m_aligned_width << 1;
