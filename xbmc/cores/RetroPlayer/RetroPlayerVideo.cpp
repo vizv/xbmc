@@ -22,6 +22,8 @@
 #include "RetroPlayerDefines.h"
 #include "PixelConverter.h"
 #include "cores/VideoPlayer/DVDCodecs/Video/DVDVideoCodec.h"
+#include "cores/VideoPlayer/DVDCodecs/Video/DVDVideoCodecFFmpeg.h"
+#include "cores/VideoPlayer/DVDCodecs/DVDCodecUtils.h"
 #include "cores/VideoPlayer/DVDCodecs/DVDFactoryCodec.h"
 #include "cores/VideoPlayer/DVDDemuxers/DVDDemux.h"
 #include "cores/VideoPlayer/VideoRenderers/RenderFlags.h"
@@ -56,13 +58,20 @@ bool CRetroPlayerVideo::OpenPixelStream(AVPixelFormat pixfmt, unsigned int width
 {
   CLog::Log(LOGINFO, "RetroPlayerVideo: Creating video stream with pixel format: %i, %dx%d", pixfmt, width, height);
 
+  m_processInfo.ResetVideoCodecInfo();
   m_framerate = framerate;
   m_orientation = orientationDeg;
   m_bConfigured = false;
   m_droppedFrames = 0;
   m_pixelConverter.reset(new CPixelConverter);
+
   if (m_pixelConverter->Open(pixfmt, AV_PIX_FMT_YUV420P, width, height))
+  {
+    m_processInfo.SetVideoPixelFormat(CDVDVideoCodecFFmpeg::GetPixelFormatName(pixfmt));
+    m_processInfo.SetVideoDimensions(width, height);
+    m_processInfo.SetVideoFps(static_cast<float>(framerate));
     return true;
+  }
 
   m_pixelConverter.reset();
 
@@ -71,6 +80,8 @@ bool CRetroPlayerVideo::OpenPixelStream(AVPixelFormat pixfmt, unsigned int width
 
 bool CRetroPlayerVideo::OpenEncodedStream(AVCodecID codec)
 {
+  m_processInfo.ResetVideoCodecInfo();
+
   CDemuxStreamVideo videoStream;
 
   // Stream
@@ -131,6 +142,16 @@ bool CRetroPlayerVideo::Configure(DVDVideoPicture& picture)
     const int buffers = 1; // TODO
 
     m_bConfigured = m_renderManager.Configure(picture, static_cast<float>(m_framerate), flags, m_orientation, buffers);
+
+    if (m_bConfigured)
+    {
+      // Update process info
+      AVPixelFormat pixfmt = static_cast<AVPixelFormat>(CDVDCodecUtils::PixfmtFromEFormat(picture.format));
+      if (pixfmt != AV_PIX_FMT_NONE)
+        m_processInfo.SetVideoPixelFormat(CDVDVideoCodecFFmpeg::GetPixelFormatName(pixfmt));
+      m_processInfo.SetVideoDimensions(picture.iWidth, picture.iHeight);
+      m_processInfo.SetVideoFps(static_cast<float>(m_framerate));
+    }
   }
 
   return m_bConfigured;
