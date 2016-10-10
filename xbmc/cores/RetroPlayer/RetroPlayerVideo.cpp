@@ -21,6 +21,7 @@
 #include "RetroPlayerVideo.h"
 #include "RetroPlayerDefines.h"
 #include "PixelConverter.h"
+#include "PixelConverterRBP.h"
 #include "cores/VideoPlayer/DVDCodecs/Video/DVDVideoCodec.h"
 #include "cores/VideoPlayer/DVDCodecs/Video/DVDVideoCodecFFmpeg.h"
 #include "cores/VideoPlayer/DVDCodecs/DVDCodecUtils.h"
@@ -63,7 +64,12 @@ bool CRetroPlayerVideo::OpenPixelStream(AVPixelFormat pixfmt, unsigned int width
   m_orientation = orientationDeg;
   m_bConfigured = false;
   m_droppedFrames = 0;
+
+#ifdef TARGET_RASPBERRY_PI
+  m_pixelConverter.reset(new CPixelConverterRBP);
+#else
   m_pixelConverter.reset(new CPixelConverter);
+#endif
 
   if (m_pixelConverter->Open(pixfmt, AV_PIX_FMT_YUV420P, width, height))
   {

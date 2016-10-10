@@ -1,4 +1,5 @@
 SRCS=PixelConverter.cpp \
+     PixelConverterRBP.cpp \
      RetroPlayer.cpp \
      RetroPlayerAudio.cpp \
      RetroPlayerVideo.cpp

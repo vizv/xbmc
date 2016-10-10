@@ -261,6 +261,8 @@
 		6838CF821D6665510057F17B /* DeadzoneFilter.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 6838CF7F1D6665510057F17B /* DeadzoneFilter.cpp */; };
 		6861B9EA1CC248EE00F62655 /* DriverReceiving.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 6861B9E81CC248EE00F62655 /* DriverReceiving.cpp */; };
 		6861B9EB1CC248EE00F62655 /* DriverReceiving.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 6861B9E81CC248EE00F62655 /* DriverReceiving.cpp */; };
+		68636A301DAC806A00ED3386 /* PixelConverterRBP.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 68636A2E1DAC806A00ED3386 /* PixelConverterRBP.cpp */; };
+		68636A311DAC806A00ED3386 /* PixelConverterRBP.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 68636A2E1DAC806A00ED3386 /* PixelConverterRBP.cpp */; };
 		687225381D568F4F0015E459 /* GameUtils.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 687225361D568F4F0015E459 /* GameUtils.cpp */; };
 		687225391D568F4F0015E459 /* GameUtils.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 687225361D568F4F0015E459 /* GameUtils.cpp */; };
 		68766B071DAC5F1C000E1F2D /* SavestateTranslator.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 68766B051DAC5F1C000E1F2D /* SavestateTranslator.cpp */; };
@@ -2848,6 +2850,9 @@
 		6861B9E91CC248EE00F62655 /* DriverReceiving.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = DriverReceiving.h; path = joysticks/generic/DriverReceiving.h; sourceTree = "<group>"; };
 		6861B9EC1CC248F600F62655 /* IDriverReceiver.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = IDriverReceiver.h; path = joysticks/IDriverReceiver.h; sourceTree = "<group>"; };
 		6861B9ED1CC248F600F62655 /* IInputReceiver.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = IInputReceiver.h; path = joysticks/IInputReceiver.h; sourceTree = "<group>"; };
+		68636A2D1DAC805D00ED3386 /* IPixelConverter.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = IPixelConverter.h; path = RetroPlayer/IPixelConverter.h; sourceTree = "<group>"; };
+		68636A2E1DAC806A00ED3386 /* PixelConverterRBP.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = PixelConverterRBP.cpp; path = RetroPlayer/PixelConverterRBP.cpp; sourceTree = "<group>"; };
+		68636A2F1DAC806A00ED3386 /* PixelConverterRBP.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = PixelConverterRBP.h; path = RetroPlayer/PixelConverterRBP.h; sourceTree = "<group>"; };
 		687225361D568F4F0015E459 /* GameUtils.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = GameUtils.cpp; path = games/GameUtils.cpp; sourceTree = "<group>"; };
 		687225371D568F4F0015E459 /* GameUtils.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = GameUtils.h; path = games/GameUtils.h; sourceTree = "<group>"; };
 		68766B051DAC5F1C000E1F2D /* SavestateTranslator.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = SavestateTranslator.cpp; path = games/addons/savestates/SavestateTranslator.cpp; sourceTree = "<group>"; };
@@ -6591,8 +6596,11 @@
 		68D77D5F1CD1C841004C1735 /* RetroPlayer */ = {
 			isa = PBXGroup;
 			children = (
+				68636A2D1DAC805D00ED3386 /* IPixelConverter.h */,
 				68D77D601CD1C86B004C1735 /* PixelConverter.cpp */,
 				68D77D611CD1C86B004C1735 /* PixelConverter.h */,
+				68636A2E1DAC806A00ED3386 /* PixelConverterRBP.cpp */,
+				68636A2F1DAC806A00ED3386 /* PixelConverterRBP.h */,
 				68D77D621CD1C86B004C1735 /* RetroPlayer.cpp */,
 				68D77D631CD1C86B004C1735 /* RetroPlayer.h */,
 				68D77D641CD1C86B004C1735 /* RetroPlayerAudio.cpp */,
@@ -10720,6 +10728,7 @@
 				18B7C938129428CA009E7A26 /* SmartPlayList.cpp in Sources */,
 				18B7C97C1294380A009E7A26 /* GUIWindowAddonBrowser.cpp in Sources */,
 				EDED2E911C878EB8000F5E80 /* AddonCallbacksAudioEngine.cpp in Sources */,
+				68636A301DAC806A00ED3386 /* PixelConverterRBP.cpp in Sources */,
 				18B7C9831294385F009E7A26 /* XMLUtils.cpp in Sources */,
 				68D77D461CD1C7F3004C1735 /* GameClientReversiblePlayback.cpp in Sources */,
 				432D7CE412D86DA500CE4C49 /* NetworkLinux.cpp in Sources */,
@@ -11421,6 +11430,7 @@
 				E49911F4174E5D3E00741B6D /* DVDSubtitleTagSami.cpp in Sources */,
 				E49911F5174E5D4500741B6D /* DVDAudio.cpp in Sources */,
 				E49911F6174E5D4500741B6D /* DVDClock.cpp in Sources */,
+				68636A311DAC806A00ED3386 /* PixelConverterRBP.cpp in Sources */,
 				E49911F7174E5D4500741B6D /* DVDDemuxSPU.cpp in Sources */,
 				E49911F8174E5D4500741B6D /* DVDFileInfo.cpp in Sources */,
 				E49911F9174E5D4500741B6D /* DVDMessage.cpp in Sources */,
