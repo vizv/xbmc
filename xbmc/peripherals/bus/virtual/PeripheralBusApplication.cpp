@@ -61,6 +61,11 @@ bool CPeripheralBusApplication::PerformDeviceScan(PeripheralScanResults& results
   return true;
 }
 
+void CPeripheralBusApplication::GetDirectory(const std::string &strPath, CFileItemList &items) const
+{
+  // Don't list emulated joysticks in the GUI
+}
+
 std::string CPeripheralBusApplication::MakeLocation(unsigned int controllerIndex) const
 {
   return StringUtils::Format("%u", controllerIndex);

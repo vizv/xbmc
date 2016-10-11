@@ -37,6 +37,7 @@ namespace PERIPHERALS
 
     // implementation of CPeripheralBus
     virtual void Initialise(void) override;
+    virtual void GetDirectory(const std::string &strPath, CFileItemList &items) const override;
 
     /*!
      * \brief Get the location for the specified controller index
