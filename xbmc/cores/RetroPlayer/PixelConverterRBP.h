@@ -20,7 +20,6 @@
 #pragma once
 
 #include "PixelConverter.h"
-#include "cores/VideoPlayer/VideoRenderers/RenderFormats.h"
 
 #include <stdint.h>
 #include <vector>

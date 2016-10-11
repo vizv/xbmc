@@ -19,14 +19,11 @@
  */
 #pragma once
 
-#include "cores/VideoPlayer/VideoRenderers/RenderFormats.h"
-
 #include "libavutil/pixfmt.h"
 
 #include <stdint.h>
 
 struct DVDVideoPicture;
-struct SwsContext;
 
 class IPixelConverter
 {
