@@ -111,6 +111,9 @@ void CGUIConfigurationWizard::Process(void)
         // Wait for input
         {
           CSingleExit exit(m_stateMutex);
+
+          CLog::Log(LOGDEBUG, "%s: Waiting for input for feature \"%s\"", m_strControllerId.c_str(), button->Feature().Name().c_str());
+
           if (!button->PromptForInput(m_inputEvent))
             Abort(false);
         }
@@ -167,6 +170,9 @@ bool CGUIConfigurationWizard::MapPrimitive(JOYSTICK::IButtonMap* buttonMap, cons
     if (currentButton)
     {
       const CControllerFeature& feature = currentButton->Feature();
+
+      CLog::Log(LOGDEBUG, "%s: mapping feature \"%s\"", m_strControllerId.c_str(), feature.Name().c_str());
+
       switch (feature.Type())
       {
         case FEATURE_TYPE::SCALAR:
