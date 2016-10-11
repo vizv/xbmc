@@ -431,7 +431,7 @@ void CPeripheralBusAddon::UpdateAddons(void)
 
     if (erased)
     {
-      CSingleExit exit(this->m_critSection);
+      CSingleExit exit(m_critSection);
       erased->Destroy();
     }
   }
