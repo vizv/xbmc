@@ -41,7 +41,7 @@ public:
   virtual bool Open(AVPixelFormat pixfmt, AVPixelFormat target, unsigned int width, unsigned int height) = 0;
 
   /*!
-   * \brief Release the resource used by this class
+   * \brief Release the resources used by this class
    */
   virtual void Dispose() = 0;
 
