@@ -18,8 +18,6 @@
  *
  */
 
-#if defined(TARGET_RASPBERRY_PI) // TODO: Move check to build systems
-
 #include "PixelConverterRBP.h"
 #include "cores/VideoPlayer/DVDClock.h"
 #include "cores/VideoPlayer/VideoRenderers/HwDecRender/MMALRenderer.h"
@@ -230,5 +228,3 @@ uint32_t CPixelConverterRBP::TranslateFormat(AVPixelFormat pixfmt)
   }
   return MMAL_ENCODING_UNKNOWN;
 }
-
-#endif

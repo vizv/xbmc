@@ -1,8 +1,11 @@
 SRCS=PixelConverter.cpp \
-     PixelConverterRBP.cpp \
      RetroPlayer.cpp \
      RetroPlayerAudio.cpp \
      RetroPlayerVideo.cpp
+
+ifeq (@CORE_SYSTEM_NAME@,rbpi)
+  SRCS += PixelConverterRBP.cpp
+endif
 
 LIB=retroplayer.a
 
