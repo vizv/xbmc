@@ -219,6 +219,6 @@ void CRetroPlayerVideo::SendPicture(DVDVideoPicture& picture)
   }
   else
   {
-    m_renderManager.FlipPage(bAbortOutput, 0.0, VS_INTERLACEMETHOD_NONE, FS_NONE);
+    m_renderManager.FlipPage(bAbortOutput, 0.0, VS_INTERLACEMETHOD_NONE, FS_NONE, false);
   }
 }
