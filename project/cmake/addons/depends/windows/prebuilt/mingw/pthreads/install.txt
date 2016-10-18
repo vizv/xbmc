@@ -1,3 +1,0 @@
-include/* mingw/include
-lib/* mingw/lib
-bin/* mingw/bin

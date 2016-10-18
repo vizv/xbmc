@@ -2,23 +2,19 @@ if(EXISTS "${INPUTFILE}")
   # if there's an input file we use it to determine which files to copy where
   file(STRINGS ${INPUTFILE} FILES)
   string(REPLACE "\n" ";" FILES "${FILES}")
-
   foreach(file ${FILES})
     string(REPLACE " " ";" file "${file}")
     list(GET file 0 dir)
     list(GET file 1 dest)
-
     list(LENGTH file deflength)
     if(deflength GREATER 2)
-      list(GET file 2 move)
+      list(GET file 2 copy)
     endif()
-
     file(GLOB files ${INPUTDIR}/${dir})
     foreach(instfile ${files})
       file(COPY ${instfile} DESTINATION ${DESTDIR}/${dest})
-
-      if(move)
-        file(RENAME ${instfile} ${DESTDIR}/${move})
+      if(copy)
+        file(COPY ${instfile} DESTINATION ${DESTDIR}/${copy})
       endif()
     endforeach()
   endforeach()

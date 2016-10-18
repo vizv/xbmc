@@ -1,3 +1,0 @@
-*.ico msys
-bin/* msys/bin
-etc/* msys/etc

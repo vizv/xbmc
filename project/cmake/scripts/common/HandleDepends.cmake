@@ -1,32 +1,11 @@
 include(${CORE_SOURCE_DIR}/project/cmake/scripts/common/CheckTargetPlatform.cmake)
 
-# exclude all sub-directories and files of a given directory from the list of files
-function(exclude_directory_from_list file_list excluded_directory resulting_list)
-  # list file_list: original list of files
-  # string excluded_directory: directory to be excluded
-  # string resulting_list: variable name where the resulting list should be stored
-
-  foreach(file ${file_list})
-    if("${file}" MATCHES "(.*)${excluded_directory}(.*)")
-      list (REMOVE_ITEM file_list ${file})
-    endif()
-  endforeach()
-
-  set(${resulting_list} ${file_list} PARENT_SCOPE)
-endfunction()
-
 # handle addon depends
 function(add_addon_depends addon searchpath)
   # input: string addon string searchpath
 
   set(OUTPUT_DIR ${DEPENDS_PATH})
-  # look for platform-specific dependencies
   file(GLOB_RECURSE cmake_input_files ${searchpath}/${CORE_SYSTEM_NAME}/*.txt)
-
-  # exclude any platform-specific prebuilt dependencies
-  exclude_directory_from_list("${cmake_input_files}" "${CORE_SYSTEM_NAME}/prebuilt/" cmake_input_files)
-
-  # look for common dependencies
   file(GLOB_RECURSE cmake_input_files2 ${searchpath}/common/*.txt)
   list(APPEND cmake_input_files ${cmake_input_files2})
 
@@ -37,7 +16,6 @@ function(add_addon_depends addon searchpath)
             file MATCHES noinstall.txt OR
             file MATCHES flags.txt OR
             file MATCHES deps.txt OR
-            file MATCHES "[a-z]+-deps[.]txt" OR
             file MATCHES platforms.txt))
       message(STATUS "Processing ${file}")
       file(STRINGS ${file} def)
@@ -70,10 +48,6 @@ function(add_addon_depends addon searchpath)
         if(EXISTS ${dir}/flags.txt)
           set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS ${dir}/flags.txt)
           file(STRINGS ${dir}/flags.txt extraflags)
-
-          # replace some custom placeholders
-          string(REPLACE "@MINGW_TOOLCHAIN_FILE@" "${OUTPUT_DIR}/Toolchain_mingw32.cmake" extraflags "${extraflags}")
-          
           separate_arguments(extraflags)
           message(STATUS "${id} extraflags: ${extraflags}")
         endif()
@@ -125,18 +99,11 @@ function(add_addon_depends addon searchpath)
               endif()
             endif()
 
+            # on windows "patch.exe" can only handle CR-LF line-endings so we
+            # need to force it to also handle LF-only line endings
             set(PATCH_PROGRAM ${PATCH_EXECUTABLE})
-
-            # On Windows "patch.exe" can only handle CR-LF line-endings.
-            # Our patches have LF-only line endings - except when they
-            # have been checked out as part of a dependency hosted on Git
-            # and core.autocrlf=true.
             if(WIN32)
-              file(READ ${patch} patch_content_hex HEX)
-              # Force handle LF-only line endings
-              if(NOT patch_content_hex MATCHES "0d0a")
-                set(PATCH_PROGRAM "\"${PATCH_PROGRAM}\" --binary")
-              endif()
+              set(PATCH_PROGRAM "\"${PATCH_PROGRAM}\" --binary")
             endif()
           endif()
 
@@ -160,11 +127,8 @@ function(add_addon_depends addon searchpath)
           set(INSTALL_COMMAND INSTALL_COMMAND "")
         endif()
 
-        # check if there's a platform-specific or generic deps.txt containing dependencies on other libraries
-        if(EXISTS ${dir}/${CORE_SYSTEM_NAME}-deps.txt)
-          file(STRINGS ${dir}/${CORE_SYSTEM_NAME}-deps.txt deps)
-          message(STATUS "${id} depends: ${deps}")
-        elseif(EXISTS ${dir}/deps.txt)
+        # check if there's a deps.txt containing dependencies on other libraries
+        if(EXISTS ${dir}/deps.txt)
           set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS ${dir}/deps.txt)
           file(STRINGS ${dir}/deps.txt deps)
           message(STATUS "${id} depends: ${deps}")

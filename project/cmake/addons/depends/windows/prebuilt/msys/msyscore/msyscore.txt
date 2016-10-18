@@ -1,1 +1,0 @@
-msyscore http://mirrors.xbmc.org/build-deps/win32/mingw-msys/msysCORE-1.0.17-1-msys-1.0.17-bin.tar.lzma
