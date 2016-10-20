@@ -83,9 +83,6 @@ CPeripheral::CPeripheral(const PeripheralScanResult& scanResult, CPeripheralBus*
 CPeripheral::~CPeripheral(void)
 {
   PersistSettings(true);
-
-  m_subDevices.clear();
-
   ClearSettings();
 }
 
@@ -115,18 +112,6 @@ bool CPeripheral::HasFeature(const PeripheralFeature feature) const
     }
   }
 
-  if (!bReturn)
-  {
-    for (unsigned int iSubdevicePtr = 0; iSubdevicePtr < m_subDevices.size(); iSubdevicePtr++)
-    {
-      if (m_subDevices.at(iSubdevicePtr)->HasFeature(feature))
-      {
-        bReturn = true;
-        break;
-      }
-    }
-  }
-
   return bReturn;
 }
 
@@ -134,9 +119,6 @@ void CPeripheral::GetFeatures(std::vector<PeripheralFeature> &features) const
 {
   for (unsigned int iFeaturePtr = 0; iFeaturePtr < m_features.size(); iFeaturePtr++)
     features.push_back(m_features.at(iFeaturePtr));
-
-  for (unsigned int iSubdevicePtr = 0; iSubdevicePtr < m_subDevices.size(); iSubdevicePtr++)
-    m_subDevices.at(iSubdevicePtr)->GetFeatures(features);
 }
 
 bool CPeripheral::Initialise(void)
@@ -185,27 +167,14 @@ bool CPeripheral::Initialise(void)
     bReturn &= InitialiseFeature(feature);
   }
 
-  for (unsigned int iSubdevicePtr = 0; iSubdevicePtr < m_subDevices.size(); iSubdevicePtr++)
-    bReturn &= m_subDevices.at(iSubdevicePtr)->Initialise();
-
   if (bReturn)
   {
-    CLog::Log(LOGDEBUG, "%s - initialised peripheral on '%s' with %d features and %d sub devices",
-      __FUNCTION__, m_strLocation.c_str(), (int)m_features.size(), (int)m_subDevices.size());
+    CLog::Log(LOGDEBUG, "%s - initialised peripheral on '%s' with %d features",
+      __FUNCTION__, m_strLocation.c_str(), (int)m_features.size());
     m_bInitialised = true;
   }
 
   return bReturn;
-}
-
-void CPeripheral::GetSubdevices(PeripheralVector &subDevices) const
-{
-  subDevices = m_subDevices;
-}
-
-bool CPeripheral::IsMultiFunctional(void) const
-{
-  return m_subDevices.size() > 0;
 }
 
 std::vector<CSetting *> CPeripheral::GetSettings(void) const

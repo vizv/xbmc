@@ -130,17 +130,6 @@ namespace PERIPHERALS
     virtual void OnDeviceRemoved(void) {}
 
     /*!
-     * @brief Get all subdevices if this device is multifunctional.
-     * @param subDevices The subdevices.
-     */
-    virtual void GetSubdevices(PeripheralVector &subDevices) const;
-
-    /*!
-     * @return True when this device is multifunctional, false otherwise.
-     */
-    virtual bool IsMultiFunctional(void) const;
-
-    /*!
      * @brief Add a setting to this peripheral. This will overwrite a previous setting with the same key.
      * @param strKey The key of the setting.
      * @param setting The setting.
@@ -221,7 +210,6 @@ namespace PERIPHERALS
     bool                             m_bHidden;
     bool                             m_bError;
     std::vector<PeripheralFeature>   m_features;
-    PeripheralVector                 m_subDevices;
     std::map<std::string, PeripheralDeviceSetting> m_settings;
     std::set<std::string>             m_changedSettings;
     CPeripheralBus*                  m_bus;
