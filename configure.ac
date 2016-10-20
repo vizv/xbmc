@@ -2167,6 +2167,7 @@ OUTPUT_FILES="Makefile \
     xbmc/cores/paplayer/Makefile \
     xbmc/cores/omxplayer/Makefile \
     xbmc/cores/playercorefactory/Makefile \
+    xbmc/cores/RetroPlayer/Makefile \
     xbmc/messaging/Makefile \
     xbmc/messaging/helpers/Makefile \
     xbmc/guilib/Makefile \
