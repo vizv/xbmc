@@ -87,12 +87,12 @@ bool SupportsPeripheralControllers(const std::string &condition, const std::stri
 {
   using namespace PERIPHERALS;
 
-  std::vector<CPeripheral*> results;
+  PeripheralVector results;
   g_peripherals.GetPeripheralsWithFeature(results, FEATURE_JOYSTICK);
 
   // Ignore emulated joysticks
   return std::find_if(results.begin(), results.end(),
-    [](const CPeripheral* result)
+    [](const PeripheralPtr& result)
     {
       return result->Type() == PERIPHERAL_JOYSTICK;
     }) != results.end();
@@ -102,7 +102,7 @@ bool HasRumbleFeature(const std::string &condition, const std::string &value, co
 {
   using namespace PERIPHERALS;
 
-  std::vector<CPeripheral*> results;
+  PeripheralVector results;
   g_peripherals.GetPeripheralsWithFeature(results, FEATURE_RUMBLE);
   return !results.empty();
 }
