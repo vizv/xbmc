@@ -71,11 +71,11 @@ namespace GAME
      * to the same port. If a device requests a specific port, this function will
      * attempt to honor that request.
      */
-    void MapDevices(const std::vector<PERIPHERALS::CPeripheral*>& devices,
-                    std::map<PERIPHERALS::CPeripheral*, JOYSTICK::IInputHandler*>& deviceToPortMap);
+    void MapDevices(const PERIPHERALS::PeripheralVector& devices,
+                    std::map<PERIPHERALS::PeripheralPtr, JOYSTICK::IInputHandler*>& deviceToPortMap);
 
   private:
-    JOYSTICK::IInputHandler* AssignToPort(PERIPHERALS::CPeripheral* device, bool checkPortNumber = true);
+    JOYSTICK::IInputHandler* AssignToPort(const PERIPHERALS::PeripheralPtr& device, bool checkPortNumber = true);
 
     struct SPort
     {

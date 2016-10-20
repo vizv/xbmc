@@ -34,10 +34,10 @@ using namespace PERIPHERALS;
 
 namespace GAME
 {
-  int GetRequestedPort(const PERIPHERALS::CPeripheral* device)
+  int GetRequestedPort(const PERIPHERALS::PeripheralPtr& device)
   {
     if (device->Type() == PERIPHERAL_JOYSTICK)
-      return static_cast<const CPeripheralJoystick*>(device)->RequestedPort();
+      return std::static_pointer_cast<CPeripheralJoystick>(device)->RequestedPort();
     return JOYSTICK_PORT_UNKNOWN;
   }
 }
@@ -80,8 +80,8 @@ void CPortManager::ClosePort(IInputHandler* handler)
   NotifyObservers(ObservableMessagePortsChanged);
 }
 
-void CPortManager::MapDevices(const std::vector<CPeripheral*>& devices,
-                              std::map<CPeripheral*, IInputHandler*>& deviceToPortMap)
+void CPortManager::MapDevices(const PeripheralVector& devices,
+                              std::map<PeripheralPtr, IInputHandler*>& deviceToPortMap)
 {
   CSingleLock lock(m_mutex);
 
@@ -93,9 +93,9 @@ void CPortManager::MapDevices(const std::vector<CPeripheral*>& devices,
     port.device = nullptr;
 
   // Prioritize devices by several criteria
-  std::vector<CPeripheral*> devicesCopy = devices;
+  PeripheralVector devicesCopy = devices;
   std::sort(devicesCopy.begin(), devicesCopy.end(),
-    [](CPeripheral* lhs, CPeripheral* rhs)
+    [](const PeripheralPtr& lhs, const PeripheralPtr& rhs)
     {
       // Prioritize physical joysticks over emulated ones
       if (lhs->Type() == PERIPHERAL_JOYSTICK && rhs->Type() != PERIPHERAL_JOYSTICK)
@@ -105,8 +105,8 @@ void CPortManager::MapDevices(const std::vector<CPeripheral*>& devices,
 
       if (lhs->Type() == PERIPHERAL_JOYSTICK && rhs->Type() == PERIPHERAL_JOYSTICK)
       {
-        CPeripheralJoystick* i = static_cast<CPeripheralJoystick*>(lhs);
-        CPeripheralJoystick* j = static_cast<CPeripheralJoystick*>(rhs);
+        std::shared_ptr<CPeripheralJoystick> i = std::static_pointer_cast<CPeripheralJoystick>(lhs);
+        std::shared_ptr<CPeripheralJoystick> j = std::static_pointer_cast<CPeripheralJoystick>(rhs);
 
         // Prioritize requested a port over no port requested
         if (i->RequestedPort() != JOYSTICK_PORT_UNKNOWN && j->RequestedPort() == JOYSTICK_PORT_UNKNOWN)
@@ -120,8 +120,8 @@ void CPortManager::MapDevices(const std::vector<CPeripheral*>& devices,
 
       if (lhs->Type() == PERIPHERAL_JOYSTICK_EMULATION && rhs->Type() == PERIPHERAL_JOYSTICK_EMULATION)
       {
-        CPeripheralJoystickEmulation* i = static_cast<CPeripheralJoystickEmulation*>(lhs);
-        CPeripheralJoystickEmulation* j = static_cast<CPeripheralJoystickEmulation*>(rhs);
+        std::shared_ptr<CPeripheralJoystickEmulation> i = std::static_pointer_cast<CPeripheralJoystickEmulation>(lhs);
+        std::shared_ptr<CPeripheralJoystickEmulation> j = std::static_pointer_cast<CPeripheralJoystickEmulation>(rhs);
 
         // Sort emulated joysticks by player number
         return i->ControllerNumber() < j->ControllerNumber();
@@ -131,7 +131,7 @@ void CPortManager::MapDevices(const std::vector<CPeripheral*>& devices,
     });
 
   // Record mapped devices in output variable
-  for (CPeripheral* device : devicesCopy)
+  for (auto& device : devicesCopy)
   {
     IInputHandler* handler = AssignToPort(device);
     if (handler)
@@ -139,7 +139,7 @@ void CPortManager::MapDevices(const std::vector<CPeripheral*>& devices,
   } 
 }
 
-IInputHandler* CPortManager::AssignToPort(CPeripheral* device, bool checkPortNumber /* = true */)
+IInputHandler* CPortManager::AssignToPort(const PeripheralPtr& device, bool checkPortNumber /* = true */)
 {
   const int requestedPort = GetRequestedPort(device);
   const bool bPortRequested = (requestedPort != JOYSTICK_PORT_UNKNOWN);
@@ -163,7 +163,7 @@ IInputHandler* CPortManager::AssignToPort(CPeripheral* device, bool checkPortNum
       continue;
 
     // Success
-    port.device = device;
+    port.device = device.get();
     return port.handler;
   }
 

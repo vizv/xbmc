@@ -19,13 +19,12 @@
  */
 #pragma once
 
+#include "peripherals/PeripheralTypes.h"
 #include "utils/Observer.h"
 
 #include <map>
 
 namespace JOYSTICK { class IInputHandler; }
-namespace PERIPHERALS { class CPeripheral; }
-
 namespace GAME
 {
   class CPortMapper : public Observer
@@ -40,6 +39,6 @@ namespace GAME
   private:
     void ProcessPeripherals();
 
-    std::map<PERIPHERALS::CPeripheral*, JOYSTICK::IInputHandler*>  m_portMap;
+    std::map<PERIPHERALS::PeripheralPtr, JOYSTICK::IInputHandler*>  m_portMap;
   };
 }

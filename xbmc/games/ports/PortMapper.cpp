@@ -52,20 +52,18 @@ void CPortMapper::Notify(const Observable &obs, const ObservableMessage msg)
 
 void CPortMapper::ProcessPeripherals()
 {
-  std::map<CPeripheral*, IInputHandler*>& oldPortMap = m_portMap;
+  auto& oldPortMap = m_portMap;
 
-  std::vector<CPeripheral*> devices;
+  PeripheralVector devices;
   g_peripherals.GetPeripheralsWithFeature(devices, FEATURE_JOYSTICK);
 
-  std::map<CPeripheral*, IInputHandler*> newPortMap;
+  std::map<PeripheralPtr, IInputHandler*> newPortMap;
   CPortManager::GetInstance().MapDevices(devices, newPortMap);
 
-  for (std::vector<CPeripheral*>::iterator it = devices.begin(); it != devices.end(); ++it)
+  for (auto& device : devices)
   {
-    CPeripheral* device = *it;
-
-    std::map<CPeripheral*, IInputHandler*>::const_iterator itOld = oldPortMap.find(device);
-    std::map<CPeripheral*, IInputHandler*>::const_iterator itNew = newPortMap.find(device);
+    std::map<PeripheralPtr, IInputHandler*>::const_iterator itOld = oldPortMap.find(device);
+    std::map<PeripheralPtr, IInputHandler*>::const_iterator itNew = newPortMap.find(device);
 
     IInputHandler* oldHandler = itOld != oldPortMap.end() ? itOld->second : NULL;
     IInputHandler* newHandler = itNew != newPortMap.end() ? itNew->second : NULL;
