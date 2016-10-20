@@ -123,9 +123,8 @@ public:
    * @param pts used for lateness detection
    * @param method for deinterlacing
    * @param sync signals frame, top, or bottom field
-   * @param wait: block until pic has been rendered
    */
-  void FlipPage(volatile std::atomic_bool& bStop, double pts, EINTERLACEMETHOD deintMethod, EFIELDSYNC sync, bool wait);
+  void FlipPage(volatile std::atomic_bool& bStop, double pts, EINTERLACEMETHOD deintMethod, EFIELDSYNC sync);
 
   void AddOverlay(CDVDOverlay* o, double pts);
 
@@ -241,7 +240,6 @@ protected:
   int m_lateframes;
   double m_presentpts;
   EPRESENTSTEP m_presentstep;
-  bool m_forceNext;
   int m_presentsource;
   XbmcThreads::ConditionVariable  m_presentevent;
   CEvent m_flushEvent;
