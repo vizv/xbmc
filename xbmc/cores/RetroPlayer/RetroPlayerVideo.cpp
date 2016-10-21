@@ -133,6 +133,7 @@ void CRetroPlayerVideo::AddData(const uint8_t* data, unsigned int size)
 
 void CRetroPlayerVideo::CloseStream()
 {
+  m_renderManager.Flush();
   m_pixelConverter.reset();
   m_pVideoCodec.reset();
 }
