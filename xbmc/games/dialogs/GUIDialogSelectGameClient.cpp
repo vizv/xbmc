@@ -136,7 +136,7 @@ GameClientPtr CGUIDialogSelectGameClient::InstallGameClient(const GameClientVect
     }
     else
     {
-      CLog::Log(LOGERROR, "Select game client dialog: Failed to install %s", gameClient->ID().c_str());
+      CLog::Log(LOGERROR, "Select game client dialog: Failed to install %s", gameClientId.c_str());
     }
   }
   else if (result == iAddonBrowser)
