@@ -712,6 +712,9 @@ void CMMALRenderer::Reset()
 
 void CMMALRenderer::Flush()
 {
+  if (m_vout_input)
+    mmal_port_flush(m_vout_input);
+  ReleaseBuffers();
   m_iYV12RenderBuffer = 0;
   CLog::Log(LOGDEBUG, "%s::%s", CLASSNAME, __func__);
 }
