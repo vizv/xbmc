@@ -85,6 +85,9 @@ bool CPixelConverterRBP::Open(AVPixelFormat pixfmt, AVPixelFormat targetfmt, uns
 
   m_mmal_format = TranslateFormat(targetfmt);
 
+  if (m_mmal_format == MMAL_ENCODING_UNKNOWN)
+    return false;
+
   /* Create dummy component with attached pool */
   m_pool = std::make_shared<CMMALPool>(MMAL_COMPONENT_DEFAULT_VIDEO_DECODER, false, MMAL_NUM_OUTPUT_BUFFERS, 0, MMAL_ENCODING_I420, MMALStateFFDec);
 
@@ -138,10 +141,10 @@ bool CPixelConverterRBP::Decode(const uint8_t* pData, unsigned int size)
 
   const int stride = size / m_height;
 
-  uint8_t* src[] =       { dataMutable,         0,                   0,                   0 };
-  int      srcStride[] = { stride,              0,                   0,                   0 };
-  uint8_t* dst[] =       { m_buf->data[0],      m_buf->data[1],      m_buf->data[2],      0 };
-  int      dstStride[] = { m_buf->iLineSize[0], m_buf->iLineSize[1], m_buf->iLineSize[2], 0 };
+  uint8_t* src[] =       { dataMutable,                       0, 0, 0 };
+  int      srcStride[] = { stride,                            0, 0, 0 };
+  uint8_t* dst[] =       { (uint8_t *)omvb->gmem->m_arm,      0, 0, 0 };
+  int      dstStride[] = { (int)omvb->m_aligned_width * bpp,  0, 0, 0 };
 
   sws_scale(m_swsContext, src, srcStride, 0, m_height, dst, dstStride);
 
@@ -187,6 +190,8 @@ DVDVideoPicture* CPixelConverterRBP::AllocatePicture(int iWidth, int iHeight)
     omvb->mmal_buffer->data = (uint8_t *)gmem->m_vc_handle;
     omvb->mmal_buffer->alloc_size = omvb->mmal_buffer->length = gmem->m_numbytes;
   }
+  else
+    CLog::Log(LOGERROR, "CPixelConverterRBP::AllocatePicture invalid picture:%p pool:%p", pPicture, m_pool.get());
 
   if (pPicture)
   {
@@ -207,6 +212,8 @@ void CPixelConverterRBP::FreePicture(DVDVideoPicture* pPicture)
 
     delete pPicture;
   }
+  else
+    CLog::Log(LOGERROR, "CPixelConverterRBP::FreePicture invalid picture:%p", pPicture);
 }
 
 AVPixelFormat CPixelConverterRBP::TranslateTargetFormat(AVPixelFormat pixfmt)
