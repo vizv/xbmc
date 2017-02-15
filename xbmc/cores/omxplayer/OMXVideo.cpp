@@ -86,6 +86,7 @@ COMXVideo::COMXVideo(CRenderManager& renderManager, CProcessInfo &processInfo) :
   m_settings_changed  = false;
   m_setStartTime      = false;
   m_transform         = OMX_DISPLAY_ROT0;
+  m_isPi1             = g_RBP.RaspberryPiVersion() == 1;
 }
 
 COMXVideo::~COMXVideo()
@@ -236,7 +237,7 @@ bool COMXVideo::PortSettingsChanged(ResolutionUpdateInfo &resinfo)
 
   EINTERLACEMETHOD interlace_method = CMediaSettings::GetInstance().GetCurrentVideoSettings().m_InterlaceMethod;
   if (interlace_method == VS_INTERLACEMETHOD_AUTO)
-    interlace_method = VS_INTERLACEMETHOD_MMAL_ADVANCED;
+    interlace_method = m_isPi1 ? VS_INTERLACEMETHOD_MMAL_BOB : VS_INTERLACEMETHOD_MMAL_ADVANCED;
 
   if (m_deinterlace && interlace_method != VS_INTERLACEMETHOD_NONE)
   {
