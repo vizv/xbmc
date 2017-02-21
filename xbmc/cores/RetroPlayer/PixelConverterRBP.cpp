@@ -34,6 +34,7 @@ std::vector<CPixelConverterRBP::PixelFormatTargetTable> CPixelConverterRBP::pixf
 {
   { AV_PIX_FMT_BGR0,      AV_PIX_FMT_BGR0 },
   { AV_PIX_FMT_RGB565LE,  AV_PIX_FMT_RGB565LE },
+  { AV_PIX_FMT_YUV420P,   AV_PIX_FMT_YUV420P },
 };
 
 std::vector<CPixelConverterRBP::MMALEncodingTable> CPixelConverterRBP::mmal_encoding_table =
@@ -96,7 +97,8 @@ bool CPixelConverterRBP::Open(AVPixelFormat pixfmt, AVPixelFormat targetfmt, uns
 
 void CPixelConverterRBP::Dispose()
 {
-  m_pool->Close();
+  if (m_pool)
+    m_pool->Close();
   m_pool = nullptr;
 
   CPixelConverter::Dispose();
@@ -185,10 +187,12 @@ DVDVideoPicture* CPixelConverterRBP::AllocatePicture(int iWidth, int iHeight)
       delete pPicture;
       pPicture = nullptr;
     }
-
-    CGPUMEM *gmem = omvb->gmem;
-    omvb->mmal_buffer->data = (uint8_t *)gmem->m_vc_handle;
-    omvb->mmal_buffer->alloc_size = omvb->mmal_buffer->length = gmem->m_numbytes;
+    else
+    {
+      CGPUMEM *gmem = omvb->gmem;
+      omvb->mmal_buffer->data = (uint8_t *)gmem->m_vc_handle;
+      omvb->mmal_buffer->alloc_size = omvb->mmal_buffer->length = gmem->m_numbytes;
+    }
   }
   else
     CLog::Log(LOGERROR, "CPixelConverterRBP::AllocatePicture invalid picture:%p pool:%p", pPicture, m_pool.get());
