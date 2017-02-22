@@ -39,16 +39,16 @@ public:
   virtual bool Decode(const uint8_t* pData, unsigned int size) override;
   virtual void GetPicture(DVDVideoPicture& dvdVideoPicture) override;
 
-private:
   /*!
    * \brief Allocate a new picture (AV_PIX_FMT_YUV420P)
    */
-  DVDVideoPicture* AllocatePicture(int iWidth, int iHeight);
+  DVDVideoPicture* AllocatePicture(int iWidth, int iHeight, int iAlignedWidth = 0, int iAlignedHeight = 0, int iSize = 0);
 
   /*!
    * \brief Free an allocated picture
    */
   void FreePicture(DVDVideoPicture* pPicture);
+private:
 
   struct PixelFormatTargetTable
   {

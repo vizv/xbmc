@@ -165,17 +165,17 @@ void CPixelConverterRBP::GetPicture(DVDVideoPicture& dvdVideoPicture)
   omvb->gmem->Flush();
 }
 
-DVDVideoPicture* CPixelConverterRBP::AllocatePicture(int iWidth, int iHeight)
+DVDVideoPicture* CPixelConverterRBP::AllocatePicture(int iWidth, int iHeight, int iAlignedWidth, int iAlignedHeight, int iSize)
 {
   MMAL::CMMALYUVBuffer *omvb = nullptr;
   DVDVideoPicture* pPicture = new DVDVideoPicture;
 
   // gpu requirements
-  int w = (iWidth + 31) & ~31;
-  int h = (iHeight + 15) & ~15;
+  int w = iAlignedWidth ? iAlignedWidth : (iWidth + 31) & ~31;
+  int h = iAlignedHeight ? iAlignedHeight : (iHeight + 15) & ~15;
   if (pPicture && m_pool)
   {
-    m_pool->SetFormat(m_mmal_format, iWidth, iHeight, w, h, 0, nullptr);
+    m_pool->SetFormat(m_mmal_format, iWidth, iHeight, w, h, iSize, nullptr);
 
     omvb = dynamic_cast<MMAL::CMMALYUVBuffer *>(m_pool->GetBuffer(500));
     if (!omvb ||
