@@ -310,6 +310,10 @@ bool CMMALRenderer::CheckConfigurationVout(uint32_t width, uint32_t height, uint
 
     m_vout_input = m_vout->input[0];
 
+    status = mmal_port_parameter_set_boolean(m_vout_input, MMAL_PARAMETER_NO_IMAGE_PADDING, MMAL_TRUE);
+    if (status != MMAL_SUCCESS)
+      CLog::Log(LOGERROR, "%s::%s Failed to enable no image padding mode on %s (status=%x %s)", CLASSNAME, __func__, m_vout_input->name, status, mmal_status_to_string(status));
+
     status = mmal_port_parameter_set_boolean(m_vout_input, MMAL_PARAMETER_ZERO_COPY, MMAL_TRUE);
     if (status != MMAL_SUCCESS)
        CLog::Log(LOGERROR, "%s::%s Failed to enable zero copy mode on %s (status=%x %s)", CLASSNAME, __func__, m_vout_input->name, status, mmal_status_to_string(status));
