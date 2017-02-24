@@ -73,6 +73,7 @@ public:
     freeBuffer.push_back(*res);
     usedBuffer.erase(res);
   }
+  void Finalise(DVDVideoPicture* pDvdVideoPicture) {}
 private:
   struct BUFFER
   {
@@ -295,6 +296,7 @@ CDVDVideoCodec::VCReturn CAddonVideoCodec::GetPicture(DVDVideoPicture* pDvdVideo
     if (g_advancedSettings.CanLogComponent(LOGVIDEO))
       CLog::Log(LOGDEBUG, "CAddonVideoCodec: GetPicture::VC_PICTURE with pts %llu", picture.pts);
 
+    m_bufferPool->Finalise(pDvdVideoPicture);
     m_bufferPool->ReleaseBuffer(m_lastPictureBuffer);
     m_lastPictureBuffer = picture.decodedData;
 
