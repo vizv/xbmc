@@ -30,6 +30,108 @@ using namespace kodi::addon;
 
 #define ALIGN(value, alignment) (((value)+(alignment-1))&~(alignment-1))
 
+#ifdef TARGET_RASPBERRY_PI
+
+#include "cores/RetroPlayer/PixelConverterRBP.h"
+#include "cores/VideoPlayer/VideoRenderers/HwDecRender/MMALRenderer.h"
+
+class BufferPool
+{
+public:
+  BufferPool()
+  {
+    m_pixelConverter.reset(new CPixelConverterRBP);
+    if (!m_pixelConverter->Open(AV_PIX_FMT_YUV420P, AV_PIX_FMT_YUV420P, 128, 128))
+    {
+      CLog::Log(LOGERROR, "CAddonVideoCodec::Open failed to open pixelConverter");
+      m_pixelConverter.reset();
+    }
+  }
+  ~BufferPool()
+  {
+  }
+
+  bool GetBuffer(VIDEOCODEC_PICTURE &picture)
+  {
+    if (freeBuffer.empty())
+      freeBuffer.resize(1);
+
+    BUFFER &buf(freeBuffer.back());
+
+    DVDVideoPicture* m_buf = nullptr;
+    int m_width = 1280, m_height = 570;
+    if (m_pixelConverter)
+      m_buf = m_pixelConverter->AllocatePicture(0, 0, 0, 0, picture.decodedDataSize + 1024*1024);
+    MMAL::CMMALYUVBuffer *omvb = m_buf ? (MMAL::CMMALYUVBuffer *)m_buf->MMALBuffer : nullptr;
+    if (!omvb || !omvb->gmem || !omvb->gmem->m_arm)
+    {
+      CLog::Log(LOGERROR, "%s: Failed to allocate picture of dimensions %dx%d", __FUNCTION__, m_width, m_height);
+      buf.memSize = 0;
+      picture.decodedData = nullptr;
+      return false;
+    }
+    buf.mem = omvb->gmem->m_arm;
+    buf.memSize = picture.decodedDataSize;
+    buf.omvb = omvb;
+    picture.decodedData = (uint8_t*)buf.mem;
+    usedBuffer.push_back(buf);
+    freeBuffer.pop_back();
+    return true;
+  }
+
+  void ReleaseBuffer(void *bufferPtr)
+  {
+    std::vector<BUFFER>::iterator res(std::find(usedBuffer.begin(), usedBuffer.end(), bufferPtr));
+    if (res == usedBuffer.end())
+    {
+      CLog::Log(LOGERROR, "Unable to release buffer:%p", bufferPtr);
+      return;
+    }
+    if (res->omvb)
+      res->omvb->Release();
+    freeBuffer.push_back(*res);
+    usedBuffer.erase(res);
+  }
+
+  void Finalise(DVDVideoPicture* pDvdVideoPicture)
+  {
+    void *bufferPtr = pDvdVideoPicture->data[0];
+    std::vector<BUFFER>::iterator res(std::find(usedBuffer.begin(), usedBuffer.end(), bufferPtr));
+    if (res == usedBuffer.end())
+    {
+      CLog::Log(LOGERROR, "Unable to finalise buffer:%p", bufferPtr);
+      return;
+    }
+    MMAL::CMMALYUVBuffer *omvb = res->omvb;
+    if (omvb)
+    {
+      pDvdVideoPicture->format = RENDER_FMT_MMAL;
+      pDvdVideoPicture->MMALBuffer = omvb;
+      omvb->m_width = pDvdVideoPicture->iWidth;
+      omvb->m_height = pDvdVideoPicture->iHeight;
+      omvb->m_aligned_width = pDvdVideoPicture->iLineSize[0];
+      omvb->m_aligned_height = pDvdVideoPicture->iHeight;
+      omvb->mmal_buffer->pts = pDvdVideoPicture->pts == DVD_NOPTS_VALUE ? MMAL_TIME_UNKNOWN : pDvdVideoPicture->pts;
+      // need to flush ARM cache so GPU can see it
+      omvb->gmem->Flush();
+    }
+  }
+
+private:
+  struct BUFFER
+  {
+    BUFFER():mem(nullptr), memSize(0) {};
+    BUFFER(void* m, size_t s) :mem(m), memSize(s) {};
+    bool operator == (const void* data) const { return mem == data; };
+
+    void *mem;
+    size_t memSize;
+    MMAL::CMMALYUVBuffer *omvb;
+  };
+  std::vector<BUFFER> freeBuffer, usedBuffer;
+  std::unique_ptr<CPixelConverterRBP> m_pixelConverter;
+};
+#else
 class BufferPool
 {
 public:
@@ -86,6 +188,7 @@ private:
   };
   std::vector<BUFFER> freeBuffer, usedBuffer;
 };
+#endif
 
 CAddonVideoCodec::CAddonVideoCodec(CProcessInfo &processInfo, ADDON::AddonInfoPtr& addonInfo, kodi::addon::IAddonInstance* parentInstance)
   : CDVDVideoCodec(processInfo),
@@ -207,7 +310,7 @@ bool CAddonVideoCodec::Open(CDVDStreamInfo &hints, CDVDCodecOptions &options)
 
   unsigned int nformats(0);
   for (auto fmt : options.m_formats)
-    if (fmt == RENDER_FMT_YUV420P)
+    if (fmt == RENDER_FMT_YUV420P || fmt == RENDER_FMT_MMAL)
     {
       m_formats[nformats++] = VideoFormatYV12;
       break;
