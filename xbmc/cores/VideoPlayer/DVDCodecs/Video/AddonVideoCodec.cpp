@@ -436,10 +436,14 @@ void CAddonVideoCodec::Reset()
   VIDEOCODEC_PICTURE picture;
   picture.flags = VIDEOCODEC_PICTURE::FLAG_DRAIN;
 
-  while (m_struct.toAddon.GetPicture(m_addonInstance, picture) != VIDEOCODEC_RETVAL::VC_EOF)
+  int r = -1;
+  while (r = m_struct.toAddon.GetPicture(m_addonInstance, picture), r != VIDEOCODEC_RETVAL::VC_EOF)
   {
-    m_bufferPool->ReleaseBuffer(m_lastPictureBuffer);
-    m_lastPictureBuffer = picture.decodedData;
+    if (r == VC_PICTURE)
+    {
+      m_bufferPool->ReleaseBuffer(m_lastPictureBuffer);
+      m_lastPictureBuffer = picture.decodedData;
+    }
   }
 
   m_bufferPool->ReleaseBuffer(m_lastPictureBuffer);
