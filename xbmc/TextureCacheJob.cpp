@@ -104,30 +104,30 @@ bool CTextureCacheJob::CacheTexture(CBaseTexture **out_texture)
     if (!(!(file.IsPicture() && !(file.IsZIP() || file.IsRAR() || file.IsCBR() || file.IsCBZ() ))
         && !StringUtils::StartsWithNoCase(file.GetMimeType(), "image/") && !StringUtils::EqualsNoCase(file.GetMimeType(), "application/octet-stream"))) // ignore non-pictures
     {
+      // Read image into memory to use our vfs
+      ssize_t fileRead = 0;
+      XFILE::CFile xfile;
+      XFILE::auto_buffer buf;
+      if (!URIUtils::HasExtension(image, ".dds"))
+        xfile.LoadFile(image, buf);
+
 #if defined(HAS_OMXPLAYER)
       if (CServiceBroker::GetSettings().GetBool("videoplayer.acceleratedjpegs"))
       {
-        // Read image into memory to use our vfs
-        XFILE::CFile xfile;
-        XFILE::auto_buffer buf;
-
-        if (xfile.LoadFile(image, buf) > 0)
+        if (COMXImage::CreateThumb(image, buf, width, height, additional_info, CTextureCache::GetCachedPath(m_cachePath + ".jpg")))
         {
-          if (COMXImage::CreateThumb(image, buf, width, height, additional_info, CTextureCache::GetCachedPath(m_cachePath + ".jpg")))
-          {
-            m_details.width = width;
-            m_details.height = height;
-            m_details.file = m_cachePath + ".jpg";
-            if (out_texture)
-              *out_texture = LoadImage(CTextureCache::GetCachedPath(m_details.file), width, height, "" /* already flipped */);
-            CLog::Log(LOGDEBUG, "Fast %s image '%s' to '%s': %p", m_oldHash.empty() ? "Caching" : "Recaching", CURL::GetRedacted(image).c_str(), m_details.file.c_str(), out_texture);
-            return true;
-          }
+          m_details.width = width;
+          m_details.height = height;
+          m_details.file = m_cachePath + ".jpg";
+          if (out_texture)
+            *out_texture = LoadImage(CTextureCache::GetCachedPath(m_details.file), width, height, "" /* already flipped */);
+          CLog::Log(LOGDEBUG, "Fast %s image '%s' to '%s': %p", m_oldHash.empty() ? "Caching" : "Recaching", CURL::GetRedacted(image).c_str(), m_details.file.c_str(), out_texture);
+          return true;
         }
       }
 #endif
       texture = new CTexture();
-      if (!(texture->LoadFromFileInternal(image, width, height, true, file.GetMimeType())))
+      if (!(texture->LoadFromFileInternal(image, buf, width, height, true, file.GetMimeType())))
       {
         delete texture;
         texture = nullptr;
