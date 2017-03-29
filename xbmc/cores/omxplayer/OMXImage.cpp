@@ -604,7 +604,7 @@ bool COMXImage::GetCodingType(const XFILE::auto_buffer &buf, unsigned int &width
     unsigned short block_size = 0;
     bool nMarker = false;
 
-    while(p < q)
+    while(p < q && !progressive)
     {
       switch(marker)
       {
