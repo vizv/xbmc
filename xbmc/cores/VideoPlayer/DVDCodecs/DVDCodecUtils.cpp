@@ -82,18 +82,18 @@ double CDVDCodecUtils::NormalizeFrameduration(double frameduration, bool *match)
 
 bool CDVDCodecUtils::IsH264AnnexB(std::string format, AVStream *avstream)
 {
-  assert(avstream->codec->codec_id == AV_CODEC_ID_H264 || avstream->codec->codec_id == AV_CODEC_ID_H264_MVC);
-  if (avstream->codec->extradata_size < 4)
+  assert(avstream->codecpar->codec_id == AV_CODEC_ID_H264 || avstream->codecpar->codec_id == AV_CODEC_ID_H264_MVC);
+  if (avstream->codecpar->extradata_size < 4)
     return true;
-  if (avstream->codec->extradata[0] == 1)
+  if (avstream->codecpar->extradata[0] == 1)
     return false;
   if (format == "avi")
   {
-    BYTE *src = avstream->codec->extradata;
+    BYTE *src = avstream->codecpar->extradata;
     unsigned startcode = AV_RB32(src);
     if (startcode == 0x00000001 || (startcode & 0xffffff00) == 0x00000100)
       return true;
-    if (avstream->codec->codec_tag == MKTAG('A', 'V', 'C', '1') || avstream->codec->codec_tag == MKTAG('a', 'v', 'c', '1'))
+    if (avstream->codecpar->codec_tag == MKTAG('A', 'V', 'C', '1') || avstream->codecpar->codec_tag == MKTAG('a', 'v', 'c', '1'))
       return false;
   }
   return true;

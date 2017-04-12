@@ -1406,14 +1406,14 @@ CDemuxStream* CDVDDemuxFFmpeg::AddStream(int streamIdx)
       }
     case AVMEDIA_TYPE_VIDEO:
       {
-        if (pStream->codec->codec_id == AV_CODEC_ID_H264_MVC)
+        if (pStream->codecpar->codec_id == AV_CODEC_ID_H264_MVC)
         {
           m_pSSIF = new CDemuxStreamSSIF();
           m_pSSIF->SetMVCStreamId(streamIdx);
 
           stream = new CDemuxStream();
           stream->type = STREAM_DATA;
-          pStream->codec->codec_type = AVMEDIA_TYPE_DATA;
+          pStream->codecpar->codec_type = AVMEDIA_TYPE_DATA;
           break;
         }
         CDemuxStreamVideoFFmpeg* st = new CDemuxStreamVideoFFmpeg(pStream);
@@ -1498,7 +1498,7 @@ CDemuxStream* CDVDDemuxFFmpeg::AddStream(int streamIdx)
         if (av_dict_get(pStream->metadata, "title", NULL, 0))
           st->m_description = av_dict_get(pStream->metadata, "title", NULL, 0)->value;
 
-        if (pStream->codec->codec_id == AV_CODEC_ID_H264)
+        if (pStream->codecpar->codec_id == AV_CODEC_ID_H264)
         {
           if (CDVDCodecUtils::IsH264AnnexB(m_pFormatContext->iformat->name, pStream))
           {
@@ -1520,18 +1520,18 @@ CDemuxStream* CDVDDemuxFFmpeg::AddStream(int streamIdx)
               else
                 mvcStream = m_pFormatContext->streams[m_pSSIF->GetMVCStreamId()];
 
-              if (mvcStream && pStream->codec->extradata_size > 0 && mvcStream->codec->extradata_size > 0)
+              if (mvcStream && pStream->codecpar->extradata_size > 0 && mvcStream->codecpar->extradata_size > 0)
               {
-                uint8_t* extr = pStream->codec->extradata;
-                pStream->codec->extradata = (uint8_t*)av_mallocz(pStream->codec->extradata_size + mvcStream->codec->extradata_size + FF_INPUT_BUFFER_PADDING_SIZE);
-                memcpy(pStream->codec->extradata, extr, pStream->codec->extradata_size);
-                memcpy(pStream->codec->extradata + pStream->codec->extradata_size, mvcStream->codec->extradata, mvcStream->codec->extradata_size);
-                pStream->codec->extradata_size += mvcStream->codec->extradata_size;
+                uint8_t* extr = pStream->codecpar->extradata;
+                pStream->codecpar->extradata = (uint8_t*)av_mallocz(pStream->codecpar->extradata_size + mvcStream->codecpar->extradata_size + FF_INPUT_BUFFER_PADDING_SIZE);
+                memcpy(pStream->codecpar->extradata, extr, pStream->codecpar->extradata_size);
+                memcpy(pStream->codecpar->extradata + pStream->codecpar->extradata_size, mvcStream->codecpar->extradata, mvcStream->codecpar->extradata_size);
+                pStream->codecpar->extradata_size += mvcStream->codecpar->extradata_size;
                 av_free(extr);
               }
             }
           }
-          else if (CDVDCodecUtils::ProcessH264MVCExtradata(pStream->codec->extradata, pStream->codec->extradata_size))
+          else if (CDVDCodecUtils::ProcessH264MVCExtradata(pStream->codecpar->extradata, pStream->codecpar->extradata_size))
           {
             pStream->codecpar->codec_tag = MKTAG('M', 'V', 'C', '1');
           }
