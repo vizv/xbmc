@@ -20,6 +20,7 @@
 
 #include "VideoSyncPi.h"
 #include "WinSystemRpiGLESContext.h"
+#include "guilib/GUIWindowManager.h"
 #include "utils/log.h"
 
 bool CWinSystemRpiGLESContext::InitWindowSystem()
@@ -112,6 +113,8 @@ void CWinSystemRpiGLESContext::SetVSyncImpl(bool enable)
 
 void CWinSystemRpiGLESContext::PresentRenderImpl(bool rendered)
 {
+  CWinSystemRpi::SetVisible(!g_windowManager.IsFullSceenVideoOnly());
+
   if (m_delayDispReset && m_dispResetTimer.IsTimePast())
   {
     m_delayDispReset = false;
