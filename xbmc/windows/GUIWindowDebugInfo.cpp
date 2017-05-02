@@ -69,7 +69,7 @@ bool CGUIWindowDebugInfo::OnMessage(CGUIMessage &message)
   return CGUIDialog::OnMessage(message);
 }
 
-void CGUIWindowDebugInfo::Process(unsigned int currentTime, CDirtyRegionList &dirtyregions)
+void CGUIWindowDebugInfo::Process(CGUIRenderInfo &renderInfo)
 {
   g_graphicsContext.SetRenderingResolution(g_graphicsContext.GetResInfo(), false);
 

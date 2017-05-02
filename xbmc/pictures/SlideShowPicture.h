@@ -50,7 +50,7 @@ public:
 
   bool IsLoaded() const { return m_bIsLoaded;};
   void UnLoad() {m_bIsLoaded = false;};
-  void Process(unsigned int currentTime, CDirtyRegionList &dirtyregions);
+  void Process(CGUIRenderInfo &renderInfo);
   void Render();
   void Close();
   void Reset(DISPLAY_EFFECT dispEffect = EFFECT_RANDOM, TRANSITION_EFFECT transEffect = FADEIN_FADEOUT);

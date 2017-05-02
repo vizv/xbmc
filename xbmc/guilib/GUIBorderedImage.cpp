@@ -38,9 +38,9 @@ CGUIBorderedImage::~CGUIBorderedImage(void)
 {
 }
 
-void CGUIBorderedImage::Process(unsigned int currentTime, CDirtyRegionList &dirtyregions)
+void CGUIBorderedImage::Process(CGUIRenderInfo &renderInfo)
 {
-  CGUIImage::Process(currentTime, dirtyregions);
+  CGUIImage::Process(renderInfo);
   if (!m_borderImage.GetFileName().empty() && m_texture.ReadyToRender())
   {
     CRect rect = CRect(m_texture.GetXPosition(), m_texture.GetYPosition(), m_texture.GetXPosition() + m_texture.GetWidth(), m_texture.GetYPosition() + m_texture.GetHeight());
@@ -49,7 +49,7 @@ void CGUIBorderedImage::Process(unsigned int currentTime, CDirtyRegionList &dirt
     m_borderImage.SetWidth(rect.Width() + m_borderSize.x1 + m_borderSize.x2);
     m_borderImage.SetHeight(rect.Height() + m_borderSize.y1 + m_borderSize.y2);
     m_borderImage.SetDiffuseColor(m_diffuseColor);
-    if (m_borderImage.Process(currentTime))
+    if (m_borderImage.Process(renderInfo.GetTime()))
       MarkDirtyRegion();
   }
 }

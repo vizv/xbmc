@@ -40,7 +40,7 @@ public:
   virtual ~CGUIListLabel(void);
   virtual CGUIListLabel *Clone() const { return new CGUIListLabel(*this); };
 
-  virtual void Process(unsigned int currentTime, CDirtyRegionList &dirtyregions);
+  virtual void Process(CGUIRenderInfo &renderInfo);
   virtual void Render();
   virtual bool CanFocus() const { return false; };
   virtual void UpdateInfo(const CGUIListItem *item = NULL);

@@ -58,7 +58,7 @@ protected:
    */
   std::string GetLocalized(const CVariant &var) const;
 
-  virtual void Process(unsigned int currentTime, CDirtyRegionList &dirtyregions);
+  virtual void Process(CGUIRenderInfo &renderInfo);
   virtual void OnInitWindow();
   virtual void OnDeinitWindow(int nextWindowID);
 

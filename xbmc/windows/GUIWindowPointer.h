@@ -28,7 +28,7 @@ class CGUIWindowPointer :
 public:
   CGUIWindowPointer(void);
   virtual ~CGUIWindowPointer(void);
-  virtual void Process(unsigned int currentTime, CDirtyRegionList &dirtyregions);
+  virtual void Process(CGUIRenderInfo &renderInfo);
 protected:
   void SetPointer(int pointer);
   virtual void OnWindowLoaded();

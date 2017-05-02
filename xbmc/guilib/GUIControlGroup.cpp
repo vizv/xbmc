@@ -92,7 +92,7 @@ void CGUIControlGroup::DynamicResourceAlloc(bool bOnOff)
   }
 }
 
-void CGUIControlGroup::Process(unsigned int currentTime, CDirtyRegionList &dirtyregions)
+void CGUIControlGroup::Process(CGUIRenderInfo &renderInfo)
 {
   CPoint pos(GetPosition());
   g_graphicsContext.SetOrigin(pos.x, pos.y);
@@ -101,14 +101,14 @@ void CGUIControlGroup::Process(unsigned int currentTime, CDirtyRegionList &dirty
   for (auto *control : m_children)
   {
     control->UpdateVisibility();
-    unsigned int oldDirty = dirtyregions.size();
-    control->DoProcess(currentTime, dirtyregions);
-    if (control->IsVisible() || (oldDirty != dirtyregions.size())) // visible or dirty (was visible?)
+    unsigned int oldDirty = renderInfo.GetRegionSize();
+    control->DoProcess(renderInfo);
+    if (control->IsVisible() || (oldDirty != renderInfo.GetRegionSize())) // visible or dirty (was visible?)
       rect.Union(control->GetRenderRegion());
   }
 
   g_graphicsContext.RestoreOrigin();
-  CGUIControl::Process(currentTime, dirtyregions);
+  CGUIControl::Process(renderInfo);
   m_renderRegion = rect;
 }
 

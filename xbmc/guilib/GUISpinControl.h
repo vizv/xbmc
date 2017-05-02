@@ -50,7 +50,7 @@ public:
   virtual ~CGUISpinControl(void);
   virtual CGUISpinControl *Clone() const { return new CGUISpinControl(*this); };
 
-  virtual void Process(unsigned int currentTime, CDirtyRegionList &dirtyregions);
+  virtual void Process(CGUIRenderInfo &renderInfo);
   virtual void Render();
   virtual bool OnAction(const CAction &action);
   virtual void OnLeft();

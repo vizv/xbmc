@@ -185,7 +185,7 @@ void CGUIDialogSubtitles::OnInitWindow()
   Search();
 }
 
-void CGUIDialogSubtitles::Process(unsigned int currentTime, CDirtyRegionList &dirtyregions)
+void CGUIDialogSubtitles::Process(CGUIRenderInfo &renderInfo)
 {
   if (m_bInvalidated)
   {
@@ -227,7 +227,7 @@ void CGUIDialogSubtitles::Process(unsigned int currentTime, CDirtyRegionList &di
       OnMessage(msg);
     }
   }
-  CGUIDialog::Process(currentTime, dirtyregions);
+  CGUIDialog::Process(renderInfo);
 }
 
 void CGUIDialogSubtitles::FillServices()

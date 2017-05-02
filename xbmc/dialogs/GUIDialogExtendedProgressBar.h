@@ -60,7 +60,7 @@ public:
   CGUIDialogExtendedProgressBar(void);
   virtual ~CGUIDialogExtendedProgressBar(void) {};
   virtual bool OnMessage(CGUIMessage& message);
-  virtual void Process(unsigned int currentTime, CDirtyRegionList &dirtyregions);
+  virtual void Process(CGUIRenderInfo &renderInfo);
 
   CGUIDialogProgressBarHandle *GetHandle(const std::string &strTitle);
 

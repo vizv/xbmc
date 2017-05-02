@@ -48,7 +48,7 @@ public:
   virtual ~GUIScrollBarControl(void);
   virtual GUIScrollBarControl *Clone() const { return new GUIScrollBarControl(*this); };
 
-  virtual void Process(unsigned int currentTime, CDirtyRegionList &dirtyregions);
+  virtual void Process(CGUIRenderInfo &renderInfo);
   virtual void Render();
   virtual bool OnAction(const CAction &action);
   virtual void AllocResources();

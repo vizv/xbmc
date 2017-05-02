@@ -124,13 +124,13 @@ void CGUIControl::DynamicResourceAlloc(bool bOnOff)
 // 1. animate and set animation transform
 // 2. if visible, process
 // 3. reset the animation transform
-void CGUIControl::DoProcess(unsigned int currentTime, CDirtyRegionList &dirtyregions)
+void CGUIControl::DoProcess(CGUIRenderInfo &renderInfo)
 {
   CRect dirtyRegion = m_renderRegion;
 
   bool changed = m_bInvalidated && IsVisible();
 
-  changed |= Animate(currentTime);
+  changed |= Animate(renderInfo.GetTime());
 
   if (IsVisible())
   {
@@ -138,7 +138,7 @@ void CGUIControl::DoProcess(unsigned int currentTime, CDirtyRegionList &dirtyreg
     if (m_hasCamera)
       g_graphicsContext.SetCameraPosition(m_camera);
 
-    Process(currentTime, dirtyregions);
+    Process(renderInfo);
     m_bInvalidated = false;
 
     if (dirtyRegion != m_renderRegion)
@@ -158,11 +158,11 @@ void CGUIControl::DoProcess(unsigned int currentTime, CDirtyRegionList &dirtyreg
 
   if (changed)
   {
-    dirtyregions.push_back(dirtyRegion);
+    renderInfo.AddRegion(dirtyRegion);
   }
 }
 
-void CGUIControl::Process(unsigned int currentTime, CDirtyRegionList &dirtyregions)
+void CGUIControl::Process(CGUIRenderInfo &renderInfo)
 {
   // update our render region
   m_renderRegion = g_graphicsContext.generateAABB(CalcRenderRegion());

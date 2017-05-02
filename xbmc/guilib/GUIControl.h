@@ -81,8 +81,8 @@ public:
   virtual ~CGUIControl(void);
   virtual CGUIControl *Clone() const=0;
 
-  virtual void DoProcess(unsigned int currentTime, CDirtyRegionList &dirtyregions);
-  virtual void Process(unsigned int currentTime, CDirtyRegionList &dirtyregions);
+  virtual void DoProcess(CGUIRenderInfo &renderInfo);
+  virtual void Process(CGUIRenderInfo &renderInfo);
   virtual void DoRender();
   virtual void Render() {};
   // Called after the actual rendering is completed to trigger additional

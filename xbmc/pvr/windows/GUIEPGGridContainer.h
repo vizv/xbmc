@@ -57,7 +57,7 @@ namespace PVR
     std::string GetDescription() const override;
     EVENT_RESULT OnMouseEvent(const CPoint &point, const CMouseEvent &event) override;
 
-    void Process(unsigned int currentTime, CDirtyRegionList &dirtyregions) override;
+    void Process(CGUIRenderInfo &renderInfo) override;
     void Render() override;
 
     CGUIListItemPtr GetListItem(int offset, unsigned int flag = 0) const override;
@@ -119,15 +119,15 @@ namespace PVR
     void GoToBlock(int blockIndex);
     void GoToChannel(int channelIndex);
     void UpdateScrollOffset(unsigned int currentTime);
-    void ProcessItem(float posX, float posY, const CFileItemPtr &item, CFileItemPtr &lastitem, bool focused, CGUIListItemLayout* normallayout, CGUIListItemLayout* focusedlayout, unsigned int currentTime, CDirtyRegionList &dirtyregions, float resize = -1.0f);
+    void ProcessItem(float posX, float posY, const CFileItemPtr &item, CFileItemPtr &lastitem, bool focused, CGUIListItemLayout* normallayout, CGUIListItemLayout* focusedlayout, CGUIRenderInfo &renderInfo, float resize = -1.0f);
     void RenderItem(float posX, float posY, CGUIListItem *item, bool focused);
     void GetCurrentLayouts();
 
-    void ProcessChannels(unsigned int currentTime, CDirtyRegionList &dirtyregions);
-    void ProcessRuler(unsigned int currentTime, CDirtyRegionList &dirtyregions);
-    void ProcessRulerDate(unsigned int currentTime, CDirtyRegionList &dirtyregions);
-    void ProcessProgrammeGrid(unsigned int currentTime, CDirtyRegionList &dirtyregions);
-    void ProcessProgressIndicator(unsigned int currentTime, CDirtyRegionList &dirtyregions);
+    void ProcessChannels(CGUIRenderInfo &renderInfo);
+    void ProcessRuler(CGUIRenderInfo &renderInfo);
+    void ProcessRulerDate(CGUIRenderInfo &renderInfo);
+    void ProcessProgrammeGrid(CGUIRenderInfo &renderInfo);
+    void ProcessProgressIndicator(CGUIRenderInfo &renderInfo);
     void RenderChannels();
     void RenderRulerDate();
     void RenderRuler();
@@ -162,10 +162,10 @@ namespace PVR
     bool OnMouseDoubleClick(int dwButton, const CPoint &point);
     bool OnMouseWheel(char wheel, const CPoint &point);
 
-    void HandleChannels(bool bRender, unsigned int currentTime, CDirtyRegionList &dirtyregions);
-    void HandleRuler(bool bRender, unsigned int currentTime, CDirtyRegionList &dirtyregions);
-    void HandleRulerDate(bool bRender, unsigned int currentTime, CDirtyRegionList &dirtyregions);
-    void HandleProgrammeGrid(bool bRender, unsigned int currentTime, CDirtyRegionList &dirtyregions);
+    void HandleChannels(bool bRender, CGUIRenderInfo &renderInfo);
+    void HandleRuler(bool bRender, CGUIRenderInfo &renderInfo);
+    void HandleRulerDate(bool bRender, CGUIRenderInfo &renderInfo);
+    void HandleProgrammeGrid(bool bRender, CGUIRenderInfo &renderInfo);
 
     float GetCurrentTimePositionOnPage() const;
     float GetProgressIndicatorWidth() const;

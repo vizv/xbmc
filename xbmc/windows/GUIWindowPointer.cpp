@@ -78,7 +78,7 @@ void CGUIWindowPointer::OnWindowLoaded()
   m_renderOrder = RENDER_ORDER_WINDOW_POINTER;
 }
 
-void CGUIWindowPointer::Process(unsigned int currentTime, CDirtyRegionList &dirtyregions)
+void CGUIWindowPointer::Process(CGUIRenderInfo &renderInfo)
 {
   bool active = CInputManager::GetInstance().IsMouseActive();
   if (active != m_active)
@@ -89,5 +89,5 @@ void CGUIWindowPointer::Process(unsigned int currentTime, CDirtyRegionList &dirt
   MousePosition pos = CInputManager::GetInstance().GetMousePosition();
   SetPosition((float)pos.x, (float)pos.y);
   SetPointer(CInputManager::GetInstance().GetMouseState());
-  return CGUIWindow::Process(currentTime, dirtyregions);
+  return CGUIWindow::Process(renderInfo);
 }

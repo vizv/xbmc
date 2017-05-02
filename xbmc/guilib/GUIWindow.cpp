@@ -339,11 +339,11 @@ void CGUIWindow::CenterWindow()
   m_posY = (m_coordsRes.iHeight - GetHeight()) / 2;
 }
 
-void CGUIWindow::DoProcess(unsigned int currentTime, CDirtyRegionList &dirtyregions)
+void CGUIWindow::DoProcess(CGUIRenderInfo &renderInfo)
 {
   g_graphicsContext.SetRenderingResolution(m_coordsRes, m_needsScaling);
   g_graphicsContext.AddGUITransform();
-  CGUIControlGroup::DoProcess(currentTime, dirtyregions);
+  CGUIControlGroup::DoProcess(renderInfo);
   g_graphicsContext.RemoveTransform();
 
   // check if currently focused control can have it

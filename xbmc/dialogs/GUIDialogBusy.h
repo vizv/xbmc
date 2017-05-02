@@ -31,7 +31,7 @@ public:
   CGUIDialogBusy(void);
   virtual ~CGUIDialogBusy(void);
   virtual bool OnBack(int actionID);
-  virtual void DoProcess(unsigned int currentTime, CDirtyRegionList &dirtyregions);
+  virtual void DoProcess(CGUIRenderInfo &renderInfo);
   virtual void Render();
   /*! \brief set the current progress of the busy operation
    \param progress a percentage of progress

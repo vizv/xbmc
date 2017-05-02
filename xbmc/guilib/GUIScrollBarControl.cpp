@@ -46,23 +46,23 @@ GUIScrollBarControl::~GUIScrollBarControl(void)
 {
 }
 
-void GUIScrollBarControl::Process(unsigned int currentTime, CDirtyRegionList &dirtyregions)
+void GUIScrollBarControl::Process(CGUIRenderInfo &renderInfo)
 {
   bool changed = false;
 
   if (m_bInvalidated)
     changed |= UpdateBarSize();
 
-  changed |= m_guiBackground.Process(currentTime);
-  changed |= m_guiBarNoFocus.Process(currentTime);
-  changed |= m_guiBarFocus.Process(currentTime);
-  changed |= m_guiNibNoFocus.Process(currentTime);
-  changed |= m_guiNibFocus.Process(currentTime);
+  changed |= m_guiBackground.Process(renderInfo.GetTime());
+  changed |= m_guiBarNoFocus.Process(renderInfo.GetTime());
+  changed |= m_guiBarFocus.Process(renderInfo.GetTime());
+  changed |= m_guiNibNoFocus.Process(renderInfo.GetTime());
+  changed |= m_guiNibFocus.Process(renderInfo.GetTime());
 
   if (changed)
     MarkDirtyRegion();
 
-  CGUIControl::Process(currentTime, dirtyregions);
+  CGUIControl::Process(renderInfo);
 }
 
 void GUIScrollBarControl::Render()

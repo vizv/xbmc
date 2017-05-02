@@ -78,11 +78,11 @@ bool CGUIWindowTestPattern::OnMessage(CGUIMessage& message)
   return CGUIWindow::OnMessage(message);
 }
 
-void CGUIWindowTestPattern::Process(unsigned int currentTime, CDirtyRegionList &dirtyregions)
+void CGUIWindowTestPattern::Process(CGUIRenderInfo &renderInfo)
 {
   if (m_pattern == 0 || m_pattern == 4)
     MarkDirtyRegion();
-  CGUIWindow::Process(currentTime, dirtyregions);
+  CGUIWindow::Process(renderInfo);
   m_renderRegion.SetRect(0, 0, (float)g_graphicsContext.GetWidth(), (float)g_graphicsContext.GetHeight());
 
 #ifndef HAS_DX

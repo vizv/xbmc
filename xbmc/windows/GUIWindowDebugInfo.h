@@ -33,7 +33,7 @@ class CGUIWindowDebugInfo :
 public:
   CGUIWindowDebugInfo();
   virtual ~CGUIWindowDebugInfo();
-  virtual void Process(unsigned int currentTime, CDirtyRegionList &dirtyregions);
+  virtual void Process(CGUIRenderInfo &renderInfo);
   virtual void Render();
   virtual bool OnMessage(CGUIMessage &message);
 protected:

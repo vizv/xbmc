@@ -33,7 +33,7 @@ public:
   virtual ~CGUIBorderedImage(void);
   virtual CGUIBorderedImage *Clone() const { return new CGUIBorderedImage(*this); };
 
-  virtual void Process(unsigned int currentTime, CDirtyRegionList &dirtyregions);
+  virtual void Process(CGUIRenderInfo &renderInfo);
   virtual void Render();
   virtual void AllocResources();
   virtual void FreeResources(bool immediately = false);

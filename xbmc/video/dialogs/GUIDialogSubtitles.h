@@ -43,7 +43,7 @@ public:
   virtual void OnInitWindow();
 
 protected:
-  virtual void Process(unsigned int currentTime, CDirtyRegionList &dirtyregions);
+  virtual void Process(CGUIRenderInfo &renderInfo);
   virtual void OnJobComplete(unsigned int jobID, bool success, CJob *job);
 
   bool SetService(const std::string &service);

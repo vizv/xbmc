@@ -1029,20 +1029,21 @@ void CGUIWindowManager::Process(unsigned int currentTime)
   assert(g_application.IsCurrentThread());
   CSingleLock lock(g_graphicsContext);
 
-  CDirtyRegionList dirtyregions;
+  m_renderInfo.Reset(currentTime);
 
   CGUIWindow* pWindow = GetWindow(GetActiveWindow());
   if (pWindow)
-    pWindow->DoProcess(currentTime, dirtyregions);
+    pWindow->DoProcess(m_renderInfo);
 
   // process all dialogs - visibility may change etc.
   for (const auto& entry : m_mapWindows)
   {
     CGUIWindow *pWindow = entry.second;
     if (pWindow && pWindow->IsDialog())
-      pWindow->DoProcess(currentTime, dirtyregions);
+      pWindow->DoProcess(m_renderInfo);
   }
 
+  CDirtyRegionList &dirtyregions = m_renderInfo.GetRegions();
   for (CDirtyRegionList::iterator itr = dirtyregions.begin(); itr != dirtyregions.end(); ++itr)
     m_tracker.MarkDirtyRegion(*itr);
 }

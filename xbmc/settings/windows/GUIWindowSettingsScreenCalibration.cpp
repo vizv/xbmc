@@ -407,7 +407,7 @@ void CGUIWindowSettingsScreenCalibration::FrameMove()
   CGUIWindow::FrameMove();
 }
 
-void CGUIWindowSettingsScreenCalibration::DoProcess(unsigned int currentTime, CDirtyRegionList &dirtyregions)
+void CGUIWindowSettingsScreenCalibration::DoProcess(CGUIRenderInfo &renderInfo)
 {
   MarkDirtyRegion();
 
@@ -415,7 +415,7 @@ void CGUIWindowSettingsScreenCalibration::DoProcess(unsigned int currentTime, CD
     SET_CONTROL_HIDDEN(i);
 
   m_needsScaling = true;
-  CGUIWindow::DoProcess(currentTime, dirtyregions);
+  CGUIWindow::DoProcess(renderInfo);
   m_needsScaling = false;
 
   g_graphicsContext.SetRenderingResolution(m_Res[m_iCurRes], false);
@@ -427,7 +427,7 @@ void CGUIWindowSettingsScreenCalibration::DoProcess(unsigned int currentTime, CD
     SET_CONTROL_VISIBLE(i);
     CGUIControl *control = GetControl(i);
     if (control)
-      control->DoProcess(currentTime, dirtyregions);
+      control->DoProcess(renderInfo);
   }
   g_graphicsContext.RemoveTransform();
 }

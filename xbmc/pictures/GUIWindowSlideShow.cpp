@@ -373,7 +373,7 @@ void CGUIWindowSlideShow::SetDirection(int direction)
   }
 }
 
-void CGUIWindowSlideShow::Process(unsigned int currentTime, CDirtyRegionList &regions)
+void CGUIWindowSlideShow::Process(CGUIRenderInfo &renderInfo)
 {
   const RESOLUTION_INFO res = g_graphicsContext.GetResInfo();
 
@@ -386,7 +386,7 @@ void CGUIWindowSlideShow::Process(unsigned int currentTime, CDirtyRegionList &re
 
   // if we haven't processed yet, we should mark the whole screen
   if (!HasProcessed())
-    regions.push_back(CRect(0.0f, 0.0f, (float)g_graphicsContext.GetWidth(), (float)g_graphicsContext.GetHeight()));
+    renderInfo.AddRegion(CRect(0.0f, 0.0f, (float)g_graphicsContext.GetWidth(), (float)g_graphicsContext.GetHeight()));
 
   if (m_iCurrentSlide < 0 || m_iCurrentSlide >= static_cast<int>(m_slides.size()))
     m_iCurrentSlide = 0;
@@ -466,7 +466,7 @@ void CGUIWindowSlideShow::Process(unsigned int currentTime, CDirtyRegionList &re
 
   if (m_bErrorMessage)
   { // hack, just mark it all
-    regions.push_back(CRect(0.0f, 0.0f, (float)g_graphicsContext.GetWidth(), (float)g_graphicsContext.GetHeight()));
+    renderInfo.AddRegion(CRect(0.0f, 0.0f, (float)g_graphicsContext.GetWidth(), (float)g_graphicsContext.GetHeight()));
     return;
   }
 
@@ -529,7 +529,7 @@ void CGUIWindowSlideShow::Process(unsigned int currentTime, CDirtyRegionList &re
   {
     m_Image[m_iCurrentPic].SetInSlideshow(bSlideShow);
     m_Image[m_iCurrentPic].Pause(!bSlideShow);
-    m_Image[m_iCurrentPic].Process(currentTime, regions);
+    m_Image[m_iCurrentPic].Process(renderInfo);
   }
 
   // Check if we should be transitioning immediately
@@ -566,7 +566,7 @@ void CGUIWindowSlideShow::Process(unsigned int currentTime, CDirtyRegionList &re
       // set the appropriate transition time
       m_Image[1 - m_iCurrentPic].SetTransitionTime(0, m_Image[m_iCurrentPic].GetTransitionTime(1));
       m_Image[1 - m_iCurrentPic].Pause(!m_bSlideShow || m_bPause || m_slides.at(m_iNextSlide)->IsVideo());
-      m_Image[1 - m_iCurrentPic].Process(currentTime, regions);
+      m_Image[1 - m_iCurrentPic].Process(renderInfo);
     }
     else // next pic isn't loaded.  We should hang around if it is in progress
     {
@@ -621,7 +621,7 @@ void CGUIWindowSlideShow::Process(unsigned int currentTime, CDirtyRegionList &re
     g_infoManager.SetCurrentSlide(*m_slides.at(m_iCurrentSlide));
 
   RenderPause();
-  CGUIWindow::Process(currentTime, regions);
+  CGUIWindow::Process(renderInfo);
   m_renderRegion.SetRect(0, 0, (float)g_graphicsContext.GetWidth(), (float)g_graphicsContext.GetHeight());
 }
 

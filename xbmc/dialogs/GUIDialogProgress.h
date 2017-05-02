@@ -50,7 +50,7 @@ public:
 protected:
   virtual void OnInitWindow();
   virtual int GetDefaultLabelID(int controlId) const;
-  virtual void Process(unsigned int currentTime, CDirtyRegionList &dirtyregions);
+  virtual void Process(CGUIRenderInfo &renderInfo);
 
   bool m_bCanCancel;
   bool m_bCanceled;

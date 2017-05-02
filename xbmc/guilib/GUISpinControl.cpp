@@ -371,7 +371,7 @@ void CGUISpinControl::SetInvalid()
   m_imgspinDownDisabled.SetInvalid();
 }
 
-void CGUISpinControl::Process(unsigned int currentTime, CDirtyRegionList &dirtyregions)
+void CGUISpinControl::Process(CGUIRenderInfo &renderInfo)
 {
   bool changed = false;
 
@@ -447,18 +447,18 @@ void CGUISpinControl::Process(unsigned int currentTime, CDirtyRegionList &dirtyr
     changed |= m_imgspinUpDisabled.SetPosition(m_posX + textWidth + space + m_imgspinDownDisabled.GetWidth(), m_posY);
   }
 
-  changed |= m_imgspinDownFocus.Process(currentTime);
-  changed |= m_imgspinDown.Process(currentTime);
-  changed |= m_imgspinUp.Process(currentTime);
-  changed |= m_imgspinUpFocus.Process(currentTime);
-  changed |= m_imgspinUpDisabled.Process(currentTime);
-  changed |= m_imgspinDownDisabled.Process(currentTime);
-  changed |= m_label.Process(currentTime);
+  changed |= m_imgspinDownFocus.Process(renderInfo.GetTime());
+  changed |= m_imgspinDown.Process(renderInfo.GetTime());
+  changed |= m_imgspinUp.Process(renderInfo.GetTime());
+  changed |= m_imgspinUpFocus.Process(renderInfo.GetTime());
+  changed |= m_imgspinUpDisabled.Process(renderInfo.GetTime());
+  changed |= m_imgspinDownDisabled.Process(renderInfo.GetTime());
+  changed |= m_label.Process(renderInfo.GetTime());
 
   if (changed)
     MarkDirtyRegion();
 
-  CGUIControl::Process(currentTime, dirtyregions);
+  CGUIControl::Process(renderInfo);
 }
 
 void CGUISpinControl::Render()

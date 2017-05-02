@@ -211,6 +211,7 @@ public:
    */
   bool IsPythonWindow(int id) const { return (id >= WINDOW_PYTHON_START && id <= WINDOW_PYTHON_END); };
 
+  CGUIRenderInfo GetGUIRenderInfo() const { return m_renderInfo; }
 #ifdef _DEBUG
   void DumpTextureUse();
 #endif
@@ -262,6 +263,7 @@ private:
   bool m_initialized;
 
   CDirtyRegionTracker m_tracker;
+  CGUIRenderInfo m_renderInfo;
 };
 
 /*!

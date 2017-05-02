@@ -31,7 +31,7 @@ public:
   virtual bool OnAction(const CAction &action);
   virtual void ClearBackground();
   virtual void FrameMove();
-  virtual void Process(unsigned int currentTime, CDirtyRegionList &dirtyregion);
+  virtual void Process(CGUIRenderInfo &renderInfo);
   virtual void Render();
   virtual void RenderEx();
   virtual void OnWindowLoaded();

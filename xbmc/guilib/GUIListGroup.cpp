@@ -57,7 +57,7 @@ void CGUIListGroup::AddControl(CGUIControl *control, int position /*= -1*/)
   CGUIControlGroup::AddControl(control, position);
 }
 
-void CGUIListGroup::Process(unsigned int currentTime, CDirtyRegionList &dirtyregions)
+void CGUIListGroup::Process(CGUIRenderInfo &renderInfo)
 {
   g_graphicsContext.SetOrigin(m_posX, m_posY);
 
@@ -66,14 +66,14 @@ void CGUIListGroup::Process(unsigned int currentTime, CDirtyRegionList &dirtyreg
   {
     CGUIControl *control = *it;
     control->UpdateVisibility(m_item);
-    unsigned int oldDirty = dirtyregions.size();
-    control->DoProcess(currentTime, dirtyregions);
-    if (control->IsVisible() || (oldDirty != dirtyregions.size())) // visible or dirty (was visible?)
+    unsigned int oldDirty = renderInfo.GetRegionSize();
+    control->DoProcess(renderInfo);
+    if (control->IsVisible() || (oldDirty != renderInfo.GetRegionSize())) // visible or dirty (was visible?)
       rect.Union(control->GetRenderRegion());
   }
 
   g_graphicsContext.RestoreOrigin();
-  CGUIControl::Process(currentTime, dirtyregions);
+  CGUIControl::Process(renderInfo);
   m_renderRegion = rect;
   m_item = NULL;
 }

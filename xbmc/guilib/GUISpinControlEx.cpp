@@ -62,7 +62,7 @@ void CGUISpinControlEx::SetInvalid()
   m_buttonControl.SetInvalid();
 }
 
-void CGUISpinControlEx::Process(unsigned int currentTime, CDirtyRegionList &dirtyregions)
+void CGUISpinControlEx::Process(CGUIRenderInfo &renderInfo)
 {
   // make sure the button has focus if it should have...
   m_buttonControl.SetFocus(HasFocus());
@@ -74,8 +74,8 @@ void CGUISpinControlEx::Process(unsigned int currentTime, CDirtyRegionList &dirt
     float spinPosY = m_buttonControl.GetYPosition() + (m_buttonControl.GetHeight() - GetSpinHeight()) * 0.5f;
     CGUISpinControl::SetPosition(spinPosX, spinPosY);
   }
-  m_buttonControl.DoProcess(currentTime, dirtyregions);
-  CGUISpinControl::Process(currentTime, dirtyregions);
+  m_buttonControl.DoProcess(renderInfo);
+  CGUISpinControl::Process(renderInfo);
 }
 
 void CGUISpinControlEx::Render()

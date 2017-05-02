@@ -60,7 +60,7 @@ CGUIControllerWindow::~CGUIControllerWindow(void)
   delete m_featureList;
 }
 
-void CGUIControllerWindow::DoProcess(unsigned int currentTime, CDirtyRegionList &dirtyregions)
+void CGUIControllerWindow::DoProcess(CGUIRenderInfo &renderInfo)
 {
   /*
    * Apply the faded focus texture to the current controller when unfocused
@@ -83,7 +83,7 @@ void CGUIControllerWindow::DoProcess(unsigned int currentTime, CDirtyRegionList 
     }
   }
 
-  CGUIDialog::DoProcess(currentTime, dirtyregions);
+  CGUIDialog::DoProcess(renderInfo);
 
   if (control && bAlphaFaded)
   {

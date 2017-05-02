@@ -56,22 +56,22 @@ void CGUIProgressControl::SetPosition(float posX, float posY)
   m_guiBackground.SetPosition(posX, posY);
 }
 
-void CGUIProgressControl::Process(unsigned int currentTime, CDirtyRegionList &dirtyregions)
+void CGUIProgressControl::Process(CGUIRenderInfo &renderInfo)
 {
   bool changed = false;
 
   if (!IsDisabled())
     changed |= UpdateLayout();
-  changed |= m_guiBackground.Process(currentTime);
-  changed |= m_guiMid.Process(currentTime);
-  changed |= m_guiLeft.Process(currentTime);
-  changed |= m_guiRight.Process(currentTime);
-  changed |= m_guiOverlay.Process(currentTime);
+  changed |= m_guiBackground.Process(renderInfo.GetTime());
+  changed |= m_guiMid.Process(renderInfo.GetTime());
+  changed |= m_guiLeft.Process(renderInfo.GetTime());
+  changed |= m_guiRight.Process(renderInfo.GetTime());
+  changed |= m_guiOverlay.Process(renderInfo.GetTime());
 
   if (changed)
     MarkDirtyRegion();
 
-  CGUIControl::Process(currentTime, dirtyregions);
+  CGUIControl::Process(renderInfo);
 }
 
 void CGUIProgressControl::Render()

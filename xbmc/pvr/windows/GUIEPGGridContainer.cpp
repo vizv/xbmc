@@ -175,7 +175,7 @@ void CGUIEPGGridContainer::SetPageControl(int id)
   m_pageControl = id;
 }
 
-void CGUIEPGGridContainer::Process(unsigned int currentTime, CDirtyRegionList &dirtyregions)
+void CGUIEPGGridContainer::Process(CGUIRenderInfo &renderInfo)
 {
   ValidateOffset();
 
@@ -204,12 +204,12 @@ void CGUIEPGGridContainer::Process(unsigned int currentTime, CDirtyRegionList &d
     }
   }
 
-  UpdateScrollOffset(currentTime);
-  ProcessChannels(currentTime, dirtyregions);
-  ProcessRulerDate(currentTime, dirtyregions);
-  ProcessRuler(currentTime, dirtyregions);
-  ProcessProgrammeGrid(currentTime, dirtyregions);
-  ProcessProgressIndicator(currentTime, dirtyregions);
+  UpdateScrollOffset(renderInfo.GetTime());
+  ProcessChannels(renderInfo);
+  ProcessRulerDate(renderInfo);
+  ProcessRuler(renderInfo);
+  ProcessProgrammeGrid(renderInfo);
+  ProcessProgressIndicator(renderInfo);
 
   if (m_pageControl)
   {
@@ -221,7 +221,7 @@ void CGUIEPGGridContainer::Process(unsigned int currentTime, CDirtyRegionList &d
     SendWindowMessage(msg);
   }
 
-  CGUIControl::Process(currentTime, dirtyregions);
+  CGUIControl::Process(renderInfo);
 }
 
 void CGUIEPGGridContainer::Render()
@@ -235,56 +235,52 @@ void CGUIEPGGridContainer::Render()
   CGUIControl::Render();
 }
 
-void CGUIEPGGridContainer::ProcessChannels(unsigned int currentTime, CDirtyRegionList &dirtyregions)
+void CGUIEPGGridContainer::ProcessChannels(CGUIRenderInfo &renderInfo)
 {
-  HandleChannels(false, currentTime, dirtyregions);
+  HandleChannels(false, renderInfo);
 }
 
 void CGUIEPGGridContainer::RenderChannels()
 {
   // params not needed for render.
-  unsigned int dummyTime = 0;
-  CDirtyRegionList dummyRegions;
-  HandleChannels(true, dummyTime, dummyRegions);
+  CGUIRenderInfo dummyInfo;
+  HandleChannels(true, dummyInfo);
 }
 
-void CGUIEPGGridContainer::ProcessRulerDate(unsigned int currentTime, CDirtyRegionList &dirtyregions)
+void CGUIEPGGridContainer::ProcessRulerDate(CGUIRenderInfo &renderInfo)
 {
-  HandleRulerDate(false, currentTime, dirtyregions);
+  HandleRulerDate(false, renderInfo);
 }
 
 void CGUIEPGGridContainer::RenderRulerDate()
 {
   // params not needed for render.
-  unsigned int dummyTime = 0;
-  CDirtyRegionList dummyRegions;
-  HandleRulerDate(true, dummyTime, dummyRegions);
+  CGUIRenderInfo dummyInfo;
+  HandleRulerDate(true, dummyInfo);
 }
 
-void CGUIEPGGridContainer::ProcessRuler(unsigned int currentTime, CDirtyRegionList &dirtyregions)
+void CGUIEPGGridContainer::ProcessRuler(CGUIRenderInfo &renderInfo)
 {
-  HandleRuler(false, currentTime, dirtyregions);
+  HandleRuler(false, renderInfo);
 }
 
 void CGUIEPGGridContainer::RenderRuler()
 {
   // params not needed for render.
-  unsigned int dummyTime = 0;
-  CDirtyRegionList dummyRegions;
-  HandleRuler(true, dummyTime, dummyRegions);
+  CGUIRenderInfo dummyInfo;
+  HandleRuler(true, dummyInfo);
 }
 
-void CGUIEPGGridContainer::ProcessProgrammeGrid(unsigned int currentTime, CDirtyRegionList &dirtyregions)
+void CGUIEPGGridContainer::ProcessProgrammeGrid(CGUIRenderInfo &renderInfo)
 {
-  HandleProgrammeGrid(false, currentTime, dirtyregions);
+  HandleProgrammeGrid(false, renderInfo);
 }
 
 void CGUIEPGGridContainer::RenderProgrammeGrid()
 {
   // params not needed for render.
-  unsigned int dummyTime = 0;
-  CDirtyRegionList dummyRegions;
-  HandleProgrammeGrid(true, dummyTime, dummyRegions);
+  CGUIRenderInfo dummyInfo;
+  HandleProgrammeGrid(true, dummyInfo);
 }
 
 float CGUIEPGGridContainer::GetCurrentTimePositionOnPage() const
@@ -307,7 +303,7 @@ float CGUIEPGGridContainer::GetProgressIndicatorHeight() const
   return (m_orientation == VERTICAL) ? m_rulerHeight + m_gridHeight : GetCurrentTimePositionOnPage();
 }
 
-void CGUIEPGGridContainer::ProcessProgressIndicator(unsigned int currentTime, CDirtyRegionList &dirtyregions)
+void CGUIEPGGridContainer::ProcessProgressIndicator(CGUIRenderInfo &renderInfo)
 {
   float width = GetProgressIndicatorWidth();
   float height = GetProgressIndicatorHeight();
@@ -324,7 +320,7 @@ void CGUIEPGGridContainer::ProcessProgressIndicator(unsigned int currentTime, CD
     m_guiProgressIndicatorTexture.SetVisible(false);
   }
   
-  m_guiProgressIndicatorTexture.Process(currentTime);
+  m_guiProgressIndicatorTexture.Process(renderInfo.GetTime());
 }
 
 void CGUIEPGGridContainer::RenderProgressIndicator()
@@ -339,7 +335,7 @@ void CGUIEPGGridContainer::RenderProgressIndicator()
 
 void CGUIEPGGridContainer::ProcessItem(float posX, float posY, const CFileItemPtr &item, CFileItemPtr &lastitem,
   bool focused, CGUIListItemLayout* normallayout, CGUIListItemLayout* focusedlayout,
-  unsigned int currentTime, CDirtyRegionList &dirtyregions, float resize /* = -1.0f */)
+  CGUIRenderInfo &renderInfo, float resize /* = -1.0f */)
 {
   if (!normallayout || !focusedlayout)
     return;
@@ -380,7 +376,7 @@ void CGUIEPGGridContainer::ProcessItem(float posX, float posY, const CFileItemPt
       item->GetFocusedLayout()->SetFocusedItem(subItem ? subItem : 1);
     }
 
-    item->GetFocusedLayout()->Process(item.get(), m_parentID, currentTime, dirtyregions);
+    item->GetFocusedLayout()->Process(item.get(), m_parentID, renderInfo);
     lastitem = item;
   }
   else
@@ -403,9 +399,9 @@ void CGUIEPGGridContainer::ProcessItem(float posX, float posY, const CFileItemPt
       item->GetFocusedLayout()->SetFocusedItem(0);
 
     if (item->GetFocusedLayout() && item->GetFocusedLayout()->IsAnimating(ANIM_TYPE_UNFOCUS))
-      item->GetFocusedLayout()->Process(item.get(), m_parentID, currentTime, dirtyregions);
+      item->GetFocusedLayout()->Process(item.get(), m_parentID, renderInfo);
     else
-      item->GetLayout()->Process(item.get(), m_parentID, currentTime, dirtyregions);
+      item->GetLayout()->Process(item.get(), m_parentID, renderInfo);
   }
   g_graphicsContext.RestoreOrigin();
 }
@@ -1962,7 +1958,7 @@ void CGUIEPGGridContainer::GetProgrammeCacheOffsets(int &cacheBefore, int &cache
   }
 }
 
-void CGUIEPGGridContainer::HandleChannels(bool bRender, unsigned int currentTime, CDirtyRegionList &dirtyregions)
+void CGUIEPGGridContainer::HandleChannels(bool bRender, CGUIRenderInfo &renderInfo)
 {
   if (!m_focusedChannelLayout || !m_channelLayout)
     return;
@@ -2045,9 +2041,9 @@ void CGUIEPGGridContainer::HandleChannels(bool bRender, unsigned int currentTime
       {
         // process our item
         if (m_orientation == VERTICAL)
-          ProcessItem(originChannel.x, pos, item, m_lastItem, focused, m_channelLayout, m_focusedChannelLayout, currentTime, dirtyregions);
+          ProcessItem(originChannel.x, pos, item, m_lastItem, focused, m_channelLayout, m_focusedChannelLayout, renderInfo);
         else
-          ProcessItem(pos, originChannel.y, item, m_lastItem, focused, m_channelLayout, m_focusedChannelLayout, currentTime, dirtyregions);
+          ProcessItem(pos, originChannel.y, item, m_lastItem, focused, m_channelLayout, m_focusedChannelLayout, renderInfo);
       }
     }
     // increment our position
@@ -2070,7 +2066,7 @@ void CGUIEPGGridContainer::HandleChannels(bool bRender, unsigned int currentTime
   }
 }
 
-void CGUIEPGGridContainer::HandleRulerDate(bool bRender, unsigned int currentTime, CDirtyRegionList &dirtyregions)
+void CGUIEPGGridContainer::HandleRulerDate(bool bRender, CGUIRenderInfo &renderInfo)
 {
   if (!m_rulerDateLayout || m_gridModel->RulerItemsSize() <= 1 || m_gridModel->IsZeroGridDuration())
     return;
@@ -2090,11 +2086,11 @@ void CGUIEPGGridContainer::HandleRulerDate(bool bRender, unsigned int currentTim
     item->SetLabel(m_gridModel->GetRulerItem(rulerOffset / m_rulerUnit + 1)->GetLabel2());
 
     CFileItemPtr lastitem;
-    ProcessItem(m_posX, m_posY, item, lastitem, false, m_rulerDateLayout, m_rulerDateLayout, currentTime, dirtyregions);
+    ProcessItem(m_posX, m_posY, item, lastitem, false, m_rulerDateLayout, m_rulerDateLayout, renderInfo);
   }
 }
 
-void CGUIEPGGridContainer::HandleRuler(bool bRender, unsigned int currentTime, CDirtyRegionList &dirtyregions)
+void CGUIEPGGridContainer::HandleRuler(bool bRender, CGUIRenderInfo &renderInfo)
 {
   if (!m_rulerLayout || m_gridModel->RulerItemsSize() <= 1 || m_gridModel->IsZeroGridDuration())
     return;
@@ -2128,7 +2124,7 @@ void CGUIEPGGridContainer::HandleRuler(bool bRender, unsigned int currentTime, C
     if (!m_rulerDateLayout)
     {
       item->SetLabel(m_gridModel->GetRulerItem(rulerOffset / m_rulerUnit + 1)->GetLabel2());
-      ProcessItem(m_posX, m_posY, item, lastitem, false, m_rulerLayout, m_rulerLayout, currentTime, dirtyregions, m_channelWidth);
+      ProcessItem(m_posX, m_posY, item, lastitem, false, m_rulerLayout, m_rulerLayout, renderInfo, m_channelWidth);
     }
 
     GetProgrammeCacheOffsets(cacheBeforeRuler, cacheAfterRuler);
@@ -2179,7 +2175,7 @@ void CGUIEPGGridContainer::HandleRuler(bool bRender, unsigned int currentTime, C
       if (bRender)
         RenderItem(pos, originRuler.y, item.get(), false);
       else
-        ProcessItem(pos, originRuler.y, item, lastitem, false, m_rulerLayout, m_rulerLayout, currentTime, dirtyregions, m_rulerWidth);
+        ProcessItem(pos, originRuler.y, item, lastitem, false, m_rulerLayout, m_rulerLayout, renderInfo, m_rulerWidth);
 
       pos += m_rulerWidth;
     }
@@ -2188,7 +2184,7 @@ void CGUIEPGGridContainer::HandleRuler(bool bRender, unsigned int currentTime, C
       if (bRender)
         RenderItem(originRuler.x, pos, item.get(), false);
       else
-        ProcessItem(originRuler.x, pos, item, lastitem, false, m_rulerLayout, m_rulerLayout, currentTime, dirtyregions, m_rulerHeight);
+        ProcessItem(originRuler.x, pos, item, lastitem, false, m_rulerLayout, m_rulerLayout, renderInfo, m_rulerHeight);
 
       pos += m_rulerHeight;
     }
@@ -2200,7 +2196,7 @@ void CGUIEPGGridContainer::HandleRuler(bool bRender, unsigned int currentTime, C
     g_graphicsContext.RestoreClipRegion();
 }
 
-void CGUIEPGGridContainer::HandleProgrammeGrid(bool bRender, unsigned int currentTime, CDirtyRegionList &dirtyregions)
+void CGUIEPGGridContainer::HandleProgrammeGrid(bool bRender, CGUIRenderInfo &renderInfo)
 {
   if (!m_focusedProgrammeLayout || !m_programmeLayout || m_gridModel->RulerItemsSize() <= 1 || m_gridModel->IsZeroGridDuration())
     return;
@@ -2328,9 +2324,9 @@ void CGUIEPGGridContainer::HandleProgrammeGrid(bool bRender, unsigned int curren
         }
 
         if (m_orientation == VERTICAL)
-          ProcessItem(posA2, posB, item, m_lastChannel, focused, m_programmeLayout, m_focusedProgrammeLayout, currentTime, dirtyregions, m_gridModel->GetGridItemWidth(channel, block));
+          ProcessItem(posA2, posB, item, m_lastChannel, focused, m_programmeLayout, m_focusedProgrammeLayout, renderInfo, m_gridModel->GetGridItemWidth(channel, block));
         else
-          ProcessItem(posB, posA2, item, m_lastChannel, focused, m_programmeLayout, m_focusedProgrammeLayout, currentTime, dirtyregions, m_gridModel->GetGridItemWidth(channel, block));
+          ProcessItem(posB, posA2, item, m_lastChannel, focused, m_programmeLayout, m_focusedProgrammeLayout, renderInfo, m_gridModel->GetGridItemWidth(channel, block));
       }
 
       // increment our X position

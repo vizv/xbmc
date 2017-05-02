@@ -35,7 +35,7 @@ namespace GAME
     virtual ~CGUIControllerWindow(void);
 
     // implementation of CGUIControl via CGUIDialog
-    virtual void DoProcess(unsigned int currentTime, CDirtyRegionList &dirtyregions) override;
+    virtual void DoProcess(CGUIRenderInfo &renderInfo) override;
     virtual bool OnMessage(CGUIMessage& message) override;
 
   protected:

@@ -290,7 +290,7 @@ bool CGUIDialogSettingsBase::OnBack(int actionID)
   return CGUIDialog::OnBack(actionID);
 }
 
-void CGUIDialogSettingsBase::DoProcess(unsigned int currentTime, CDirtyRegionList &dirtyregions)
+void CGUIDialogSettingsBase::DoProcess(CGUIRenderInfo &renderInfo)
 {
   // update alpha status of current button
   bool bAlphaFaded = false;
@@ -310,7 +310,7 @@ void CGUIDialogSettingsBase::DoProcess(unsigned int currentTime, CDirtyRegionLis
       bAlphaFaded = true;
     }
   }
-  CGUIDialog::DoProcess(currentTime, dirtyregions);
+  CGUIDialog::DoProcess(renderInfo);
   if (control && bAlphaFaded)
   {
     control->SetFocus(false);

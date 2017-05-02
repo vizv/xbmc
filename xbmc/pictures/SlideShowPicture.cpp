@@ -289,7 +289,7 @@ void CSlideShowPic::UpdateVertices(float cur_x[4], float cur_y[4], const float n
   }
 }
 
-void CSlideShowPic::Process(unsigned int currentTime, CDirtyRegionList &dirtyregions)
+void CSlideShowPic::Process(CGUIRenderInfo &renderInfo)
 {
   if (!m_pImage || !m_bIsLoaded || m_bIsFinished) return ;
   color_t alpha = m_alpha;
@@ -548,15 +548,15 @@ void CSlideShowPic::Process(unsigned int currentTime, CDirtyRegionList &dirtyreg
     y[i] += m_fPosY * m_fHeight * fScale;
   }
 
-  UpdateVertices(m_ax, m_ay, x, y, dirtyregions);
+  UpdateVertices(m_ax, m_ay, x, y, renderInfo.GetRegions());
 
   // now render the image in the top right corner if we're zooming
   if (m_fZoomAmount == 1 || m_bIsComic)
   {
     const float empty[4] = {0};
-    UpdateVertices(m_bx, m_by, empty, empty, dirtyregions);
-    UpdateVertices(m_sx, m_sy, empty, empty, dirtyregions);
-    UpdateVertices(m_ox, m_oy, empty, empty, dirtyregions);
+    UpdateVertices(m_bx, m_by, empty, empty, renderInfo.GetRegions());
+    UpdateVertices(m_sx, m_sy, empty, empty, renderInfo.GetRegions());
+    UpdateVertices(m_ox, m_oy, empty, empty, renderInfo.GetRegions());
     m_bIsDirty = false;
     return;
   }
@@ -606,8 +606,8 @@ void CSlideShowPic::Process(unsigned int currentTime, CDirtyRegionList &dirtyreg
   fSmallX -= fSmallWidth * 0.5f;
   fSmallY -= fSmallHeight * 0.5f;
 
-  UpdateVertices(m_bx, m_by, bx, by, dirtyregions);
-  UpdateVertices(m_sx, m_sy, sx, sy, dirtyregions);
+  UpdateVertices(m_bx, m_by, bx, by, renderInfo.GetRegions());
+  UpdateVertices(m_sx, m_sy, sx, sy, renderInfo.GetRegions());
 
   // now we must render the wireframe image of the view window
   // work out the direction of the top of pic vector
@@ -635,7 +635,7 @@ void CSlideShowPic::Process(unsigned int currentTime, CDirtyRegionList &dirtyreg
     if (oy[i] > fSmallY + fSmallHeight) oy[i] = fSmallY + fSmallHeight;
   }
 
-  UpdateVertices(m_ox, m_oy, ox, oy, dirtyregions);
+  UpdateVertices(m_ox, m_oy, ox, oy, renderInfo.GetRegions());
   m_bIsDirty = false;
 }
 

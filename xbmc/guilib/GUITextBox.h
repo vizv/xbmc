@@ -48,8 +48,8 @@ public:
   virtual ~CGUITextBox(void);
   virtual CGUITextBox *Clone() const { return new CGUITextBox(*this); };
 
-  virtual void DoProcess(unsigned int currentTime, CDirtyRegionList &dirtyregions);
-  virtual void Process(unsigned int currentTime, CDirtyRegionList &dirtyregions);
+  virtual void DoProcess(CGUIRenderInfo &renderInfo);
+  virtual void Process(CGUIRenderInfo &renderInfo);
   virtual void Render();
   virtual bool OnMessage(CGUIMessage& message);
   virtual float GetHeight() const;

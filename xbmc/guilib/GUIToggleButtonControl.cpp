@@ -35,7 +35,7 @@ CGUIToggleButtonControl::~CGUIToggleButtonControl(void)
 {
 }
 
-void CGUIToggleButtonControl::Process(unsigned int currentTime, CDirtyRegionList &dirtyregions)
+void CGUIToggleButtonControl::Process(CGUIRenderInfo &renderInfo)
 {
   // ask our infoManager whether we are selected or not...
   if (m_toggleSelect)
@@ -48,11 +48,11 @@ void CGUIToggleButtonControl::Process(unsigned int currentTime, CDirtyRegionList
     m_selectButton.SetVisible(IsVisible());
     m_selectButton.SetEnabled(!IsDisabled());
     m_selectButton.SetPulseOnSelect(m_pulseOnSelect);
-    ProcessToggle(currentTime);
-    m_selectButton.DoProcess(currentTime, dirtyregions);
+    ProcessToggle(renderInfo.GetTime());
+    m_selectButton.DoProcess(renderInfo);
   }
   else
-    CGUIButtonControl::Process(currentTime, dirtyregions);
+    CGUIButtonControl::Process(renderInfo);
 }
 
 void CGUIToggleButtonControl::ProcessToggle(unsigned int currentTime)

@@ -39,7 +39,7 @@ public:
    \return true if settings were changed and the dialog confirmed, false otherwise.
    */
   static bool ShowAndGetInput(const ADDON::AddonPtr &addon, bool saveToDisk = true);
-  virtual void DoProcess(unsigned int currentTime, CDirtyRegionList &dirtyregions);
+  virtual void DoProcess(CGUIRenderInfo &renderInfo);
 
   std::string GetCurrentID() const;
 protected:

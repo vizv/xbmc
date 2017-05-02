@@ -51,7 +51,7 @@ public:
   virtual ~CGUIRSSControl(void);
   virtual CGUIRSSControl *Clone() const { return new CGUIRSSControl(*this); };
 
-  virtual void Process(unsigned int currentTime, CDirtyRegionList &dirtyregions);
+  virtual void Process(CGUIRenderInfo &renderInfo);
   virtual void Render();
   virtual void OnFeedUpdate(const vecText &feed);
   virtual void OnFeedRelease();

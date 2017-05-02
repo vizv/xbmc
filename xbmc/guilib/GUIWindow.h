@@ -96,7 +96,7 @@ public:
 
   void CenterWindow();
 
-  virtual void DoProcess(unsigned int currentTime, CDirtyRegionList &dirtyregions);
+  virtual void DoProcess(CGUIRenderInfo &renderInfo);
   
   /*! \brief Main render function, called every frame.
    Window classes should override this only if they need to alter how something is rendered.

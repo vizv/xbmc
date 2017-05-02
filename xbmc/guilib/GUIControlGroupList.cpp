@@ -44,9 +44,9 @@ CGUIControlGroupList::~CGUIControlGroupList(void)
 {
 }
 
-void CGUIControlGroupList::Process(unsigned int currentTime, CDirtyRegionList &dirtyregions)
+void CGUIControlGroupList::Process(CGUIRenderInfo &renderInfo)
 {
-  if (m_scroller.Update(currentTime))
+  if (m_scroller.Update(renderInfo.GetTime()))
     MarkDirtyRegion();
 
   // first we update visibility of all our items, to ensure our size and
@@ -79,7 +79,7 @@ void CGUIControlGroupList::Process(unsigned int currentTime, CDirtyRegionList &d
       g_graphicsContext.SetOrigin(m_posX, m_posY + pos - m_scroller.GetValue());
     else
       g_graphicsContext.SetOrigin(m_posX + pos - m_scroller.GetValue(), m_posY);
-    control->DoProcess(currentTime, dirtyregions);
+    control->DoProcess(renderInfo);
 
     if (control->IsVisible())
     {
@@ -94,7 +94,7 @@ void CGUIControlGroupList::Process(unsigned int currentTime, CDirtyRegionList &d
     }
     g_graphicsContext.RestoreOrigin();
   }
-  CGUIControl::Process(currentTime, dirtyregions);
+  CGUIControl::Process(renderInfo);
 }
 
 void CGUIControlGroupList::Render()

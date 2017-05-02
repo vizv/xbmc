@@ -42,7 +42,7 @@ public:
   virtual ~CGUIControlGroup(void);
   virtual CGUIControlGroup *Clone() const { return new CGUIControlGroup(*this); };
 
-  virtual void Process(unsigned int currentTime, CDirtyRegionList &dirtyregions);
+  virtual void Process(CGUIRenderInfo &renderInfo);
   virtual void Render();
   virtual void RenderEx();
   virtual bool OnAction(const CAction &action);

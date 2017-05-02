@@ -44,7 +44,7 @@ CGUIMoverControl::CGUIMoverControl(int parentID, int controlID, float posX, floa
 CGUIMoverControl::~CGUIMoverControl(void)
 {}
 
-void CGUIMoverControl::Process(unsigned int currentTime, CDirtyRegionList &dirtyregions)
+void CGUIMoverControl::Process(CGUIRenderInfo &renderInfo)
 {
   if (m_bInvalidated)
   {
@@ -77,10 +77,10 @@ void CGUIMoverControl::Process(unsigned int currentTime, CDirtyRegionList &dirty
     m_imgFocus.SetVisible(false);
     m_imgNoFocus.SetVisible(true);
   }
-  m_imgFocus.Process(currentTime);
-  m_imgNoFocus.Process(currentTime);
+  m_imgFocus.Process(renderInfo.GetTime());
+  m_imgNoFocus.Process(renderInfo.GetTime());
 
-  CGUIControl::Process(currentTime, dirtyregions);
+  CGUIControl::Process(renderInfo);
 }
 
 void CGUIMoverControl::Render()

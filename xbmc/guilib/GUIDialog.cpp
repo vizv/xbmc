@@ -130,16 +130,16 @@ void CGUIDialog::OnDeinitWindow(int nextWindowID)
   CGUIWindow::OnDeinitWindow(nextWindowID);
 }
 
-void CGUIDialog::DoProcess(unsigned int currentTime, CDirtyRegionList &dirtyregions)
+void CGUIDialog::DoProcess(CGUIRenderInfo &renderInfo)
 {
   UpdateVisibility();
 
   // if we were running but now we're not, mark us dirty
   if (!m_active && m_wasRunning)
-    dirtyregions.push_back(m_renderRegion);
+    renderInfo.AddRegion(m_renderRegion);
 
   if (m_active)
-    CGUIWindow::DoProcess(currentTime, dirtyregions);
+    CGUIWindow::DoProcess(renderInfo);
 
   m_wasRunning = m_active;
 }

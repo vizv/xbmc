@@ -114,9 +114,9 @@ void CGUITextBox::UpdateInfo(const CGUIListItem *item)
   UpdatePageControl();
 }
 
-void CGUITextBox::DoProcess(unsigned int currentTime, CDirtyRegionList &dirtyregions)
+void CGUITextBox::DoProcess(CGUIRenderInfo &renderInfo)
 {
-  CGUIControl::DoProcess(currentTime, dirtyregions);
+  CGUIControl::DoProcess(renderInfo);
 
   // if not visible, we reset the autoscroll timer and positioning
   if (!IsVisible() && m_autoScrollTime)
@@ -129,7 +129,7 @@ void CGUITextBox::DoProcess(unsigned int currentTime, CDirtyRegionList &dirtyreg
   }
 }
 
-void CGUITextBox::Process(unsigned int currentTime, CDirtyRegionList &dirtyregions)
+void CGUITextBox::Process(CGUIRenderInfo &renderInfo)
 {
   // update our auto-scrolling as necessary
   if (m_autoScrollTime && m_lines.size() > m_itemsPerPage)
@@ -137,7 +137,7 @@ void CGUITextBox::Process(unsigned int currentTime, CDirtyRegionList &dirtyregio
     if ((!m_autoScrollCondition || m_autoScrollCondition->Get()) && !g_application.ScreenSaverDisablesAutoScrolling())
     {
       if (m_lastRenderTime)
-        m_autoScrollDelayTime += currentTime - m_lastRenderTime;
+        m_autoScrollDelayTime += renderInfo.GetTime() - m_lastRenderTime;
       if (m_autoScrollDelayTime > (unsigned int)m_autoScrollDelay && m_scrollSpeed == 0)
       { // delay is finished - start scrolling
         MarkDirtyRegion();
@@ -168,7 +168,7 @@ void CGUITextBox::Process(unsigned int currentTime, CDirtyRegionList &dirtyregio
   {
     if (m_autoScrollRepeatAnim->GetProcess() != ANIM_PROCESS_NONE)
       MarkDirtyRegion();
-    m_autoScrollRepeatAnim->Animate(currentTime, true);
+    m_autoScrollRepeatAnim->Animate(renderInfo.GetTime(), true);
     TransformMatrix matrix;
     m_autoScrollRepeatAnim->RenderAnimation(matrix);
     m_cachedTextMatrix = g_graphicsContext.AddTransform(matrix);
@@ -179,14 +179,14 @@ void CGUITextBox::Process(unsigned int currentTime, CDirtyRegionList &dirtyregio
     MarkDirtyRegion();
 
   if (m_lastRenderTime)
-    m_scrollOffset += m_scrollSpeed * (currentTime - m_lastRenderTime);
+    m_scrollOffset += m_scrollSpeed * (renderInfo.GetTime() - m_lastRenderTime);
   if ((m_scrollSpeed < 0 && m_scrollOffset < m_offset * m_itemHeight) ||
       (m_scrollSpeed > 0 && m_scrollOffset > m_offset * m_itemHeight))
   {
     m_scrollOffset = m_offset * m_itemHeight;
     m_scrollSpeed = 0;
   }
-  m_lastRenderTime = currentTime;
+  m_lastRenderTime = renderInfo.GetTime();
 
   if (m_pageControl)
   {
@@ -194,7 +194,7 @@ void CGUITextBox::Process(unsigned int currentTime, CDirtyRegionList &dirtyregio
     SendWindowMessage(msg);
   }
 
-  CGUIControl::Process(currentTime, dirtyregions);
+  CGUIControl::Process(renderInfo);
 
   if (m_autoScrollRepeatAnim)
     g_graphicsContext.RemoveTransform();

@@ -113,7 +113,7 @@ void CGUIMultiImage::UpdateInfo(const CGUIListItem *item)
   }
 }
 
-void CGUIMultiImage::Process(unsigned int currentTime, CDirtyRegionList &dirtyregions)
+void CGUIMultiImage::Process(CGUIRenderInfo &renderInfo)
 {
   // Set a viewport so that we don't render outside the defined area
   if (m_directoryStatus == READY && !m_files.empty())
@@ -147,12 +147,12 @@ void CGUIMultiImage::Process(unsigned int currentTime, CDirtyRegionList &dirtyre
     if (m_image.SetColorDiffuse(m_diffuseColor))
       MarkDirtyRegion();
 
-    m_image.DoProcess(currentTime, dirtyregions);
+    m_image.DoProcess(renderInfo);
 
     g_graphicsContext.RestoreClipRegion();
   }
 
-  CGUIControl::Process(currentTime, dirtyregions);
+  CGUIControl::Process(renderInfo);
 }
 
 void CGUIMultiImage::Render()

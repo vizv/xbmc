@@ -28,7 +28,7 @@ class CGUIWindowScreensaverDim :
 public:
   CGUIWindowScreensaverDim();
   virtual ~CGUIWindowScreensaverDim();
-  virtual void Process(unsigned int currentTime, CDirtyRegionList &dirtyregions);
+  virtual void Process(CGUIRenderInfo &renderInfo);
   virtual void Render();
 protected:
   virtual void UpdateVisibility();

@@ -121,18 +121,18 @@ void CGUILabelControl::UpdateInfo(const CGUIListItem *item)
     MarkDirtyRegion();
 }
 
-void CGUILabelControl::Process(unsigned int currentTime, CDirtyRegionList &dirtyregions)
+void CGUILabelControl::Process(CGUIRenderInfo &renderInfo)
 {
   bool changed = false;
 
   changed |= m_label.SetColor(IsDisabled() ? CGUILabel::COLOR_DISABLED : CGUILabel::COLOR_TEXT);
   changed |= m_label.SetMaxRect(m_posX, m_posY, GetMaxWidth(), m_height);
-  changed |= m_label.Process(currentTime);
+  changed |= m_label.Process(renderInfo.GetTime());
 
   if (changed)
     MarkDirtyRegion();
 
-  CGUIControl::Process(currentTime, dirtyregions);
+  CGUIControl::Process(renderInfo);
 }
 
 CRect CGUILabelControl::CalcRenderRegion() const

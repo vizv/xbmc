@@ -112,11 +112,11 @@ void CGUIDialogBusy::Open_Internal(const std::string &param /* = "" */)
 }
 
 
-void CGUIDialogBusy::DoProcess(unsigned int currentTime, CDirtyRegionList &dirtyregions)
+void CGUIDialogBusy::DoProcess(CGUIRenderInfo &renderInfo)
 {
   bool visible = g_windowManager.GetTopMostModalDialogID() == WINDOW_DIALOG_BUSY;
   if(!visible && m_bLastVisible)
-    dirtyregions.push_back(m_renderRegion);
+    renderInfo.AddRegion(m_renderRegion);
   m_bLastVisible = visible;
 
   // update the progress control if available
@@ -128,7 +128,7 @@ void CGUIDialogBusy::DoProcess(unsigned int currentTime, CDirtyRegionList &dirty
     progress->SetVisible(m_progress > -1);
   }
 
-  CGUIDialog::DoProcess(currentTime, dirtyregions);
+  CGUIDialog::DoProcess(renderInfo);
 }
 
 void CGUIDialogBusy::Render()

@@ -41,10 +41,10 @@ CGUIWindowScreensaver::~CGUIWindowScreensaver(void)
 {
 }
 
-void CGUIWindowScreensaver::Process(unsigned int currentTime, CDirtyRegionList &regions)
+void CGUIWindowScreensaver::Process(CGUIRenderInfo &renderInfo)
 {
   MarkDirtyRegion();
-  CGUIWindow::Process(currentTime, regions);
+  CGUIWindow::Process(renderInfo);
   m_renderRegion.SetRect(0, 0, (float)g_graphicsContext.GetWidth(), (float)g_graphicsContext.GetHeight());
 }
 

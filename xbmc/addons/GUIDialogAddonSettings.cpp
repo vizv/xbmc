@@ -1157,7 +1157,7 @@ const TiXmlElement *CGUIDialogAddonSettings::GetFirstSetting() const
   return NULL;
 }
 
-void CGUIDialogAddonSettings::DoProcess(unsigned int currentTime, CDirtyRegionList &dirtyregions)
+void CGUIDialogAddonSettings::DoProcess(CGUIRenderInfo &renderInfo)
 {
   // update status of current section button
   bool alphaFaded = false;
@@ -1177,7 +1177,7 @@ void CGUIDialogAddonSettings::DoProcess(unsigned int currentTime, CDirtyRegionLi
       alphaFaded = true;
     }
   }
-  CGUIDialogBoxBase::DoProcess(currentTime, dirtyregions);
+  CGUIDialogBoxBase::DoProcess(renderInfo);
   if (alphaFaded && m_active) // dialog may close
   {
     control->SetFocus(false);

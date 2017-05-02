@@ -71,12 +71,12 @@ bool CGUIListLabel::UpdateColors()
   return changed;
 }
 
-void CGUIListLabel::Process(unsigned int currentTime, CDirtyRegionList &dirtyregions)
+void CGUIListLabel::Process(CGUIRenderInfo &renderInfo)
 {
-  if (m_label.Process(currentTime))
+  if (m_label.Process(renderInfo.GetTime()))
     MarkDirtyRegion();
 
-  CGUIControl::Process(currentTime, dirtyregions);
+  CGUIControl::Process(renderInfo);
 }
 
 void CGUIListLabel::Render()

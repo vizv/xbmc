@@ -47,11 +47,11 @@ void CGUIWindowScreensaverDim::UpdateVisibility()
     Close();
 }
 
-void CGUIWindowScreensaverDim::Process(unsigned int currentTime, CDirtyRegionList &dirtyregions)
+void CGUIWindowScreensaverDim::Process(CGUIRenderInfo &renderInfo)
 {
   if (m_newDimLevel != m_dimLevel && !IsAnimating(ANIM_TYPE_WINDOW_CLOSE))
     m_dimLevel = m_newDimLevel;
-  CGUIDialog::Process(currentTime, dirtyregions);
+  CGUIDialog::Process(renderInfo);
   m_renderRegion.SetRect(0, 0, (float)g_graphicsContext.GetWidth(), (float)g_graphicsContext.GetHeight());
 }
 

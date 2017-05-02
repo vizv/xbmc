@@ -44,7 +44,7 @@ CGUIResizeControl::CGUIResizeControl(int parentID, int controlID, float posX, fl
 CGUIResizeControl::~CGUIResizeControl(void)
 {}
 
-void CGUIResizeControl::Process(unsigned int currentTime, CDirtyRegionList &dirtyregions)
+void CGUIResizeControl::Process(CGUIRenderInfo &renderInfo)
 {
   if (m_bInvalidated)
   {
@@ -77,9 +77,9 @@ void CGUIResizeControl::Process(unsigned int currentTime, CDirtyRegionList &dirt
     m_imgFocus.SetVisible(false);
     m_imgNoFocus.SetVisible(true);
   }
-  m_imgFocus.Process(currentTime);
-  m_imgNoFocus.Process(currentTime);
-  CGUIControl::Process(currentTime, dirtyregions);
+  m_imgFocus.Process(renderInfo.GetTime());
+  m_imgNoFocus.Process(renderInfo.GetTime());
+  CGUIControl::Process(renderInfo);
 }
 
 void CGUIResizeControl::Render()

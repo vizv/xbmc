@@ -397,12 +397,12 @@ void CGUIWindowFullScreen::FrameMove()
   }
 }
 
-void CGUIWindowFullScreen::Process(unsigned int currentTime, CDirtyRegionList &dirtyregion)
+void CGUIWindowFullScreen::Process(CGUIRenderInfo &renderInfo)
 {
   if (g_application.m_pPlayer->IsRenderingGuiLayer())
     MarkDirtyRegion();
 
-  CGUIWindow::Process(currentTime, dirtyregion);
+  CGUIWindow::Process(renderInfo);
 
   //! @todo This isn't quite optimal - ideally we'd only be dirtying up the actual video render rect
   //!       which is probably the job of the renderer as it can more easily track resizing etc.

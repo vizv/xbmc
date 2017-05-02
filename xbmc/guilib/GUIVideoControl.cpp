@@ -34,13 +34,13 @@ CGUIVideoControl::CGUIVideoControl(int parentID, int controlID, float posX, floa
 CGUIVideoControl::~CGUIVideoControl(void)
 {}
 
-void CGUIVideoControl::Process(unsigned int currentTime, CDirtyRegionList &dirtyregions)
+void CGUIVideoControl::Process(CGUIRenderInfo &renderInfo)
 {
   //! @todo Proper processing which marks when its actually changed. Just mark always for now.
   if (g_application.m_pPlayer->IsRenderingGuiLayer())
     MarkDirtyRegion();
 
-  CGUIControl::Process(currentTime, dirtyregions);
+  CGUIControl::Process(renderInfo);
 }
 
 void CGUIVideoControl::Render()

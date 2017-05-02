@@ -68,9 +68,9 @@ CGUIBaseContainer::~CGUIBaseContainer(void)
   delete m_listProvider;
 }
 
-void CGUIBaseContainer::DoProcess(unsigned int currentTime, CDirtyRegionList &dirtyregions)
+void CGUIBaseContainer::DoProcess(CGUIRenderInfo &renderInfo)
 {
-  CGUIControl::DoProcess(currentTime, dirtyregions);
+  CGUIControl::DoProcess(renderInfo);
 
   if (m_pageChangeTimer.IsRunning() && m_pageChangeTimer.GetElapsedMilliseconds() > 200)
     m_pageChangeTimer.Stop();
@@ -83,10 +83,10 @@ void CGUIBaseContainer::DoProcess(unsigned int currentTime, CDirtyRegionList &di
   }
 }
 
-void CGUIBaseContainer::Process(unsigned int currentTime, CDirtyRegionList &dirtyregions)
+void CGUIBaseContainer::Process(CGUIRenderInfo &renderInfo)
 {
   // update our auto-scrolling as necessary
-  UpdateAutoScrolling(currentTime);
+  UpdateAutoScrolling(renderInfo.GetTime());
 
   ValidateOffset();
 
@@ -95,7 +95,7 @@ void CGUIBaseContainer::Process(unsigned int currentTime, CDirtyRegionList &dirt
 
   if (!m_layout || !m_focusedLayout) return;
 
-  UpdateScrollOffset(currentTime);
+  UpdateScrollOffset(renderInfo.GetTime());
 
   int offset = (int)floorf(m_scroller.GetValue() / m_layout->Size(m_orientation));
 
@@ -130,9 +130,9 @@ void CGUIBaseContainer::Process(unsigned int currentTime, CDirtyRegionList &dirt
       CGUIListItemPtr item = m_items[itemNo];
       // render our item
       if (m_orientation == VERTICAL)
-        ProcessItem(origin.x, pos, item, focused, currentTime, dirtyregions);
+        ProcessItem(origin.x, pos, item, focused, renderInfo);
       else
-        ProcessItem(pos, origin.y, item, focused, currentTime, dirtyregions);
+        ProcessItem(pos, origin.y, item, focused, renderInfo);
     }
     // increment our position
     pos += focused ? m_focusedLayout->Size(m_orientation) : m_layout->Size(m_orientation);
@@ -143,12 +143,12 @@ void CGUIBaseContainer::Process(unsigned int currentTime, CDirtyRegionList &dirt
   // to have same behaviour when scrolling down, we need to set page control to offset+1
   UpdatePageControl(offset + (m_scroller.IsScrollingDown() ? 1 : 0));
 
-  m_lastRenderTime = currentTime;
+  m_lastRenderTime = renderInfo.GetTime();
 
-  CGUIControl::Process(currentTime, dirtyregions);
+  CGUIControl::Process(renderInfo);
 }
 
-void CGUIBaseContainer::ProcessItem(float posX, float posY, CGUIListItemPtr& item, bool focused, unsigned int currentTime, CDirtyRegionList &dirtyregions)
+void CGUIBaseContainer::ProcessItem(float posX, float posY, CGUIListItemPtr& item, bool focused, CGUIRenderInfo &renderInfo)
 {
   if (!m_focusedLayout || !m_layout) return;
 
@@ -178,7 +178,7 @@ void CGUIBaseContainer::ProcessItem(float posX, float posY, CGUIListItemPtr& ite
           subItem = m_lastItem->GetFocusedLayout()->GetFocusedItem();
         item->GetFocusedLayout()->SetFocusedItem(subItem ? subItem : 1);
       }
-      item->GetFocusedLayout()->Process(item.get(), m_parentID, currentTime, dirtyregions);
+      item->GetFocusedLayout()->Process(item.get(), m_parentID, renderInfo);
     }
     m_lastItem = item;
   }
@@ -192,9 +192,9 @@ void CGUIBaseContainer::ProcessItem(float posX, float posY, CGUIListItemPtr& ite
       item->SetLayout(layout);
     }
     if (item->GetFocusedLayout())
-      item->GetFocusedLayout()->Process(item.get(), m_parentID, currentTime, dirtyregions);
+      item->GetFocusedLayout()->Process(item.get(), m_parentID, renderInfo);
     if (item->GetLayout())
-      item->GetLayout()->Process(item.get(), m_parentID, currentTime, dirtyregions);
+      item->GetLayout()->Process(item.get(), m_parentID, renderInfo);
   }
 
   g_graphicsContext.RestoreOrigin();

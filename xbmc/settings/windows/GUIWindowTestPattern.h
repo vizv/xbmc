@@ -34,7 +34,7 @@ public:
   virtual bool OnMessage(CGUIMessage& message);
   virtual bool OnAction(const CAction &action);
   virtual void Render();
-  virtual void Process(unsigned int currentTime, CDirtyRegionList &dirtyregions);
+  virtual void Process(CGUIRenderInfo &renderInfo);
 
 protected:
   virtual void DrawVerticalLines(int top, int left, int bottom, int right) = 0;

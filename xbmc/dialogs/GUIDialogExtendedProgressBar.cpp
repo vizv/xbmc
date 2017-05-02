@@ -96,12 +96,12 @@ bool CGUIDialogExtendedProgressBar::OnMessage(CGUIMessage& message)
   return CGUIDialog::OnMessage(message);
 }
 
-void CGUIDialogExtendedProgressBar::Process(unsigned int currentTime, CDirtyRegionList &dirtyregions)
+void CGUIDialogExtendedProgressBar::Process(CGUIRenderInfo &renderInfo)
 {
   if (m_active)
-    UpdateState(currentTime);
+    UpdateState(renderInfo.GetTime());
 
-  CGUIDialog::Process(currentTime, dirtyregions);
+  CGUIDialog::Process(renderInfo);
 }
 
 void CGUIDialogExtendedProgressBar::UpdateState(unsigned int currentTime)

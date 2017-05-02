@@ -176,7 +176,7 @@ void CGUIDialogProgress::ShowProgressBar(bool bOnOff)
   SetInvalid();
 }
 
-void CGUIDialogProgress::Process(unsigned int currentTime, CDirtyRegionList &dirtyregions)
+void CGUIDialogProgress::Process(CGUIRenderInfo &renderInfo)
 {
   if (m_bInvalidated)
   { // take a copy to save holding the lock for too long
@@ -195,7 +195,7 @@ void CGUIDialogProgress::Process(unsigned int currentTime, CDirtyRegionList &dir
     else
       SET_CONTROL_HIDDEN(CONTROL_NO_BUTTON);
   }
-  CGUIDialogBoxBase::Process(currentTime, dirtyregions);
+  CGUIDialogBoxBase::Process(renderInfo);
 }
 
 void CGUIDialogProgress::OnInitWindow()

@@ -72,7 +72,7 @@ public:
   virtual ~CGUIImage(void);
   virtual CGUIImage *Clone() const { return new CGUIImage(*this); };
 
-  virtual void Process(unsigned int currentTime, CDirtyRegionList &dirtyregions);
+  virtual void Process(CGUIRenderInfo &renderInfo);
   virtual void Render();
   virtual void UpdateVisibility(const CGUIListItem *item = NULL);
   virtual bool OnAction(const CAction &action) ;

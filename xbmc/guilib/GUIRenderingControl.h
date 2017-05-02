@@ -30,7 +30,7 @@ public:
   CGUIRenderingControl(const CGUIRenderingControl &from);
   virtual CGUIRenderingControl *Clone() const { return new CGUIRenderingControl(*this); }; //! @todo check for naughties
 
-  virtual void Process(unsigned int currentTime, CDirtyRegionList &dirtyregions);
+  virtual void Process(CGUIRenderInfo &renderInfo);
   virtual void Render();
   virtual void UpdateVisibility(const CGUIListItem *item = NULL);
   virtual void FreeResources(bool immediately = false);

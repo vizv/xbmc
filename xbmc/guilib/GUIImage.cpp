@@ -95,7 +95,7 @@ void CGUIImage::AllocateOnDemand()
     AllocResources();
 }
 
-void CGUIImage::Process(unsigned int currentTime, CDirtyRegionList &dirtyregions)
+void CGUIImage::Process(CGUIRenderInfo &renderInfo)
 {
   // check whether our image failed to allocate, and if so drop back to the fallback image
   if (m_texture.FailedToAlloc() && m_texture.GetFileName() != m_info.GetFallback())
@@ -115,16 +115,16 @@ void CGUIImage::Process(unsigned int currentTime, CDirtyRegionList &dirtyregions
     // compute the frame time
     unsigned int frameTime = 0;
     if (m_lastRenderTime)
-      frameTime = currentTime - m_lastRenderTime;
+      frameTime = renderInfo.GetTime() - m_lastRenderTime;
     if (!frameTime)
       frameTime = (unsigned int)(1000 / g_graphicsContext.GetFPS());
-    m_lastRenderTime = currentTime;
+    m_lastRenderTime = renderInfo.GetTime();
 
     if (m_fadingTextures.size())  // have some fading images
     { // anything other than the last old texture needs to be faded out as per usual
       for (std::vector<CFadingTexture *>::iterator i = m_fadingTextures.begin(); i != m_fadingTextures.end() - 1;)
       {
-        if (!ProcessFading(*i, frameTime, currentTime))
+        if (!ProcessFading(*i, frameTime, renderInfo.GetTime()))
           i = m_fadingTextures.erase(i);
         else
           ++i;
@@ -132,7 +132,7 @@ void CGUIImage::Process(unsigned int currentTime, CDirtyRegionList &dirtyregions
 
       if (m_texture.ReadyToRender() || m_texture.GetFileName().empty())
       { // fade out the last one as well
-        if (!ProcessFading(m_fadingTextures[m_fadingTextures.size() - 1], frameTime, currentTime))
+        if (!ProcessFading(m_fadingTextures[m_fadingTextures.size() - 1], frameTime, renderInfo.GetTime()))
           m_fadingTextures.erase(m_fadingTextures.end() - 1);
       }
       else
@@ -146,7 +146,7 @@ void CGUIImage::Process(unsigned int currentTime, CDirtyRegionList &dirtyregions
           MarkDirtyRegion();
         if (texture->m_texture->SetDiffuseColor(m_diffuseColor))
           MarkDirtyRegion();
-        if (texture->m_texture->Process(currentTime))
+        if (texture->m_texture->Process(renderInfo.GetTime()))
           MarkDirtyRegion();
       }
     }
@@ -164,10 +164,10 @@ void CGUIImage::Process(unsigned int currentTime, CDirtyRegionList &dirtyregions
   if (m_texture.SetDiffuseColor(m_diffuseColor))
     MarkDirtyRegion();
 
-  if (m_texture.Process(currentTime))
+  if (m_texture.Process(renderInfo.GetTime()))
     MarkDirtyRegion();
 
-  CGUIControl::Process(currentTime, dirtyregions);
+  CGUIControl::Process(renderInfo);
 }
 
 void CGUIImage::Render()

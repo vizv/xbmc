@@ -35,3 +35,23 @@ private:
 };
 
 typedef std::vector<CDirtyRegion> CDirtyRegionList;
+
+class CGUIRenderInfo
+{
+public:
+  CGUIRenderInfo() { Reset(0); }
+  void Reset(unsigned int t) { m_currentTime = t; m_dirtyregions.clear(); m_visible = 0; m_total = 0; }
+  void IncVisible() { m_visible++; }
+  void IncTotal() { m_total++; }
+  int GetVisible() { return m_visible; }
+  int GetTotal() { return m_total; }
+  unsigned int GetTime() { return m_currentTime; }
+  void AddRegion(const CDirtyRegion &region) { m_dirtyregions.push_back(region); }
+  CDirtyRegionList &GetRegions() { return m_dirtyregions; }
+  size_t GetRegionSize() { return m_dirtyregions.size(); }
+private:
+  unsigned int m_currentTime;
+  CDirtyRegionList m_dirtyregions;
+  int m_visible;
+  int m_total;
+};

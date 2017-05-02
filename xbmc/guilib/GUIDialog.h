@@ -48,7 +48,7 @@ public:
 
   virtual bool OnAction(const CAction &action);
   virtual bool OnMessage(CGUIMessage& message);
-  virtual void DoProcess(unsigned int currentTime, CDirtyRegionList &dirtyregions);
+  virtual void DoProcess(CGUIRenderInfo &renderInfo);
   virtual void Render();
 
   void Open(const std::string &param = "");

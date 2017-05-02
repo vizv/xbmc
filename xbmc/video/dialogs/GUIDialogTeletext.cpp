@@ -81,9 +81,9 @@ bool CGUIDialogTeletext::OnMessage(CGUIMessage& message)
   return CGUIDialog::OnMessage(message);
 }
 
-void CGUIDialogTeletext::Process(unsigned int currentTime, CDirtyRegionList &dirtyregions)
+void CGUIDialogTeletext::Process(CGUIRenderInfo &renderInfo)
 {
-  CGUIDialog::Process(currentTime, dirtyregions);
+  CGUIDialog::Process(renderInfo);
   m_renderRegion = m_vertCoords;
 }
 

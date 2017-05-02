@@ -41,9 +41,9 @@ CGUIButtonControl::~CGUIButtonControl(void)
 {
 }
 
-void CGUIButtonControl::Process(unsigned int currentTime, CDirtyRegionList &dirtyregions)
+void CGUIButtonControl::Process(CGUIRenderInfo &renderInfo)
 {
-  ProcessText(currentTime);
+  ProcessText(renderInfo.GetTime());
   if (m_bInvalidated)
   {
     m_imgFocus.SetWidth(GetWidth());
@@ -80,10 +80,10 @@ void CGUIButtonControl::Process(unsigned int currentTime, CDirtyRegionList &dirt
     m_imgNoFocus.SetVisible(true);
   }
 
-  m_imgFocus.Process(currentTime);
-  m_imgNoFocus.Process(currentTime);
+  m_imgFocus.Process(renderInfo.GetTime());
+  m_imgNoFocus.Process(renderInfo.GetTime());
 
-  CGUIControl::Process(currentTime, dirtyregions);
+  CGUIControl::Process(renderInfo);
 }
 
 void CGUIButtonControl::Render()

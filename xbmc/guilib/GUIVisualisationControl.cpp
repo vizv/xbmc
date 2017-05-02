@@ -91,7 +91,7 @@ bool CGUIVisualisationControl::OnAction(const CAction &action)
   }
 }
 
-void CGUIVisualisationControl::Process(unsigned int currentTime, CDirtyRegionList &dirtyregions)
+void CGUIVisualisationControl::Process(CGUIRenderInfo &renderInfo)
 {
   if (g_application.m_pPlayer->IsPlayingAudio())
   {
@@ -112,7 +112,7 @@ void CGUIVisualisationControl::Process(unsigned int currentTime, CDirtyRegionLis
       m_bAttemptedLoad = true;
     }
   }
-  CGUIRenderingControl::Process(currentTime, dirtyregions);
+  CGUIRenderingControl::Process(renderInfo);
 }
 
 void CGUIVisualisationControl::FreeResources(bool immediately)

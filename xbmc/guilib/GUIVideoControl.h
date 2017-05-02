@@ -42,7 +42,7 @@ public:
   virtual ~CGUIVideoControl(void);
   virtual CGUIVideoControl *Clone() const { return new CGUIVideoControl(*this); };
 
-  virtual void Process(unsigned int currentTime, CDirtyRegionList &dirtyregions);
+  virtual void Process(CGUIRenderInfo &renderInfo);
   virtual void Render();
   virtual void RenderEx();
   virtual EVENT_RESULT OnMouseEvent(const CPoint &point, const CMouseEvent &event);

@@ -68,8 +68,8 @@ namespace XBMCAddon
       { XBMC_TRACE; if(up()) CGUIMediaWindow::FreeResources(forceUnLoad); else checkedv(FreeResources(forceUnLoad)); }
       virtual bool OnClick(int iItem, const std::string &player = "") override { XBMC_TRACE; return up() ? CGUIMediaWindow::OnClick(iItem, player) : checkedb(OnClick(iItem)); }
 
-      virtual void Process(unsigned int currentTime, CDirtyRegionList &dirtyregions) override
-      { XBMC_TRACE; if(up()) CGUIMediaWindow::Process(currentTime,dirtyregions); else checkedv(Process(currentTime,dirtyregions)); }
+      virtual void Process(CGUIRenderInfo &renderInfo) override
+      { XBMC_TRACE; if(up()) CGUIMediaWindow::Process(renderInfo); else checkedv(Process(renderInfo)); }
 
       // this is a hack to SKIP the CGUIMediaWindow
       virtual bool OnAction(const CAction &action) override
@@ -435,11 +435,11 @@ namespace XBMCAddon
       ref(window)->FreeResources(forceUnLoad);
     }
 
-    void WindowXML::Process(unsigned int currentTime, CDirtyRegionList &regions)
+    void WindowXML::Process(CGUIRenderInfo &renderInfo)
     {
       XBMC_TRACE;
       g_TextureManager.AddTexturePath(m_mediaDir);
-      ref(window)->Process(currentTime, regions);
+      ref(window)->Process(renderInfo);
       g_TextureManager.RemoveTexturePath(m_mediaDir);
     }
 

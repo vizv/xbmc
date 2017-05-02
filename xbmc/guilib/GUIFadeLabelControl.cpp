@@ -74,11 +74,11 @@ void CGUIFadeLabelControl::AddLabel(const std::string &label)
   m_infoLabels.push_back(CGUIInfoLabel(label, "", GetParentID()));
 }
 
-void CGUIFadeLabelControl::Process(unsigned int currentTime, CDirtyRegionList &dirtyregions)
+void CGUIFadeLabelControl::Process(CGUIRenderInfo &renderInfo)
 {
   if (m_infoLabels.empty() || !m_label.font)
   {
-    CGUIControl::Process(currentTime, dirtyregions);
+    CGUIControl::Process(renderInfo);
     return;
   }
 
@@ -128,7 +128,7 @@ void CGUIFadeLabelControl::Process(unsigned int currentTime, CDirtyRegionList &d
 
     // apply the fading animation
     TransformMatrix matrix;
-    m_fadeAnim.Animate(currentTime, true);
+    m_fadeAnim.Animate(renderInfo.GetTime(), true);
     m_fadeAnim.RenderAnimation(matrix);
     m_fadeMatrix = g_graphicsContext.AddTransform(matrix);
 
@@ -156,7 +156,7 @@ void CGUIFadeLabelControl::Process(unsigned int currentTime, CDirtyRegionList &d
     g_graphicsContext.RemoveTransform();
   }
 
-  CGUIControl::Process(currentTime, dirtyregions);
+  CGUIControl::Process(renderInfo);
 }
 
 bool CGUIFadeLabelControl::UpdateColors()

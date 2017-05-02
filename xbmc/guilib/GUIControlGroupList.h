@@ -42,7 +42,7 @@ public:
   virtual float GetHeight() const;
   virtual float Size() const;
 
-  virtual void Process(unsigned int currentTime, CDirtyRegionList &dirtyregions);
+  virtual void Process(CGUIRenderInfo &renderInfo);
   virtual void Render();
   virtual bool OnMessage(CGUIMessage& message);
 

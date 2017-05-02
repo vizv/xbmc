@@ -65,7 +65,7 @@ CGUISliderControl::~CGUISliderControl(void)
 {
 }
 
-void CGUISliderControl::Process(unsigned int currentTime, CDirtyRegionList &dirtyregions)
+void CGUISliderControl::Process(CGUIRenderInfo &renderInfo)
 {
   bool dirty = false;
 
@@ -83,7 +83,7 @@ void CGUISliderControl::Process(unsigned int currentTime, CDirtyRegionList &dirt
 
   dirty |= m_guiBackground.SetHeight(m_height);
   dirty |= m_guiBackground.SetWidth(m_width);
-  dirty |= m_guiBackground.Process(currentTime);
+  dirty |= m_guiBackground.Process(renderInfo.GetTime());
 
   CGUITexture &nibLower = (IsActive() && m_bHasFocus && !IsDisabled() && m_currentSelector == RangeSelectorLower) ? m_guiSelectorLowerFocus : m_guiSelectorLower;
   float fScale;
@@ -92,7 +92,7 @@ void CGUISliderControl::Process(unsigned int currentTime, CDirtyRegionList &dirt
   else
     fScale = m_width == 0 ? 1.0f : m_width / nibLower.GetTextureWidth();
 
-  dirty |= ProcessSelector(nibLower, currentTime, fScale, RangeSelectorLower);
+  dirty |= ProcessSelector(nibLower, renderInfo.GetTime(), fScale, RangeSelectorLower);
   if (m_rangeSelection)
   {
     CGUITexture &nibUpper = (IsActive() && m_bHasFocus && !IsDisabled() && m_currentSelector == RangeSelectorUpper) ? m_guiSelectorUpperFocus : m_guiSelectorUpper;
@@ -100,13 +100,13 @@ void CGUISliderControl::Process(unsigned int currentTime, CDirtyRegionList &dirt
       fScale = m_height == 0 ? 1.0f : m_height / m_guiBackground.GetTextureHeight();
     else
       fScale = m_width == 0 ? 1.0f : m_width / nibUpper.GetTextureWidth();;
-    dirty |= ProcessSelector(nibUpper, currentTime, fScale, RangeSelectorUpper);
+    dirty |= ProcessSelector(nibUpper, renderInfo.GetTime(), fScale, RangeSelectorUpper);
   }
 
   if (dirty)
     MarkDirtyRegion();
 
-  CGUIControl::Process(currentTime, dirtyregions);
+  CGUIControl::Process(renderInfo);
 }
 
 bool CGUISliderControl::ProcessSelector(CGUITexture &nib, unsigned int currentTime, float fScale, RangeSelector selector)

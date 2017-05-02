@@ -93,7 +93,7 @@ bool CGUIRSSControl::UpdateColors()
   return changed;
 }
 
-void CGUIRSSControl::Process(unsigned int currentTime, CDirtyRegionList &dirtyregions)
+void CGUIRSSControl::Process(CGUIRenderInfo &renderInfo)
 {
   bool dirty = false;
   if (CServiceBroker::GetSettings().GetBool(CSettings::SETTING_LOOKANDFEEL_ENABLERSSFEEDS) && CRssManager::GetInstance().IsActive())
@@ -151,7 +151,7 @@ void CGUIRSSControl::Process(unsigned int currentTime, CDirtyRegionList &dirtyre
   if(dirty)
     MarkDirtyRegion();
 
-  CGUIControl::Process(currentTime, dirtyregions);
+  CGUIControl::Process(renderInfo);
 }
 
 void CGUIRSSControl::Render()

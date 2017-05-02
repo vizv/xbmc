@@ -37,7 +37,7 @@ CGUIPanelContainer::~CGUIPanelContainer(void)
 {
 }
 
-void CGUIPanelContainer::Process(unsigned int currentTime, CDirtyRegionList &dirtyregions)
+void CGUIPanelContainer::Process(CGUIRenderInfo &renderInfo)
 {
   ValidateOffset();
 
@@ -46,7 +46,7 @@ void CGUIPanelContainer::Process(unsigned int currentTime, CDirtyRegionList &dir
 
   if (!m_layout || !m_focusedLayout) return;
 
-  UpdateScrollOffset(currentTime);
+  UpdateScrollOffset(renderInfo.GetTime());
 
   int offset = (int)(m_scroller.GetValue() / m_layout->Size(m_orientation));
 
@@ -75,9 +75,9 @@ void CGUIPanelContainer::Process(unsigned int currentTime, CDirtyRegionList &dir
       bool focused = (current == GetOffset() * m_itemsPerRow + GetCursor()) && m_bHasFocus;
 
       if (m_orientation == VERTICAL)
-        ProcessItem(origin.x + col * m_layout->Size(HORIZONTAL), pos, item, focused, currentTime, dirtyregions);
+        ProcessItem(origin.x + col * m_layout->Size(HORIZONTAL), pos, item, focused, renderInfo);
       else
-        ProcessItem(pos, origin.y + col * m_layout->Size(VERTICAL), item, focused, currentTime, dirtyregions);
+        ProcessItem(pos, origin.y + col * m_layout->Size(VERTICAL), item, focused, renderInfo);
     }
     // increment our position
     if (col < m_itemsPerRow - 1)
@@ -94,7 +94,7 @@ void CGUIPanelContainer::Process(unsigned int currentTime, CDirtyRegionList &dir
   // to have same behaviour when scrolling down, we need to set page control to offset+1
   UpdatePageControl(offset + (m_scroller.IsScrollingDown() ? 1 : 0));
 
-  CGUIControl::Process(currentTime, dirtyregions);
+  CGUIControl::Process(renderInfo);
 }
 
 

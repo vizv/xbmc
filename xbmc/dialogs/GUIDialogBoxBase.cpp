@@ -110,7 +110,7 @@ void CGUIDialogBoxBase::SetChoice(int iButton, const CVariant &choice) // iButto
   }
 }
 
-void CGUIDialogBoxBase::Process(unsigned int currentTime, CDirtyRegionList &dirtyregions)
+void CGUIDialogBoxBase::Process(CGUIRenderInfo &renderInfo)
 {
   if (m_bInvalidated)
   { // take a copy of our labels to save holding the lock for too long
@@ -139,7 +139,7 @@ void CGUIDialogBoxBase::Process(unsigned int currentTime, CDirtyRegionList &dirt
     for (size_t i = 0 ; i < choices.size() ; ++i)
       SET_CONTROL_LABEL(CONTROL_CHOICES_START + i, choices[i]);
   }
-  CGUIDialog::Process(currentTime, dirtyregions);
+  CGUIDialog::Process(renderInfo);
 }
 
 void CGUIDialogBoxBase::OnInitWindow()
