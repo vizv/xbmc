@@ -399,8 +399,12 @@ void CGUIWindowFullScreen::FrameMove()
 
 void CGUIWindowFullScreen::Process(CGUIRenderInfo &renderInfo)
 {
+  renderInfo.IncTotal();
   if (g_application.m_pPlayer->IsRenderingGuiLayer())
+  {
     MarkDirtyRegion();
+    renderInfo.IncVisible();
+  }
 
   CGUIWindow::Process(renderInfo);
 

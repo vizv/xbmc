@@ -132,8 +132,12 @@ void CGUIControl::DoProcess(CGUIRenderInfo &renderInfo)
 
   changed |= Animate(renderInfo.GetTime());
 
+  if (m_controlID != WINDOW_FULLSCREEN_VIDEO)
+    renderInfo.IncTotal();
   if (IsVisible())
   {
+    if (m_controlID != WINDOW_FULLSCREEN_VIDEO && !g_windowManager.IsAddonWindow(m_controlID) && !g_windowManager.IsPythonWindow(m_controlID))
+      renderInfo.IncVisible();
     m_cachedTransform = g_graphicsContext.AddTransform(m_transform);
     if (m_hasCamera)
       g_graphicsContext.SetCameraPosition(m_camera);
