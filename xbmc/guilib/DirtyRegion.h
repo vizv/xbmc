@@ -39,7 +39,8 @@ typedef std::vector<CDirtyRegion> CDirtyRegionList;
 class CGUIRenderInfo
 {
 public:
-  CGUIRenderInfo() { Reset(0); }
+  // start with non-zero visible as splash occurs before normal rendering loop
+  CGUIRenderInfo() { m_currentTime = 0; m_visible = 1; m_total = 1; }
   void Reset(unsigned int t) { m_currentTime = t; m_dirtyregions.clear(); m_visible = 0; m_total = 0; }
   void IncVisible() { m_visible++; }
   void IncTotal() { m_total++; }
