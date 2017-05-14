@@ -610,7 +610,7 @@ bool COMXAudio::Initialize(AEAudioFormat format, OMXClock *clock, CDVDStreamInfo
     CAEChannelInfo resolvedMap = channelMap;
     resolvedMap.ResolveChannels(stdLayout);
 
-    if (CServiceBroker::GetSettings().GetInt(CSettings::SETTING_AUDIOOUTPUT_CONFIG) == 1 /*AE_CONFIG_FIXED*/ || (upmix && channelMap.Count() <= 2))
+    if (CServiceBroker::GetSettings().GetInt(CSettings::SETTING_AUDIOOUTPUT_CONFIG) == AE_CONFIG_FIXED || (upmix && channelMap.Count() <= 2))
       resolvedMap = stdLayout;
 
     uint64_t m_dst_chan_layout = GetAVChannelLayout(resolvedMap);
@@ -837,7 +837,7 @@ bool COMXAudio::Initialize(AEAudioFormat format, OMXClock *clock, CDVDStreamInfo
   }
 
   omx_err = m_omx_decoder.AllocInputBuffers();
-  if(omx_err != OMX_ErrorNone)
+  if(omx_err != OMX_ErrorNone) 
   {
     CLog::Log(LOGERROR, "COMXAudio::Initialize - Error alloc buffers 0x%08x", omx_err);
     return false;
@@ -873,7 +873,7 @@ bool COMXAudio::Initialize(AEAudioFormat format, OMXClock *clock, CDVDStreamInfo
       m_omx_decoder.DecoderEmptyBufferDone(m_omx_decoder.GetComponent(), omx_buffer);
       return false;
     }
-  }
+  } 
 
   /* return on decoder error so m_Initialized stays false */
   if(m_omx_decoder.BadState())

@@ -96,7 +96,6 @@ bool COMXAudioCodecOMX::Open(CDVDStreamInfo &hints)
   m_pCodecContext->block_align = hints.blockalign;
   m_pCodecContext->bit_rate = hints.bitrate;
   m_pCodecContext->bits_per_coded_sample = hints.bitspersample;
-#if 0
   if (hints.codec == AV_CODEC_ID_TRUEHD)
   {
     if (CServiceBroker::GetActiveAE().HasStereoAudioChannelCount())
@@ -104,7 +103,6 @@ bool COMXAudioCodecOMX::Open(CDVDStreamInfo &hints)
     else if (!CServiceBroker::GetActiveAE().HasHDAudioChannelCount())
       m_pCodecContext->request_channel_layout = AV_CH_LAYOUT_5POINT1;
   }
-#endif
   if (m_pCodecContext->request_channel_layout)
     CLog::Log(LOGNOTICE,"COMXAudioCodecOMX::Open() Requesting channel layout of %x", (unsigned)m_pCodecContext->request_channel_layout);
 
@@ -242,9 +240,9 @@ int COMXAudioCodecOMX::GetData(BYTE** dst, double &dts, double &pts)
     {
       m_iSampleFormat = m_pCodecContext->sample_fmt;
       m_pConvert = swr_alloc_set_opts(NULL,
-                      av_get_default_channel_layout(m_pCodecContext->channels),
+                      av_get_default_channel_layout(m_pCodecContext->channels), 
                       m_desiredSampleFormat, m_pCodecContext->sample_rate,
-                      av_get_default_channel_layout(m_pCodecContext->channels),
+                      av_get_default_channel_layout(m_pCodecContext->channels), 
                       m_pCodecContext->sample_fmt, m_pCodecContext->sample_rate,
                       0, NULL);
 

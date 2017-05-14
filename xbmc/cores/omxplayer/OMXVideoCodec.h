@@ -43,7 +43,7 @@ struct OMXCoreVideoBuffer;
 #endif
 
 // should be entirely filled by all codecs
-struct VideoPicture
+struct DVDVideoPicture
 {
   double pts; // timestamp in seconds, used in the CVideoPlayer class to keep track of pts
   double dts;
@@ -175,7 +175,7 @@ public:
    * returns true if successfull
    * the data is valid until the next Decode call
    */
-  virtual bool GetPicture(VideoPicture* pVideoPicture) = 0;
+  virtual bool GetPicture(DVDVideoPicture* pDvdVideoPicture) = 0;
 
 
   /*
