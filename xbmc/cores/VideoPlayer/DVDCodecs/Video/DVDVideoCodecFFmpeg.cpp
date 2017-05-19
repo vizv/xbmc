@@ -1333,7 +1333,7 @@ IHardwareDecoder* CDVDVideoCodecFFmpeg::CreateVideoDecoderHW(AVPixelFormat pixfm
 #define VP_VIDEOCODEC_HW
 IHardwareDecoder* CDVDVideoCodecFFmpeg::CreateVideoDecoderHW(AVPixelFormat pixfmt, CProcessInfo &processInfo)
 {
-  if (pixfmt == AV_PIX_FMT_YUV420P)
+  if (pixfmt == AV_PIX_FMT_YUV420P || pixfmt == AV_PIX_FMT_SAND128)
     return new MMAL::CDecoder(m_processInfo, m_hints);
   return nullptr;
 }
