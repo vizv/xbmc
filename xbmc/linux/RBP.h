@@ -40,6 +40,17 @@
 #include "threads/CriticalSection.h"
 #include "threads/Event.h"
 
+
+typedef struct AVRpiZcFrameGeometry
+{
+    unsigned int stride_y;
+    unsigned int height_y;
+    unsigned int stride_c;
+    unsigned int height_c;
+    unsigned int planes_c;
+    unsigned int stripes;
+} AVRpiZcFrameGeometry;
+
 class CGPUMEM
 {
 public:
@@ -81,6 +92,7 @@ public:
   uint32_t WaitVsync(uint32_t target = ~0U);
   void VSyncCallback();
   int GetMBox() { return m_mb; }
+  AVRpiZcFrameGeometry GetFrameGeometry(uint32_t encoding, unsigned short video_width, unsigned short video_height);
   double AdjustHDMIClock(double adjust);
   double GetAdjustHDMIClock() { return m_actual_pll_adjust; }
 
