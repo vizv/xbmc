@@ -154,7 +154,7 @@ bool CGUIControlGroupList::OnMessage(CGUIMessage& message)
         CGUIControl *control = *it;
         if (!control->IsVisible())
           continue;
-        if (control->HasID(message.GetControlId()))
+        if (control->GetID() == message.GetControlId())
         {
           // find out whether this is the first or last control
           if (IsFirstFocusableControl(control))
@@ -183,7 +183,7 @@ bool CGUIControlGroupList::OnMessage(CGUIMessage& message)
         CGUIControl *control = *it;
         if (!control->IsVisible())
           continue;
-        if (control->HasID(m_focusedControl))
+        if (control->GetID() == m_focusedControl)
         {
           if (IsControlOnScreen(offset, control))
             return CGUIControlGroup::OnMessage(message);
