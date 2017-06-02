@@ -67,13 +67,14 @@ bool CDemuxMVC::Open(CDVDInputStream* pInput)
     return false;
   m_pInput = pInput;
 
-  unsigned char* buffer = (unsigned char*)av_malloc(FFMPEG_FILE_BUFFER_SIZE);
-  m_ioContext = avio_alloc_context(buffer, FFMPEG_FILE_BUFFER_SIZE, 0, this, mvc_file_read, NULL, mvc_file_seek);
-  m_ioContext->max_packet_size = m_pInput->GetBlockSize();
-  if (m_ioContext->max_packet_size)
-    m_ioContext->max_packet_size *= FFMPEG_FILE_BUFFER_SIZE / m_ioContext->max_packet_size;
+  int bufferSize = 4096;
+  int blockSize = m_pInput->GetBlockSize();
+  if (blockSize > 1)
+    bufferSize = blockSize;
+  unsigned char* buffer = (unsigned char*)av_malloc(bufferSize);
+  m_ioContext = avio_alloc_context(buffer, bufferSize, 0, this, mvc_file_read, NULL, mvc_file_seek);
 
-  m_pFormatContext = avformat_alloc_context();
+    m_pFormatContext = avformat_alloc_context();
   m_pFormatContext->pb = m_ioContext;
 
   AVInputFormat *format = av_find_input_format("mpegts");
