@@ -23,6 +23,7 @@
 
 #include <stdint.h>
 #include <vector>
+#include <memory>
 
 class CMMALPool;
 struct VideoPicture;
