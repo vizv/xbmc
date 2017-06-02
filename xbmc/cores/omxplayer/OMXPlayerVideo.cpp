@@ -43,7 +43,6 @@
 #include "settings/Settings.h"
 #include "settings/AdvancedSettings.h"
 #include "settings/MediaSettings.h"
-#include "cores/VideoPlayer/VideoRenderers/RenderFormats.h"
 #include "cores/VideoPlayer/VideoRenderers/RenderFlags.h"
 #include "guilib/GraphicContext.h"
 #include "TimingConstants.h"
@@ -757,8 +756,6 @@ void OMXPlayerVideo::ResolutionUpdateCallBack(uint32_t width, uint32_t height, f
   uint32_t video_width   = CDisplaySettings::GetInstance().GetResolutionInfo(res).iScreenWidth;
   uint32_t video_height  = CDisplaySettings::GetInstance().GetResolutionInfo(res).iScreenHeight;
 
-  ERenderFormat format = RENDER_FMT_BYPASS;
-
   /* figure out stereomode expected based on user settings and hints */
   unsigned flags = GetStereoModeFlags(GetStereoMode());
 
@@ -792,7 +789,6 @@ void OMXPlayerVideo::ResolutionUpdateCallBack(uint32_t width, uint32_t height, f
   picture.iHeight = height;
   picture.iDisplayWidth = iDisplayWidth;
   picture.iDisplayHeight = iDisplayHeight;
-  picture.format = format;
 
   if(!m_renderManager.Configure(picture, m_fFrameRate, flags, m_hints.orientation, 3))
   {
