@@ -83,7 +83,6 @@ protected:
   float m_totalSize;
 
   CScroller m_scroller;
-  int m_lastScrollerValue;
 
   bool m_useControlPositions;
   ORIENTATION m_orientation;

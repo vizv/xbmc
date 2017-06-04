@@ -35,7 +35,6 @@ CGUIControlGroupList::CGUIControlGroupList(int parentID, int controlID, float po
   m_totalSize = 0;
   m_orientation = orientation;
   m_alignment = alignment;
-  m_lastScrollerValue = 0;
   m_useControlPositions = useControlPositions;
   ControlType = GUICONTROL_GROUPLIST;
   m_minSize = 0;
@@ -61,13 +60,12 @@ void CGUIControlGroupList::Process(unsigned int currentTime, CDirtyRegionList &d
   }
 
   ValidateOffset();
-  if (m_pageControl && m_lastScrollerValue != m_scroller.GetValue())
+  if (m_pageControl)
   {
     CGUIMessage message(GUI_MSG_LABEL_RESET, GetParentID(), m_pageControl, (int)Size(), (int)m_totalSize);
     SendWindowMessage(message);
     CGUIMessage message2(GUI_MSG_ITEM_SELECT, GetParentID(), m_pageControl, (int)m_scroller.GetValue());
     SendWindowMessage(message2);
-    m_lastScrollerValue = m_scroller.GetValue();
   }
   // we run through the controls, rendering as we go
   int index = 0;
