@@ -2750,6 +2750,15 @@ void CApplication::FrameMove(bool processEvents, bool processGUI)
     g_windowManager.FrameMove();
   }
 
+  {
+  static bool oldFS(false);
+  bool newFS = g_windowManager.IsFullSceenVideoOnly();
+  //if (newFS != oldFS)
+  {
+    CLog::Log(LOGNOTICE, "XXX Fullscreen: %d", newFS);
+    oldFS = newFS;
+  }
+  }
   m_pPlayer->FrameMove();
 }
 

@@ -200,6 +200,7 @@ public:
   bool IsWindowActive(const std::string &xmlFile, bool ignoreClosing = true) const;
   bool IsWindowVisible(const std::string &xmlFile) const;
   bool IsWindowTopMost(const std::string &xmlFile) const;
+  bool IsFullSceenVideoOnly();
   /*! \brief Checks if the given window is an addon window.
    *
    * \return true if the given window is an addon window, otherwise false.

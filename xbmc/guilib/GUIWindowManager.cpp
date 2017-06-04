@@ -1613,6 +1613,13 @@ bool CGUIWindowManager::IsWindowTopMost(const std::string &xmlFile) const
   return false;
 }
 
+bool CGUIWindowManager::IsFullSceenVideoOnly()
+{
+  if (m_activeDialogs.empty())
+    return dynamic_cast<CGUIWindowFullScreen*>(GetWindow(GetActiveWindow())) != nullptr;
+  return false;
+}
+
 void CGUIWindowManager::ClearWindowHistory()
 {
   while (!m_windowHistory.empty())
