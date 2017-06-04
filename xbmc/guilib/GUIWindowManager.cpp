@@ -1615,6 +1615,8 @@ bool CGUIWindowManager::IsWindowTopMost(const std::string &xmlFile) const
 
 bool CGUIWindowManager::IsFullSceenVideoOnly()
 {
+  if (g_application.m_pPlayer->IsRenderingGuiLayer())
+    return false;
   if (m_activeDialogs.empty())
     return dynamic_cast<CGUIWindowFullScreen*>(GetWindow(GetActiveWindow())) != nullptr;
   return false;
