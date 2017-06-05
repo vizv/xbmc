@@ -59,8 +59,7 @@ using namespace MMAL;
 
 #define VERBOSE 0
 
-CMMALVideoBuffer::CMMALVideoBuffer(std::shared_ptr<CMMALPool> pool)
-    : CMMALBuffer(pool)
+CMMALVideoBuffer::CMMALVideoBuffer(int id) : CMMALBuffer(id)
 {
   if (VERBOSE && g_advancedSettings.CanLogComponent(LOGVIDEO))
     CLog::Log(LOGDEBUG, "%s::%s %p", CLASSNAME, __func__, this);
@@ -77,12 +76,6 @@ CMMALVideoBuffer::CMMALVideoBuffer(std::shared_ptr<CMMALPool> pool)
 
 CMMALVideoBuffer::~CMMALVideoBuffer()
 {
-  if (mmal_buffer)
-  {
-    mmal_buffer_header_release(mmal_buffer);
-    if (m_pool)
-      m_pool->Prime();
-  }
   if (VERBOSE && g_advancedSettings.CanLogComponent(LOGVIDEO))
     CLog::Log(LOGDEBUG, "%s::%s %p", CLASSNAME, __func__, this);
 }
@@ -489,8 +482,9 @@ bool CMMALVideo::Open(CDVDStreamInfo &hints, CDVDCodecOptions &options)
     CLog::Log(LOGERROR, "%s::%s Failed to create pool for video output", CLASSNAME, __func__);
     return false;
   }
-  m_pool->SetProcessInfo(&m_processInfo);
-  m_dec = m_pool->GetComponent();
+  std::shared_ptr<CMMALPool> pool = std::dynamic_pointer_cast<CMMALPool>(m_pool);
+  pool->SetProcessInfo(&m_processInfo);
+  m_dec = pool->GetComponent();
 
   m_dec->control->userdata = (struct MMAL_PORT_USERDATA_T *)this;
   status = mmal_port_enable(m_dec->control, dec_control_port_cb_static);
@@ -601,8 +595,8 @@ bool CMMALVideo::Open(CDVDStreamInfo &hints, CDVDCodecOptions &options)
   if (!SendCodecConfigData())
     return false;
 
-  if (m_pool)
-    m_pool->Prime();
+  if (pool)
+    pool->Prime();
   m_preroll = !m_hints.stills;
   m_speed = DVD_PLAYSPEED_NORMAL;
 
@@ -728,8 +722,9 @@ void CMMALVideo::Reset(void)
   if (!m_finished)
   {
     SendCodecConfigData();
-    if (m_pool)
-      m_pool->Prime();
+    std::shared_ptr<CMMALPool> pool = std::dynamic_pointer_cast<CMMALPool>(m_pool);
+    if (pool)
+      pool->Prime();
   }
   m_decoderPts = DVD_NOPTS_VALUE;
   m_demuxerPts = DVD_NOPTS_VALUE;
@@ -884,7 +879,7 @@ void CMMALVideo::ReleasePicture()
   CSingleLock lock(m_sharedSection);
   if (m_lastDvdVideoPicture)
   {
-    CMMALBuffer *omvb = dynamic_cast<CMMALBuffer *>(m_lastDvdVideoPicture->videoBuffer);
+    CMMALBuffer *omvb = dynamic_cast<CMMALBuffer*>(m_lastDvdVideoPicture->videoBuffer);
     if (VERBOSE && g_advancedSettings.CanLogComponent(LOGVIDEO))
       CLog::Log(LOGDEBUG, "%s::%s - %p (%p)", CLASSNAME, __func__, omvb, omvb->mmal_buffer);
     SAFE_RELEASE(omvb);

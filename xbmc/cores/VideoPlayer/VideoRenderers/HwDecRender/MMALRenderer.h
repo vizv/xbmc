@@ -32,10 +32,6 @@
 #include "cores/VideoPlayer/DVDStreamInfo.h"
 #include "guilib/Geometry.h"
 #include "threads/Thread.h"
-#include "cores/VideoPlayer/DVDResource.h"
-
-#define NOSOURCE   -2
-#define AUTOSOURCE -1
 
 // worst case number of buffers. 12 for decoder. 8 for multi-threading in ffmpeg. NUM_BUFFERS for renderer.
 // Note, generally these won't necessarily result in allocated pictures
@@ -46,15 +42,13 @@ class CProcessInfo;
 
 namespace MMAL {
 
-class CMMALPool;
-
 enum MMALState { MMALStateNone, MMALStateHWDec, MMALStateFFDec, MMALStateDeint, };
 
 // a generic mmal video frame. May be overridden as either software or hardware decoded buffer
-class CMMALBuffer : public IDVDResourceCounted<CMMALBuffer>
+class CMMALBuffer : public CVideoBuffer
 {
 public:
-  CMMALBuffer(std::shared_ptr<CMMALPool> pool) : m_pool(pool) {}
+  CMMALBuffer(int id) : CVideoBuffer(id) {}
   virtual ~CMMALBuffer() {}
   MMAL_BUFFER_HEADER_T *mmal_buffer;
   unsigned int m_width;
@@ -66,7 +60,7 @@ public:
   MMALState m_state;
   bool m_rendered;
   bool m_stills;
-  std::shared_ptr<CMMALPool> m_pool;
+  void Unref();
   void SetVideoDeintMethod(std::string method);
   const char *GetStateName() {
     static const char *names[] = { "MMALStateNone", "MMALStateHWDec", "MMALStateFFDec", "MMALStateDeint", };
@@ -77,7 +71,8 @@ public:
   }
 };
 
-class CMMALPool : public std::enable_shared_from_this<CMMALPool>
+
+class CMMALPool : public IVideoBufferPool
 {
 public:
   CMMALPool(const char *component_name, bool input, uint32_t num_buffers, uint32_t buffer_size, uint32_t encoding, MMALState state);
@@ -85,15 +80,14 @@ public:
   MMAL_COMPONENT_T *GetComponent() { return m_component; }
   static void AlignedSize(AVCodecContext *avctx, uint32_t &w, uint32_t &h);
   CMMALBuffer *GetBuffer(uint32_t timeout);
-  CGPUMEM *AllocateBuffer(uint32_t numbytes);
-  void ReleaseBuffer(CGPUMEM *gmem);
-  void Close();
   void Prime();
   void SetProcessInfo(CProcessInfo *processInfo) { m_processInfo = processInfo; }
   void SetFormat(uint32_t mmal_format, uint32_t width, uint32_t height, uint32_t aligned_width, uint32_t aligned_height, uint32_t size, AVCodecContext *avctx)
     { m_mmal_format = mmal_format; m_width = width; m_height = height; m_aligned_width = aligned_width; m_aligned_height = aligned_height; m_size = size, m_avctx = avctx; m_software = true; }
   bool IsSoftware() { return m_software; }
   void SetVideoDeintMethod(std::string method);
+  virtual void Return(int id) override;
+  virtual CVideoBuffer* Get() override;
 protected:
   uint32_t m_mmal_format, m_width, m_height, m_aligned_width, m_aligned_height, m_size;
   AVCodecContext *m_avctx;
@@ -101,9 +95,10 @@ protected:
   bool m_input;
   MMAL_POOL_T *m_mmal_pool;
   MMAL_COMPONENT_T *m_component;
-  CCriticalSection m_section;
-  std::deque<CGPUMEM *> m_freeBuffers;
-  bool m_closing;
+  CCriticalSection m_critSection;
+  std::vector<CMMALBuffer *> m_all;
+  std::deque<int> m_used;
+  std::deque<int> m_free;
   bool m_software;
   CProcessInfo *m_processInfo;
 };

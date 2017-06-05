@@ -23,6 +23,7 @@
 
 #include "cores/VideoPlayer/DVDStreamInfo.h"
 #include "DVDVideoCodec.h"
+#include "cores/VideoPlayer/Process/VideoBuffer.h"
 #include "threads/Event.h"
 #include "xbmc/settings/VideoSettings.h"
 
@@ -46,7 +47,7 @@ class CMMALPool;
 class CMMALVideoBuffer : public CMMALBuffer
 {
 public:
-  CMMALVideoBuffer(std::shared_ptr<CMMALPool> pool);
+  CMMALVideoBuffer(int id);
   virtual ~CMMALVideoBuffer();
 protected:
 };

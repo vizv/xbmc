@@ -98,9 +98,7 @@ bool CPixelConverterRBP::Open(AVPixelFormat pixfmt, AVPixelFormat targetfmt, uns
 
 void CPixelConverterRBP::Dispose()
 {
-  m_pool->Close();
   m_pool = nullptr;
-
   CPixelConverter::Dispose();
 }
 

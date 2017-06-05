@@ -51,6 +51,19 @@ using namespace MMAL;
 
 #define CLASSNAME "CMMALBuffer"
 
+void CMMALBuffer::Unref()
+{
+  if (mmal_buffer)
+  {
+    mmal_buffer_header_release(mmal_buffer);
+    if (m_pool)
+    {
+      std::shared_ptr<CMMALPool> pool = std::dynamic_pointer_cast<CMMALPool>(m_pool);
+      pool->Prime();
+    }
+  }
+}
+
 void CMMALBuffer::SetVideoDeintMethod(std::string method)
 {
   std::shared_ptr<CMMALPool> pool = std::dynamic_pointer_cast<CMMALPool>(m_pool);
@@ -61,6 +74,26 @@ void CMMALBuffer::SetVideoDeintMethod(std::string method)
 
 #undef CLASSNAME
 #define CLASSNAME "CMMALPool"
+
+
+void CMMALPool::Return(int id)
+{
+  CSingleLock lock(m_critSection);
+
+  m_all[id]->Unref();
+  auto it = m_used.begin();
+  while (it != m_used.end())
+  {
+    if (*it == id)
+    {
+      m_used.erase(it);
+      break;
+    }
+    else
+      ++it;
+  }
+  m_free.push_back(id);
+}
 
 CMMALPool::CMMALPool(const char *component_name, bool input, uint32_t num_buffers, uint32_t buffer_size, uint32_t encoding, MMALState state)
  :  m_input(input)
@@ -88,7 +121,6 @@ CMMALPool::CMMALPool(const char *component_name, bool input, uint32_t num_buffer
   port->buffer_num = std::max(num_buffers, port->buffer_num_recommended);
 
   m_mmal_pool = mmal_port_pool_create(port, port->buffer_num, port->buffer_size);
-  m_closing = false;
   m_software = false;
   m_processInfo = nullptr;
   m_mmal_format = 0;
@@ -131,54 +163,11 @@ CMMALPool::~CMMALPool()
 
   mmal_port_pool_destroy(port, m_mmal_pool);
   m_mmal_pool = nullptr;
-  Close();
-}
-
-void CMMALPool::Close()
-{
-  CSingleLock lock(m_section);
-
-  if (g_advancedSettings.CanLogComponent(LOGVIDEO))
-    CLog::Log(LOGDEBUG, "%s::%s - close %p", CLASSNAME, __FUNCTION__, m_mmal_pool);
-
-  m_closing = true;
-  while (!m_freeBuffers.empty())
+  CSingleLock lock(m_critSection);
+  for (auto buf : m_all)
   {
-    CGPUMEM *gmem = m_freeBuffers.front();
-    m_freeBuffers.pop_front();
-    delete gmem;
+    delete buf;
   }
-  assert(m_freeBuffers.empty());
-}
-
-CGPUMEM *CMMALPool::AllocateBuffer(uint32_t size_pic)
-{
-  CSingleLock lock(m_section);
-  CGPUMEM *gmem = nullptr;
-  while (!m_freeBuffers.empty())
-  {
-    gmem = m_freeBuffers.front();
-    m_freeBuffers.pop_front();
-    if (gmem->m_numbytes == size_pic)
-      return gmem;
-    if (g_advancedSettings.CanLogComponent(LOGVIDEO))
-      CLog::Log(LOGDEBUG, "%s::%s discarding gmem:%p size %d/%d", CLASSNAME, __FUNCTION__, gmem, gmem->m_numbytes, size_pic);
-    delete gmem;
-  }
-
-  gmem = new CGPUMEM(size_pic, true);
-  if (!gmem)
-    CLog::Log(LOGERROR, "%s::%s GCPUMEM(%d) failed", CLASSNAME, __FUNCTION__, size_pic);
-  return gmem;
-}
-
-void CMMALPool::ReleaseBuffer(CGPUMEM *gmem)
-{
-  CSingleLock lock(m_section);
-  if (m_closing)
-    delete gmem;
-  else
-    m_freeBuffers.push_back(gmem);
 }
 
 void CMMALPool::AlignedSize(AVCodecContext *avctx, uint32_t &width, uint32_t &height)
@@ -210,6 +199,11 @@ void CMMALPool::AlignedSize(AVCodecContext *avctx, uint32_t &width, uint32_t &he
   height = h;
 }
 
+CVideoBuffer* CMMALPool::Get()
+{
+   assert(0);
+}
+
 CMMALBuffer *CMMALPool::GetBuffer(uint32_t timeout)
 {
   MMAL_BUFFER_HEADER_T *mmal_buffer = nullptr;
@@ -226,22 +220,42 @@ CMMALBuffer *CMMALPool::GetBuffer(uint32_t timeout)
     // ffmpeg requirements
     uint32_t aligned_width = m_aligned_width, aligned_height = m_aligned_height;
     AlignedSize(m_avctx, aligned_width, aligned_height);
-    if (!IsSoftware())
+
+    CSingleLock lock(m_critSection);
+    CMMALBuffer *buf = nullptr;
+    if (!m_free.empty())
     {
-      CMMALVideoBuffer *vid = new CMMALVideoBuffer(shared_from_this());
-      omvb = vid;
+      int idx = m_free.front();
+      m_free.pop_front();
+      m_used.push_back(idx);
+      buf = m_all[idx];
     }
     else
     {
-      CMMALYUVBuffer *yuv = new CMMALYUVBuffer(shared_from_this(), m_mmal_format, m_width, m_height, aligned_width, aligned_height, m_size);
-      if (yuv)
+      int id = m_all.size();
+      if (!IsSoftware())
       {
-        CGPUMEM *gmem = yuv->gmem;
-        mmal_buffer->data = (uint8_t *)gmem->m_vc_handle;
-        mmal_buffer->alloc_size = gmem->m_numbytes;
+        CMMALVideoBuffer *vid = new CMMALVideoBuffer(id);
+        buf = vid;
       }
-      omvb = yuv;
+      else
+      {
+        CMMALYUVBuffer *yuv = new CMMALYUVBuffer(m_mmal_format, m_width, m_height, aligned_width, aligned_height, m_size, id);
+        if (yuv)
+        {
+          CGPUMEM *gmem = yuv->gmem;
+          mmal_buffer->data = (uint8_t *)gmem->m_vc_handle;
+          mmal_buffer->alloc_size = gmem->m_numbytes;
+        }
+        buf = yuv;
+      }
+      m_all.push_back(buf);
+      m_used.push_back(id);
     }
+
+    buf->Acquire(GetPtr());
+
+    omvb = buf;
     if (omvb)
     {
       omvb->m_rendered = false;
@@ -723,12 +737,13 @@ void CMMALRenderer::UpdateFramerateStats(double pts)
 
 void CMMALRenderer::AddVideoPicture(const VideoPicture& pic, int index)
 {
-  CMMALBuffer *buffer = dynamic_cast<MMAL::CMMALYUVBuffer*>(pic.videoBuffer);
+  CMMALBuffer *buffer = dynamic_cast<CMMALBuffer*>(pic.videoBuffer);
   assert(buffer);
   if (VERBOSE && g_advancedSettings.CanLogComponent(LOGVIDEO))
     CLog::Log(LOGDEBUG, "%s::%s MMAL - %p (%p) %i", CLASSNAME, __func__, buffer, buffer->mmal_buffer, index);
 
-  m_buffers[index] = buffer->Acquire();
+  buffer->Acquire();
+  m_buffers[index] = buffer;
   UpdateFramerateStats(pic.pts);
 }
 
@@ -845,7 +860,7 @@ void CMMALRenderer::RenderUpdate(bool clear, DWORD flags, DWORD alpha)
     else if (flags & RENDER_FLAG_BOT)
       omvb->mmal_buffer->flags |= MMAL_BUFFER_HEADER_VIDEO_FLAG_INTERLACED;
     if (g_advancedSettings.CanLogComponent(LOGVIDEO))
-      CLog::Log(LOGDEBUG, "%s::%s - MMAL: clear:%d flags:%x alpha:%d source:%d omvb:%p mmal:%p mflags:%x encoding:%.4s", CLASSNAME, __func__, clear, flags, alpha, source, omvb, omvb->mmal_buffer, omvb->mmal_buffer->flags, (char *)&omvb->m_encoding);
+      CLog::Log(LOGDEBUG, "%s::%s - MMAL: clear:%d flags:%x alpha:%d source:%d omvb:%p mmal:%p mflags:%x len:%d data:%p encoding:%.4s", CLASSNAME, __func__, clear, flags, alpha, source, omvb, omvb->mmal_buffer, omvb->mmal_buffer->flags, omvb->mmal_buffer->length, omvb->mmal_buffer->data, (char *)&omvb->m_encoding);
     assert(omvb->mmal_buffer && omvb->mmal_buffer->data && omvb->mmal_buffer->length);
     omvb->Acquire();
     omvb->m_rendered = true;
