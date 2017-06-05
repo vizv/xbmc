@@ -21,15 +21,9 @@
 
 #if defined(HAS_MMAL)
 
-#include <interface/mmal/mmal.h>
-#include <interface/mmal/util/mmal_util.h>
-#include <interface/mmal/util/mmal_default_components.h>
-#include <interface/mmal/util/mmal_util_params.h>
-#include <interface/mmal/util/mmal_connection.h>
-#include <interface/mmal/mmal_parameters.h>
-
 #include "cores/VideoPlayer/DVDStreamInfo.h"
 #include "DVDVideoCodec.h"
+#include "cores/VideoPlayer/Process/VideoBuffer.h"
 #include "threads/Event.h"
 #include "xbmc/settings/VideoSettings.h"
 
@@ -40,50 +34,21 @@
 #include "guilib/Geometry.h"
 #include "rendering/RenderSystem.h"
 #include "cores/VideoPlayer/VideoRenderers/BaseRenderer.h"
+#include "cores/VideoPlayer/VideoRenderers/HwDecRender/MMALRenderer.h"
 #include "cores/VideoPlayer/DVDResource.h"
 #include "linux/RBP.h"
 
-
-enum MMALState { MMALStateNone, MMALStateHWDec, MMALStateFFDec, MMALStateDeint, };
+namespace MMAL {
 
 class CMMALVideo;
-class CMMALRenderer;
 class CMMALPool;
-
-// a mmal video frame
-class CMMALBuffer : public IDVDResourceCounted<CMMALBuffer>
-{
-public:
-  CMMALBuffer(std::shared_ptr<CMMALPool> pool) : m_pool(pool) {}
-  virtual ~CMMALBuffer() {}
-  MMAL_BUFFER_HEADER_T *mmal_buffer;
-  unsigned int m_width;
-  unsigned int m_height;
-  unsigned int m_aligned_width;
-  unsigned int m_aligned_height;
-  uint32_t m_encoding;
-  float m_aspect_ratio;
-  MMALState m_state;
-  bool m_rendered;
-  bool m_stills;
-  std::shared_ptr<CMMALPool> m_pool;
-  void SetVideoDeintMethod(std::string method);
-  const char *GetStateName() {
-    static const char *names[] = { "MMALStateNone", "MMALStateHWDec", "MMALStateFFDec", "MMALStateDeint", };
-    if ((size_t)m_state < vcos_countof(names))
-      return names[(size_t)m_state];
-    else
-      return "invalid";
-  }
-};
 
 // a mmal video frame
 class CMMALVideoBuffer : public CMMALBuffer
 {
 public:
-  CMMALVideoBuffer(CMMALVideo *dec, std::shared_ptr<CMMALPool> pool);
+  CMMALVideoBuffer(int id);
   virtual ~CMMALVideoBuffer();
-  CMMALVideo *m_omv;
 protected:
 };
 
@@ -163,5 +128,6 @@ protected:
   bool change_dec_output_format();
 };
 
+};
 // defined(HAS_MMAL)
 #endif

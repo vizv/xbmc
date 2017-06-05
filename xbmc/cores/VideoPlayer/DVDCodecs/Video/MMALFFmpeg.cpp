@@ -21,6 +21,8 @@
 #include "system.h"
 #ifdef HAS_MMAL
 
+#include <interface/mmal/util/mmal_default_components.h>
+
 #include "cores/VideoPlayer/VideoRenderers/RenderManager.h"
 #include "cores/VideoPlayer/VideoRenderers/HwDecRender/MMALRenderer.h"
 #include "../DVDCodecUtils.h"
@@ -44,8 +46,8 @@ using namespace MMAL;
 
 #define VERBOSE 0
 
-CMMALYUVBuffer::CMMALYUVBuffer(CDecoder *omv, std::shared_ptr<CMMALPool> pool, uint32_t mmal_encoding, uint32_t width, uint32_t height, uint32_t aligned_width, uint32_t aligned_height, uint32_t size)
-: CMMALBuffer(pool), m_omv(omv)
+CMMALYUVBuffer::CMMALYUVBuffer(uint32_t mmal_encoding, uint32_t width, uint32_t height, uint32_t aligned_width, uint32_t aligned_height, uint32_t size, int id)
+  : CMMALBuffer(id)
 {
   m_width = width;
   m_height = height;
@@ -67,9 +69,11 @@ CMMALYUVBuffer::CMMALYUVBuffer(CDecoder *omv, std::shared_ptr<CMMALPool> pool, u
   else
     m_size = size;
   assert(m_size > 0);
-  gmem = m_pool->AllocateBuffer(m_size);
+  gmem = new CGPUMEM(m_size, true);
   if (gmem)
     gmem->m_opaque = (void *)this;
+  else
+    CLog::Log(LOGERROR, "%s::%s GCPUMEM(%d) failed", CLASSNAME, __FUNCTION__, m_size);
   if (VERBOSE && g_advancedSettings.CanLogComponent(LOGVIDEO))
     CLog::Log(LOGDEBUG, "%s::%s buf:%p gmem:%p mmal:%p %dx%d (%dx%d) size:%d %.4s", CLASSNAME, __FUNCTION__, this, gmem, mmal_buffer, m_width, m_height, m_aligned_width, m_aligned_height, gmem->m_numbytes, (char *)&m_encoding);
 }
@@ -78,15 +82,8 @@ CMMALYUVBuffer::~CMMALYUVBuffer()
 {
   if (VERBOSE && g_advancedSettings.CanLogComponent(LOGVIDEO))
     CLog::Log(LOGDEBUG, "%s::%s buf:%p gmem:%p mmal:%p %dx%d (%dx%d) size:%d %.4s", CLASSNAME, __FUNCTION__, this, gmem, mmal_buffer, m_width, m_height, m_aligned_width, m_aligned_height, gmem->m_numbytes, (char *)&m_encoding);
-  if (gmem)
-    m_pool->ReleaseBuffer(gmem);
+  delete gmem;
   gmem = nullptr;
-  if (mmal_buffer)
-  {
-    mmal_buffer_header_release(mmal_buffer);
-    if (m_pool)
-      m_pool->Prime();
-  }
 }
 
 //-----------------------------------------------------------------------------
@@ -109,7 +106,6 @@ CDecoder::~CDecoder()
 {
   if (g_advancedSettings.CanLogComponent(LOGVIDEO))
     CLog::Log(LOGDEBUG, "%s::%s - destroy %p", CLASSNAME, __FUNCTION__, this);
-  m_pool->Close();
 }
 
 long CDecoder::Release()
@@ -160,8 +156,9 @@ int CDecoder::FFGetBuffer(AVCodecContext *avctx, AVFrame *frame, int flags)
   if (mmal_format ==  0)
     return -1;
 
-  dec->m_pool->SetFormat(mmal_format, frame->width, frame->height, frame->width, frame->height, 0, dec->m_avctx);
-  CMMALYUVBuffer *YUVBuffer = dynamic_cast<CMMALYUVBuffer *>(dec->m_pool->GetBuffer(500));
+  std::shared_ptr<CMMALPool> pool = std::dynamic_pointer_cast<CMMALPool>(dec->m_pool);
+  pool->SetFormat(mmal_format, frame->width, frame->height, frame->width, frame->height, 0, dec->m_avctx);
+  CMMALYUVBuffer *YUVBuffer = dynamic_cast<CMMALYUVBuffer *>(pool->GetBuffer(500));
   if (!YUVBuffer || !YUVBuffer->mmal_buffer || !YUVBuffer->gmem)
   {
     CLog::Log(LOGERROR,"%s::%s Failed to allocated buffer in time", CLASSNAME, __FUNCTION__);
@@ -260,8 +257,10 @@ bool CDecoder::Open(AVCodecContext *avctx, AVCodecContext* mainctx, enum AVPixel
     CLog::Log(LOGERROR, "%s::%s Failed to create pool for decoder output", CLASSNAME, __func__);
     return false;
   }
-  m_pool->SetDecoder(this);
-  m_pool->SetProcessInfo(&m_processInfo);
+
+  std::shared_ptr<CMMALPool> pool = std::dynamic_pointer_cast<CMMALPool>(m_pool);
+  pool->SetDecoder(this);
+  pool->SetProcessInfo(&m_processInfo);
 
   std::list<EINTERLACEMETHOD> deintMethods;
   deintMethods.push_back(EINTERLACEMETHOD::VS_INTERLACEMETHOD_AUTO);

@@ -24,29 +24,25 @@
 #include <queue>
 #include "DVDCodecs/Video/DVDVideoCodecFFmpeg.h"
 #include "libavcodec/avcodec.h"
-#include "MMALCodec.h"
+#include "cores/VideoPlayer/VideoRenderers/HwDecRender/MMALRenderer.h"
 
-class CMMALRenderer;
-class CMMALPool;
 struct MMAL_BUFFER_HEADER_T;
 class CGPUMEM;
 
 namespace MMAL {
 
 class CDecoder;
-class CGPUPool;
 
 // a mmal video frame
 class CMMALYUVBuffer : public CMMALBuffer
 {
 public:
-  CMMALYUVBuffer(CDecoder *dec, std::shared_ptr<CMMALPool> pool, uint32_t mmal_encoding, uint32_t width, uint32_t height, uint32_t aligned_width, uint32_t aligned_height, uint32_t size);
+  CMMALYUVBuffer(uint32_t mmal_encoding, uint32_t width, uint32_t height, uint32_t aligned_width, uint32_t aligned_height, uint32_t size, int id);
   virtual ~CMMALYUVBuffer();
 
   unsigned int m_size;
   AVRpiZcFrameGeometry m_geo;
   CGPUMEM *gmem;
-  CDecoder *m_omv;
 private:
 };
 
