@@ -71,4 +71,5 @@ private:
 
   std::shared_ptr<CMMALPool> m_pool;
   uint32_t m_mmal_format;
+  VideoPicture* m_buf;
 };
