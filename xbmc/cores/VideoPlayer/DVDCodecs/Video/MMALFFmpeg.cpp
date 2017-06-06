@@ -166,7 +166,7 @@ int CDecoder::FFGetBuffer(AVCodecContext *avctx, AVFrame *frame, int flags)
 
   CSingleLock lock(dec->m_section);
   CGPUMEM *gmem = YUVBuffer->gmem;
-  AVBufferRef *buf = av_buffer_create((uint8_t *)gmem->m_arm, YUVBuffer->m_size, CDecoder::FFReleaseBuffer, gmem, AV_BUFFER_FLAG_READONLY);
+  AVBufferRef *buf = av_buffer_create((uint8_t *)gmem->m_arm, gmem->m_numbytes, CDecoder::FFReleaseBuffer, gmem, AV_BUFFER_FLAG_READONLY);
   if (!buf)
   {
     CLog::Log(LOGERROR, "%s::%s av_buffer_create() failed", CLASSNAME, __FUNCTION__);
