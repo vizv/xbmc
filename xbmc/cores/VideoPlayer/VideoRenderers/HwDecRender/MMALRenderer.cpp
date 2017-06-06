@@ -127,7 +127,6 @@ CMMALPool::CMMALPool(const char *component_name, bool input, uint32_t num_buffer
   m_aligned_width = 0;
   m_aligned_height = 0;
   m_avctx = nullptr;
-  m_dec = nullptr;
   m_state = state;
   if (!m_mmal_pool)
     CLog::Log(LOGERROR, "%s::%s Failed to create pool for port %s", CLASSNAME, __func__, port->name);
@@ -240,7 +239,6 @@ CMMALBuffer *CMMALPool::GetBuffer(uint32_t timeout)
         CMMALYUVBuffer *yuv = new CMMALYUVBuffer(m_mmal_format, m_width, m_height, aligned_width, aligned_height, m_size, id);
         if (yuv)
         {
-
           if (m_size == 0)
           {
             AVRpiZcFrameGeometry m_geo = g_RBP.GetFrameGeometry(m_mmal_format, aligned_width, aligned_height);

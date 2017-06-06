@@ -483,7 +483,6 @@ bool CMMALVideo::Open(CDVDStreamInfo &hints, CDVDCodecOptions &options)
     return false;
   }
   std::shared_ptr<CMMALPool> pool = std::dynamic_pointer_cast<CMMALPool>(m_pool);
-  pool->SetDecoder(this);
   pool->SetProcessInfo(&m_processInfo);
   m_dec = pool->GetComponent();
 
