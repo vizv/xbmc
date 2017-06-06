@@ -39,8 +39,11 @@ class CMMALYUVBuffer : public CMMALBuffer
 public:
   CMMALYUVBuffer(uint32_t mmal_encoding, uint32_t width, uint32_t height, uint32_t aligned_width, uint32_t aligned_height, uint32_t size, int id);
   virtual ~CMMALYUVBuffer();
-  AVRpiZcFrameGeometry &GetGeometry();
+
+  unsigned int m_size;
+  AVRpiZcFrameGeometry m_geo;
   CGPUMEM *gmem;
+private:
 };
 
 class CDecoder
