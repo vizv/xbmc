@@ -44,7 +44,7 @@ using namespace MMAL;
 
 #define CLASSNAME "CMMALYUVBuffer"
 
-#define VERBOSE 0
+#define VERBOSE 1
 
 CMMALYUVBuffer::CMMALYUVBuffer(uint32_t mmal_encoding, uint32_t width, uint32_t height, uint32_t aligned_width, uint32_t aligned_height, uint32_t size, int id)
   : CMMALBuffer(id)
@@ -66,6 +66,12 @@ CMMALYUVBuffer::~CMMALYUVBuffer()
     CLog::Log(LOGDEBUG, "%s::%s buf:%p gmem:%p mmal:%p %dx%d (%dx%d) size:%d %.4s", CLASSNAME, __FUNCTION__, this, gmem, mmal_buffer, m_width, m_height, m_aligned_width, m_aligned_height, gmem->m_numbytes, (char *)&m_encoding);
   delete gmem;
   gmem = nullptr;
+}
+
+AVRpiZcFrameGeometry& CMMALYUVBuffer::GetGeometry()
+{
+  std::shared_ptr<CMMALPool> pool = std::dynamic_pointer_cast<CMMALPool>(m_pool);
+  return pool->GetGeometry();
 }
 
 //-----------------------------------------------------------------------------
@@ -176,20 +182,21 @@ int CDecoder::FFGetBuffer(AVCodecContext *avctx, AVFrame *frame, int flags)
   }
   else if (frame->format == AV_PIX_FMT_SAND128)
   {
-    const unsigned int size_y = YUVBuffer->m_geo.stride_y * YUVBuffer->m_geo.height_y;
-    const unsigned int size_c = YUVBuffer->m_geo.stride_c * YUVBuffer->m_geo.height_c;
+    AVRpiZcFrameGeometry &geo = YUVBuffer->GetGeometry();
+    const unsigned int size_y = geo.stride_y * geo.height_y;
+    const unsigned int size_c = geo.stride_c * geo.height_c;
 
     frame->buf[0] = buf;
 
-    frame->linesize[0] = YUVBuffer->m_geo.stride_y;
-    frame->linesize[1] = YUVBuffer->m_geo.stride_c;
-    frame->linesize[2] = YUVBuffer->m_geo.stride_c;
-    if (YUVBuffer->m_geo.stripes > 1)
-        frame->linesize[3] = YUVBuffer->m_geo.height_y + YUVBuffer->m_geo.height_c;      // abuse: linesize[3] = stripe stride
+    frame->linesize[0] = geo.stride_y;
+    frame->linesize[1] = geo.stride_c;
+    frame->linesize[2] = geo.stride_c;
+    if (geo.stripes > 1)
+        frame->linesize[3] = geo.height_y + geo.height_c;      // abuse: linesize[3] = stripe stride
 
     frame->data[0] = (uint8_t *)gmem->m_arm;
     frame->data[1] = frame->data[0] + size_y;
-    if (YUVBuffer->m_geo.planes_c > 1)
+    if (geo.planes_c > 1)
         frame->data[2] = frame->data[1] + size_c;
 
     frame->extended_data = frame->data;

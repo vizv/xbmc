@@ -45,7 +45,7 @@ extern "C" {
 #include "libavutil/imgutils.h"
 }
 
-#define VERBOSE 0
+#define VERBOSE 1
 
 using namespace MMAL;
 
@@ -196,6 +196,15 @@ void CMMALPool::AlignedSize(AVCodecContext *avctx, uint32_t &width, uint32_t &he
   height = h;
 }
 
+void CMMALPool::SetFormat(uint32_t mmal_format, uint32_t width, uint32_t height, uint32_t aligned_width, uint32_t aligned_height, uint32_t size, AVCodecContext *avctx)
+{
+  if (m_mmal_format != mmal_format || m_width != width || m_height != height || m_aligned_width != aligned_width || m_aligned_height != aligned_height || m_size != size || m_avctx != avctx)
+  {
+    m_mmal_format = mmal_format; m_width = width; m_height = height; m_aligned_width = aligned_width; m_aligned_height = aligned_height; m_size = size, m_avctx = avctx; m_software = true;
+    m_geo = g_RBP.GetFrameGeometry(mmal_format, aligned_width, aligned_height);
+  }
+}
+
 CVideoBuffer* CMMALPool::Get()
 {
    assert(0);
@@ -241,7 +250,6 @@ CMMALBuffer *CMMALPool::GetBuffer(uint32_t timeout)
         {
           if (m_size == 0)
           {
-            AVRpiZcFrameGeometry m_geo = g_RBP.GetFrameGeometry(m_mmal_format, aligned_width, aligned_height);
             const unsigned int size_y = m_geo.stride_y * m_geo.height_y;
             const unsigned int size_c = m_geo.stride_c * m_geo.height_c;
             m_size = (size_y + size_c * m_geo.planes_c) * m_geo.stripes;

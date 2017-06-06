@@ -57,7 +57,7 @@ using namespace MMAL;
 
 #define CLASSNAME "CMMALVideoBuffer"
 
-#define VERBOSE 0
+#define VERBOSE 1
 
 CMMALVideoBuffer::CMMALVideoBuffer(int id) : CMMALBuffer(id)
 {
