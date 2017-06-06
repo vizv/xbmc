@@ -57,24 +57,6 @@ CMMALYUVBuffer::CMMALYUVBuffer(uint32_t mmal_encoding, uint32_t width, uint32_t 
   mmal_buffer = nullptr;
   m_rendered = false;
   m_stills = false;
-
-  if (size == 0)
-  {
-    m_geo = g_RBP.GetFrameGeometry(m_encoding, aligned_width, aligned_height);
-    const unsigned int size_y = m_geo.stride_y * m_geo.height_y;
-    const unsigned int size_c = m_geo.stride_c * m_geo.height_c;
-    m_size = (size_y + size_c * m_geo.planes_c) * m_geo.stripes;
-  }
-  else
-    m_size = size;
-  assert(m_size > 0);
-  gmem = new CGPUMEM(m_size, true);
-  if (gmem)
-    gmem->m_opaque = (void *)this;
-  else
-    CLog::Log(LOGERROR, "%s::%s GCPUMEM(%d) failed", CLASSNAME, __FUNCTION__, m_size);
-  if (VERBOSE && g_advancedSettings.CanLogComponent(LOGVIDEO))
-    CLog::Log(LOGDEBUG, "%s::%s buf:%p gmem:%p mmal:%p %dx%d (%dx%d) size:%d %.4s", CLASSNAME, __FUNCTION__, this, gmem, mmal_buffer, m_width, m_height, m_aligned_width, m_aligned_height, gmem->m_numbytes, (char *)&m_encoding);
 }
 
 CMMALYUVBuffer::~CMMALYUVBuffer()

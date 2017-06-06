@@ -243,9 +243,26 @@ CMMALBuffer *CMMALPool::GetBuffer(uint32_t timeout)
         CMMALYUVBuffer *yuv = new CMMALYUVBuffer(m_mmal_format, m_width, m_height, aligned_width, aligned_height, m_size, id);
         if (yuv)
         {
-          CGPUMEM *gmem = yuv->gmem;
-          mmal_buffer->data = (uint8_t *)gmem->m_vc_handle;
-          mmal_buffer->alloc_size = gmem->m_numbytes;
+
+          if (m_size == 0)
+          {
+            yuv->m_geo = g_RBP.GetFrameGeometry(m_mmal_format, aligned_width, aligned_height);
+            const unsigned int size_y = yuv->m_geo.stride_y * yuv->m_geo.height_y;
+            const unsigned int size_c = yuv->m_geo.stride_c * yuv->m_geo.height_c;
+            m_size = (size_y + size_c * yuv->m_geo.planes_c) * yuv->m_geo.stripes;
+          }
+          assert(m_size > 0);
+          yuv->gmem = new CGPUMEM(m_size, true);
+          if (yuv->gmem)
+          {
+            if (VERBOSE && g_advancedSettings.CanLogComponent(LOGVIDEO))
+              CLog::Log(LOGDEBUG, "%s::%s buf:%p gmem:%p mmal:%p %dx%d (%dx%d) size:%d %.4s", CLASSNAME, __FUNCTION__, yuv, yuv->gmem, mmal_buffer, m_width, m_height, aligned_width, aligned_height, yuv->gmem->m_numbytes, (char *)&m_mmal_format);
+            mmal_buffer->data = (uint8_t *)yuv->gmem->m_vc_handle;
+            mmal_buffer->alloc_size = yuv->gmem->m_numbytes;
+            yuv->gmem->m_opaque = (void *)yuv;
+          }
+          else
+            CLog::Log(LOGERROR, "%s::%s GCPUMEM(%d) failed", CLASSNAME, __FUNCTION__, m_size);
         }
         buf = yuv;
       }
