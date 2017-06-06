@@ -48,8 +48,11 @@ void CVideoBuffer::Release()
   m_refCount--;
   if (m_refCount <= 0)
   {
-    m_pool->Return(m_id);
-    m_pool = nullptr;
+    if (m_pool)
+    {
+      m_pool->Return(m_id);
+      m_pool = nullptr;
+    }
   }
 }
 
