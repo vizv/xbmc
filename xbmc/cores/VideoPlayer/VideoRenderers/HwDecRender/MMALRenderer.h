@@ -82,8 +82,7 @@ public:
   CMMALBuffer *GetBuffer(uint32_t timeout);
   void Prime();
   void SetProcessInfo(CProcessInfo *processInfo) { m_processInfo = processInfo; }
-  void SetFormat(uint32_t mmal_format, uint32_t width, uint32_t height, uint32_t aligned_width, uint32_t aligned_height, uint32_t size, AVCodecContext *avctx)
-    { m_mmal_format = mmal_format; m_width = width; m_height = height; m_aligned_width = aligned_width; m_aligned_height = aligned_height; m_size = size, m_avctx = avctx; m_software = true; }
+  void SetFormat(uint32_t mmal_format, uint32_t width, uint32_t height, uint32_t aligned_width, uint32_t aligned_height, uint32_t size, AVCodecContext *avctx);
   bool IsSoftware() { return m_software; }
   void SetVideoDeintMethod(std::string method);
   virtual void Return(int id) override;

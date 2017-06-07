@@ -197,6 +197,19 @@ void CMMALPool::AlignedSize(AVCodecContext *avctx, uint32_t &width, uint32_t &he
   height = h;
 }
 
+void CMMALPool::SetFormat(uint32_t mmal_format, uint32_t width, uint32_t height, uint32_t aligned_width, uint32_t aligned_height, uint32_t size, AVCodecContext *avctx)
+{
+  uint32_t aw = aligned_width, ah = aligned_height;
+  //AlignedSize(m_avctx, aligned_width, aligned_height);
+
+  CLog::Log(LOGDEBUG, "%s::%s %dx%d (%dx%d) (%dx%d) avctx:%p", CLASSNAME, __func__, width, height, aw, ah, aligned_width, aligned_height, avctx);
+  if (m_mmal_format != mmal_format || m_width != width || m_height != height || m_aligned_width != aligned_width || m_aligned_height != aligned_height || m_size != size || m_avctx != avctx)
+  {
+    m_mmal_format = mmal_format; m_width = width; m_height = height; m_aligned_width = aligned_width; m_aligned_height = aligned_height; m_size = size, m_avctx = avctx; m_software = true;
+    //m_geo = g_RBP.GetFrameGeometry(mmal_format, aligned_width, aligned_height);
+  }
+}
+
 CVideoBuffer* CMMALPool::Get()
 {
    assert(0);
