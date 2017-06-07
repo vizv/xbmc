@@ -58,6 +58,8 @@ CMMALYUVBuffer::CMMALYUVBuffer(uint32_t mmal_encoding, uint32_t width, uint32_t 
   mmal_buffer = nullptr;
   m_rendered = false;
   m_stills = false;
+  if (VERBOSE && g_advancedSettings.CanLogComponent(LOGVIDEO))
+    CLog::Log(LOGDEBUG, "%s::%s buf:%p gmem:%p mmal:%p %dx%d (%dx%d) size:%d %.4s", CLASSNAME, __FUNCTION__, this, gmem, mmal_buffer, m_width, m_height, m_aligned_width, m_aligned_height, gmem->m_numbytes, (char *)&m_encoding);
 }
 
 CMMALYUVBuffer::~CMMALYUVBuffer()
@@ -300,7 +302,7 @@ bool CDecoder::GetPicture(AVCodecContext* avctx, VideoPicture* picture)
     m_gmem->Flush();
 
   if (g_advancedSettings.CanLogComponent(LOGVIDEO))
-    CLog::Log(LOGDEBUG, "%s::%s - mmal:%p dts:%.3f pts:%.3f buf:%p gpu:%p", CLASSNAME, __FUNCTION__, buffer->mmal_buffer, 1e-6*picture->dts, 1e-6*picture->pts, buffer, m_gmem);
+    CLog::Log(LOGDEBUG, "%s::%s - mmal:%p dts:%.3f pts:%.3f buf:%p gpu:%p %dx%d (%dx%d)", CLASSNAME, __FUNCTION__, buffer->mmal_buffer, 1e-6*picture->dts, 1e-6*picture->pts, buffer, m_gmem,  buffer->m_width, buffer->m_height, buffer->m_aligned_width, buffer->m_aligned_height);
   return true;
 }
 

@@ -161,6 +161,7 @@ CMMALPool::~CMMALPool()
 
   mmal_port_pool_destroy(port, m_mmal_pool);
   m_mmal_pool = nullptr;
+  CSingleLock lock(m_critSection);
   for (auto buf : m_all)
   {
     delete buf;
@@ -218,6 +219,7 @@ CMMALBuffer *CMMALPool::GetBuffer(uint32_t timeout)
     uint32_t aligned_width = m_aligned_width, aligned_height = m_aligned_height;
     AlignedSize(m_avctx, aligned_width, aligned_height);
 
+    CSingleLock lock(m_critSection);
     CMMALBuffer *buf = nullptr;
     if (!m_free.empty())
     {
@@ -377,8 +379,7 @@ bool CMMALRenderer::CheckConfigurationVout(uint32_t width, uint32_t height, uint
   {
     assert(m_vout_input != nullptr && m_vout_input->format != nullptr && m_vout_input->format->es != nullptr);
     CLog::Log(LOGDEBUG, "%s::%s Changing Vout dimensions from %dx%d (%dx%d) to %dx%d (%dx%d) %.4s", CLASSNAME, __func__,
-        m_vout_input->format->es->video.crop.width, m_vout_input->format->es->video.crop.height,
-        m_vout_input->format->es->video.width, m_vout_input->format->es->video.height, width, height, aligned_width, aligned_height, (char *)&encoding);
+        m_vout_width, m_vout_height, m_vout_aligned_width, m_vout_aligned_height, width, height, aligned_width, aligned_height, (char *)&encoding);
 
     // we need to disable port when encoding changes, but not if just resolution changes
     if (encodingChanged && m_vout_input->is_enabled)
