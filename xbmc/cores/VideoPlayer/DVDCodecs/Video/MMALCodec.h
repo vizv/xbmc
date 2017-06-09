@@ -97,7 +97,6 @@ protected:
   bool Initialize( const std::string &decoder_name);
   void PortSettingsChanged(MMAL_PORT_T *port, MMAL_BUFFER_HEADER_T *buffer);
   bool SendCodecConfigData();
-  void ReleasePicture();
 
   CDVDStreamInfo    m_hints;
   float             m_fps;
