@@ -117,7 +117,6 @@ CMMALVideo::CMMALVideo(CProcessInfo &processInfo) : CDVDVideoCodec(processInfo)
   m_got_eos = false;
   m_packet_num = 0;
   m_packet_num_eos = ~0;
-  m_lastDvdVideoPicture = nullptr;
 }
 
 CMMALVideo::~CMMALVideo()
@@ -687,7 +686,6 @@ void CMMALVideo::Reset(void)
   if (g_advancedSettings.CanLogComponent(LOGVIDEO))
     CLog::Log(LOGDEBUG, "%s::%s", CLASSNAME, __func__);
 
-  ReleasePicture();
   if (m_dec_input && m_dec_input->is_enabled)
     mmal_port_disable(m_dec_input);
   if (m_dec_output && m_dec_output->is_enabled)
@@ -751,7 +749,10 @@ CDVDVideoCodec::VCReturn CMMALVideo::GetPicture(VideoPicture* pDvdVideoPicture)
   bool drain = (m_codecControlFlags & DVD_CODEC_CTRL_DRAIN) ? true : false;
   bool send_eos = drain && !m_got_eos && m_packet_num_eos != m_packet_num;
 
-  ReleasePicture();
+  if (pDvdVideoPicture->videoBuffer)
+    pDvdVideoPicture->videoBuffer->Release();
+  pDvdVideoPicture->videoBuffer = nullptr;
+
   // we don't get an EOS response if no packets have been sent
   if (!drain)
     m_got_eos = false;
@@ -827,8 +828,6 @@ CDVDVideoCodec::VCReturn CMMALVideo::GetPicture(VideoPicture* pDvdVideoPicture)
   if (ret == CDVDVideoCodec::VC_PICTURE)
   {
     assert(buffer && buffer->mmal_buffer);
-    memset(pDvdVideoPicture, 0, sizeof *pDvdVideoPicture);
-    assert(buffer);
     pDvdVideoPicture->videoBuffer = dynamic_cast<CVideoBuffer*>(buffer);
     assert(pDvdVideoPicture->videoBuffer);
     pDvdVideoPicture->color_range  = 0;
@@ -863,7 +862,6 @@ CDVDVideoCodec::VCReturn CMMALVideo::GetPicture(VideoPicture* pDvdVideoPicture)
     assert(!(buffer->mmal_buffer->flags & MMAL_BUFFER_HEADER_FLAG_DECODEONLY));
     buffer->mmal_buffer->flags &= ~MMAL_BUFFER_HEADER_FLAG_USER3;
     buffer->m_stills = m_hints.stills;
-    m_lastDvdVideoPicture = pDvdVideoPicture;
   }
 
   if (ret == CDVDVideoCodec::VC_NONE)
@@ -872,19 +870,6 @@ CDVDVideoCodec::VCReturn CMMALVideo::GetPicture(VideoPicture* pDvdVideoPicture)
     CLog::Log(LOGDEBUG, "%s::%s - ret(%x) pics(%d) inputs(%d) slept(%2d) queued(%.2f) (%.2f:%.2f) full(%d) flags(%x) preroll(%d) eos(%d %d/%d)", CLASSNAME, __func__, ret, m_output_ready.size(), mmal_queue_length(m_dec_input_pool->queue), 500-delay.MillisLeft(), queued*1e-6, m_demuxerPts*1e-6, m_decoderPts*1e-6, full, m_codecControlFlags,  m_preroll, m_got_eos, m_packet_num, m_packet_num_eos);
 
   return ret;
-}
-
-void CMMALVideo::ReleasePicture()
-{
-  CSingleLock lock(m_sharedSection);
-  if (m_lastDvdVideoPicture)
-  {
-    CMMALBuffer *omvb = dynamic_cast<CMMALBuffer*>(m_lastDvdVideoPicture->videoBuffer);
-    if (VERBOSE && g_advancedSettings.CanLogComponent(LOGVIDEO))
-      CLog::Log(LOGDEBUG, "%s::%s - %p (%p)", CLASSNAME, __func__, omvb, omvb->mmal_buffer);
-    SAFE_RELEASE(omvb);
-    m_lastDvdVideoPicture = nullptr;
-  }
 }
 
 void CMMALVideo::SetCodecControl(int flags)
