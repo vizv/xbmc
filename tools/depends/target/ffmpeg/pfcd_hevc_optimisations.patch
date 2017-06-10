@@ -10,42 +10,8 @@ index 524fb73..305632b 100644
  /ffmpeg
  /ffplay
  /ffprobe
-diff --git a/RELEASE_NOTES b/RELEASE_NOTES
-new file mode 100644
-index 0000000..c3ec010
---- /dev/null
-+++ b/RELEASE_NOTES
-@@ -0,0 +1,15 @@
-+
-+              ┌────────────────────────────────────────┐
-+              │ RELEASE NOTES for FFmpeg 3.2 "Hypatia" │
-+              └────────────────────────────────────────┘
-+
-+   The FFmpeg Project proudly presents FFmpeg 3.2 "Hypatia", about 4
-+   months after the release of FFmpeg 3.1.
-+
-+   A complete Changelog is available at the root of the project, and the
-+   complete Git history on http://source.ffmpeg.org.
-+
-+   We hope you will like this release as much as we enjoyed working on it, and
-+   as usual, if you have any questions about it, or any FFmpeg related topic,
-+   feel free to join us on the #ffmpeg IRC channel (on irc.freenode.net) or ask
-+   on the mailing-lists.
-diff --git a/doc/Doxyfile b/doc/Doxyfile
-index 0891899..8f855f8 100644
---- a/doc/Doxyfile
-+++ b/doc/Doxyfile
-@@ -38,7 +38,7 @@ PROJECT_NAME           = FFmpeg
- # could be handy for archiving the generated documentation or if some version
- # control system is used.
- 
--PROJECT_NUMBER         =
-+PROJECT_NUMBER         = 3.2
- 
- # Using the PROJECT_BRIEF tag one can provide an optional one line description
- # for a project that appears at the top of each page and should give viewer a
 diff --git a/ffmpeg.c b/ffmpeg.c
-index 11faf0d..8f510eb 100644
+index 4b4dae4..9a7c29c 100644
 --- a/ffmpeg.c
 +++ b/ffmpeg.c
 @@ -23,6 +23,11 @@
@@ -60,7 +26,7 @@ index 11faf0d..8f510eb 100644
  #include "config.h"
  #include <ctype.h>
  #include <string.h>
-@@ -68,6 +73,25 @@
+@@ -69,6 +74,25 @@
  # include "libavfilter/buffersrc.h"
  # include "libavfilter/buffersink.h"
  
@@ -86,7 +52,7 @@ index 11faf0d..8f510eb 100644
  #if HAVE_SYS_RESOURCE_H
  #include <sys/time.h>
  #include <sys/types.h>
-@@ -164,6 +188,182 @@ static int restore_tty;
+@@ -165,6 +189,182 @@ static int restore_tty;
  static void free_input_threads(void);
  #endif
  
@@ -269,7 +235,7 @@ index 11faf0d..8f510eb 100644
  /* sub2video hack:
     Convert subtitles to video with alpha to insert them in filter graphs.
     This is a temporary solution until libavfilter gets real subtitles support.
-@@ -575,6 +775,11 @@ static void ffmpeg_cleanup(int ret)
+@@ -576,6 +776,11 @@ static void ffmpeg_cleanup(int ret)
          avformat_close_input(&input_files[i]->ctx);
          av_freep(&input_files[i]);
      }
@@ -281,7 +247,7 @@ index 11faf0d..8f510eb 100644
      for (i = 0; i < nb_input_streams; i++) {
          InputStream *ist = input_streams[i];
  
-@@ -587,6 +792,9 @@ static void ffmpeg_cleanup(int ret)
+@@ -588,6 +793,9 @@ static void ffmpeg_cleanup(int ret)
          av_freep(&ist->hwaccel_device);
          av_freep(&ist->dts_buffer);
  
@@ -291,7 +257,7 @@ index 11faf0d..8f510eb 100644
          avcodec_free_context(&ist->dec_ctx);
  
          av_freep(&input_streams[i]);
-@@ -617,6 +825,7 @@ static void ffmpeg_cleanup(int ret)
+@@ -618,6 +826,7 @@ static void ffmpeg_cleanup(int ret)
      }
      term_exit();
      ffmpeg_exited = 1;
@@ -299,7 +265,7 @@ index 11faf0d..8f510eb 100644
  }
  
  void remove_avoptions(AVDictionary **a, AVDictionary *b)
-@@ -1050,6 +1259,15 @@ static void do_video_out(OutputFile *of,
+@@ -1053,6 +1262,15 @@ static void do_video_out(OutputFile *of,
      if (ost->source_index >= 0)
          ist = input_streams[ost->source_index];
  
@@ -315,7 +281,7 @@ index 11faf0d..8f510eb 100644
      frame_rate = av_buffersink_get_frame_rate(filter);
      if (frame_rate.num > 0 && frame_rate.den > 0)
          duration = 1/(av_q2d(frame_rate) * av_q2d(enc->time_base));
-@@ -2873,6 +3091,12 @@ static int init_input_stream(int ist_index, char *error, int error_len)
+@@ -2884,6 +3102,12 @@ static int init_input_stream(int ist_index, char *error, int error_len)
          ist->dec_ctx->opaque                = ist;
          ist->dec_ctx->get_format            = get_format;
          ist->dec_ctx->get_buffer2           = get_buffer;
@@ -329,7 +295,7 @@ index 11faf0d..8f510eb 100644
  
          av_opt_set_int(ist->dec_ctx, "refcounted_frames", 1, 0);
 diff --git a/libavcodec/Makefile b/libavcodec/Makefile
-index 7414d93..d0cf334 100644
+index 0dd0c7b..b9732c5 100644
 --- a/libavcodec/Makefile
 +++ b/libavcodec/Makefile
 @@ -5,6 +5,12 @@ NAME = avcodec
@@ -356,7 +322,7 @@ index 7414d93..d0cf334 100644
         vorbis_parser.o                                                  \
         xiph.o                                                           \
  
-@@ -1102,3 +1112,15 @@ $(SUBDIR)qdm2.o: $(SUBDIR)qdm2_tables.h
+@@ -1103,3 +1113,15 @@ $(SUBDIR)qdm2.o: $(SUBDIR)qdm2_tables.h
  $(SUBDIR)sinewin.o: $(SUBDIR)sinewin_tables.h
  $(SUBDIR)sinewin_fixed.o: $(SUBDIR)sinewin_fixed_tables.h
  endif
@@ -3680,7 +3646,7 @@ index 0000000..08a021d
 +endfunc
 +
 diff --git a/libavcodec/avcodec.h b/libavcodec/avcodec.h
-index d780477..5807e1b 100644
+index 57334df..7648294 100644
 --- a/libavcodec/avcodec.h
 +++ b/libavcodec/avcodec.h
 @@ -443,6 +443,8 @@ enum AVCodecID {
@@ -3692,7 +3658,7 @@ index d780477..5807e1b 100644
      /* various PCM "codecs" */
      AV_CODEC_ID_FIRST_AUDIO = 0x10000,     ///< A dummy id pointing at the start of audio codecs
      AV_CODEC_ID_PCM_S16LE = 0x10000,
-@@ -2925,6 +2927,7 @@ typedef struct AVCodecContext {
+@@ -2935,6 +2937,7 @@ typedef struct AVCodecContext {
  #define FF_BUG_MS               8192 ///< Work around various bugs in Microsoft's broken decoders.
  #define FF_BUG_TRUNCATED       16384
  #define FF_BUG_IEDGE           32768
@@ -3700,7 +3666,7 @@ index d780477..5807e1b 100644
  
      /**
       * strictly follow the standard (MPEG-4, ...).
-@@ -3276,6 +3279,9 @@ typedef struct AVCodecContext {
+@@ -3286,6 +3289,9 @@ typedef struct AVCodecContext {
  #define FF_PROFILE_H264_HIGH_444_PREDICTIVE  244
  #define FF_PROFILE_H264_HIGH_444_INTRA       (244|FF_PROFILE_H264_INTRA)
  #define FF_PROFILE_H264_CAVLC_444            44
@@ -3710,7 +3676,7 @@ index d780477..5807e1b 100644
  
  #define FF_PROFILE_VC1_SIMPLE   0
  #define FF_PROFILE_VC1_MAIN     1
-@@ -3586,7 +3592,13 @@ typedef struct AVCodecContext {
+@@ -3596,7 +3602,13 @@ typedef struct AVCodecContext {
  #endif
  
      /**
@@ -6572,7 +6538,7 @@ index acd55cc..c1716c2 100644
      if (sps->pcm_enabled_flag) {
          sps->pcm.bit_depth   = get_bits(gb, 4) + 1;
 diff --git a/libavcodec/hevcdec.c b/libavcodec/hevcdec.c
-index ef21595..335ffa4 100644
+index f9e8ff0..1885eb7 100644
 --- a/libavcodec/hevcdec.c
 +++ b/libavcodec/hevcdec.c
 @@ -42,8 +42,207 @@
@@ -8559,7 +8525,7 @@ index ef21595..335ffa4 100644
      if(ctb_row) {
          ret = init_get_bits8(&lc->gb, s->data + s->sh.offset[ctb_row - 1], s->sh.size[ctb_row - 1]);
  
-@@ -2771,6 +4364,32 @@ static int decode_nal_unit(HEVCContext *s, const H2645NAL *nal)
+@@ -2771,6 +4364,33 @@ static int decode_nal_unit(HEVCContext *s, const H2645NAL *nal)
          if (ret < 0)
              return ret;
  
@@ -8589,10 +8555,11 @@ index ef21595..335ffa4 100644
 +            s->is_decoded = 0;
 +            break;
 +        }
-         if (s->max_ra == INT_MAX) {
-             if (s->nal_unit_type == HEVC_NAL_CRA_NUT || IS_BLA(s)) {
-                 s->max_ra = s->poc;
-@@ -2894,10 +4513,19 @@ static int decode_nal_units(HEVCContext *s, const uint8_t *buf, int length)
++
+         if (s->sh.first_slice_in_pic_flag) {
+             if (s->max_ra == INT_MAX) {
+                 if (s->nal_unit_type == HEVC_NAL_CRA_NUT || IS_BLA(s)) {
+@@ -2894,10 +4514,19 @@ static int decode_nal_units(HEVCContext *s, const uint8_t *buf, int length)
          }
      }
  
@@ -8615,7 +8582,7 @@ index ef21595..335ffa4 100644
      return ret;
  }
  
-@@ -3150,6 +4778,48 @@ fail:
+@@ -3150,6 +4779,48 @@ fail:
      return AVERROR(ENOMEM);
  }
  
@@ -8664,7 +8631,7 @@ index ef21595..335ffa4 100644
  static av_cold int hevc_decode_free(AVCodecContext *avctx)
  {
      HEVCContext       *s = avctx->priv_data;
-@@ -3161,6 +4831,27 @@ static av_cold int hevc_decode_free(AVCodecContext *avctx)
+@@ -3161,6 +4832,27 @@ static av_cold int hevc_decode_free(AVCodecContext *avctx)
  
      av_freep(&s->cabac_state);
  
@@ -8692,7 +8659,7 @@ index ef21595..335ffa4 100644
      for (i = 0; i < 3; i++) {
          av_freep(&s->sao_pixel_buffer_h[i]);
          av_freep(&s->sao_pixel_buffer_v[i]);
-@@ -3202,10 +4893,14 @@ static av_cold int hevc_decode_free(AVCodecContext *avctx)
+@@ -3202,10 +4894,14 @@ static av_cold int hevc_decode_free(AVCodecContext *avctx)
      return 0;
  }
  
@@ -8707,7 +8674,7 @@ index ef21595..335ffa4 100644
  
      s->avctx = avctx;
  
-@@ -3215,6 +4910,59 @@ static av_cold int hevc_init_context(AVCodecContext *avctx)
+@@ -3215,6 +4911,59 @@ static av_cold int hevc_init_context(AVCodecContext *avctx)
      s->HEVClcList[0] = s->HEVClc;
      s->sList[0] = s;
  
@@ -8767,7 +8734,7 @@ index ef21595..335ffa4 100644
      s->cabac_state = av_malloc(HEVC_CONTEXTS);
      if (!s->cabac_state)
          goto fail;
-@@ -3357,9 +5105,9 @@ static av_cold int hevc_decode_init(AVCodecContext *avctx)
+@@ -3357,9 +5106,9 @@ static av_cold int hevc_decode_init(AVCodecContext *avctx)
      }
  
      if((avctx->active_thread_type & FF_THREAD_FRAME) && avctx->thread_count > 1)
@@ -8780,7 +8747,7 @@ index ef21595..335ffa4 100644
  
      return 0;
  }
-@@ -3418,6 +5166,8 @@ AVCodec ff_hevc_decoder = {
+@@ -3418,6 +5167,8 @@ AVCodec ff_hevc_decoder = {
      .update_thread_context = hevc_update_thread_context,
      .init_thread_copy      = hevc_init_thread_copy,
      .capabilities          = AV_CODEC_CAP_DR1 | AV_CODEC_CAP_DELAY |
@@ -10639,10 +10606,10 @@ index 81fcebc..7858478 100644
  
  #include "avcodec.h"
 diff --git a/libavcodec/mpeg4videodec.c b/libavcodec/mpeg4videodec.c
-index 791a07b..502c21f 100644
+index 54b7be1..894dcdc 100644
 --- a/libavcodec/mpeg4videodec.c
 +++ b/libavcodec/mpeg4videodec.c
-@@ -2249,6 +2249,9 @@ int ff_mpeg4_workaround_bugs(AVCodecContext *avctx)
+@@ -2247,6 +2247,9 @@ int ff_mpeg4_workaround_bugs(AVCodecContext *avctx)
  
          if (ctx->divx_version >= 0)
              s->workaround_bugs |= FF_BUG_HPEL_CHROMA;
@@ -10652,7 +10619,7 @@ index 791a07b..502c21f 100644
      }
  
      if (s->workaround_bugs & FF_BUG_STD_QPEL) {
-@@ -2273,6 +2276,7 @@ int ff_mpeg4_workaround_bugs(AVCodecContext *avctx)
+@@ -2271,6 +2274,7 @@ int ff_mpeg4_workaround_bugs(AVCodecContext *avctx)
                 s->workaround_bugs, ctx->lavc_build, ctx->xvid_build,
                 ctx->divx_version, ctx->divx_build, s->divx_packed ? "p" : "");
  
@@ -19066,7 +19033,7 @@ index 0000000..f4aeb78
 +#endif
 +
 diff --git a/libavcodec/utils.c b/libavcodec/utils.c
-index 3e8677d..115cc39 100644
+index 0c68836..b8139f5 100644
 --- a/libavcodec/utils.c
 +++ b/libavcodec/utils.c
 @@ -26,6 +26,12 @@
@@ -19194,7 +19161,7 @@ index 3eff152..30dfb14 100644
      { 0x24, AVMEDIA_TYPE_VIDEO, AV_CODEC_ID_HEVC       },
      { 0x42, AVMEDIA_TYPE_VIDEO, AV_CODEC_ID_CAVS       },
 diff --git a/libavformat/utils.c b/libavformat/utils.c
-index a059046..ef70074 100644
+index a82bbc7..4bf5574 100644
 --- a/libavformat/utils.c
 +++ b/libavformat/utils.c
 @@ -748,7 +748,7 @@ static int update_wrap_reference(AVFormatContext *s, AVStream *st, int stream_in
