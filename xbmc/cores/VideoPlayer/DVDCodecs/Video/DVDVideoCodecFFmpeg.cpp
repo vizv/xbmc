@@ -880,6 +880,7 @@ bool CDVDVideoCodecFFmpeg::SetPictureParams(VideoPicture* pVideoPicture)
 
   if (pVideoPicture->videoBuffer)
     pVideoPicture->videoBuffer->Release();
+  pVideoPicture->videoBuffer = nullptr;
 
   CVideoBufferFFmpeg *buffer = dynamic_cast<CVideoBufferFFmpeg*>(m_videoBufferPool->Get());
   buffer->SetRef(m_pFrame);
