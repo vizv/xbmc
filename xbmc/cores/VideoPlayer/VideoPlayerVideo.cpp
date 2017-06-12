@@ -389,6 +389,7 @@ void CVideoPlayerVideo::Process()
       if (m_picture.videoBuffer)
       {
         OutputPicture(&m_picture, pts);
+        m_picture.videoBuffer = nullptr;
         pts += frametime;
       }
 
@@ -673,7 +674,10 @@ bool CVideoPlayerVideo::ProcessDecoderOutput(double &frametime, double &pts)
       m_picture.iDuration += extraDelay;
     }
 
-    int iResult = OutputPicture(&m_picture, pts + extraDelay);
+    int iResult = 0;
+    if (m_picture.videoBuffer)
+      iResult = OutputPicture(&m_picture, pts + extraDelay);
+    m_picture.videoBuffer = nullptr;
 
     frametime = (double)DVD_TIME_BASE / m_fFrameRate;
 
