@@ -309,7 +309,7 @@ bool CAddonSettings::Load(const CXBMCTinyXML& doc)
     }
 
     // try to load the old setting value
-    if (!newSetting->FromString(setting.second))
+    if (newSetting && !newSetting->FromString(setting.second))
     {
       CLog::Log(LOGWARNING, "CAddonSettings[%s]: failed to load value \"%s\" for setting %s",
         m_addonId.c_str(), setting.second.c_str(), setting.first.c_str());
