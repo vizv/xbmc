@@ -5410,7 +5410,7 @@ index e27c54e..09727d9 100644
  
  void ff_hevc_hls_mvd_coding(HEVCContext *s, int x0, int y0, int log2_cb_size)
 diff --git a/libavcodec/hevc_filter.c b/libavcodec/hevc_filter.c
-index 14e7c8d..84ae3da 100644
+index 14e7c8d..0256b01 100644
 --- a/libavcodec/hevc_filter.c
 +++ b/libavcodec/hevc_filter.c
 @@ -22,6 +22,12 @@
@@ -6356,7 +6356,7 @@ index 14e7c8d..84ae3da 100644
          }
      }
  }
-@@ -839,11 +1076,104 @@ void ff_hevc_deblocking_boundary_strengths(HEVCContext *s, int x0, int y0,
+@@ -839,11 +1076,105 @@ void ff_hevc_deblocking_boundary_strengths(HEVCContext *s, int x0, int y0,
  #undef CB
  #undef CR
  
@@ -6366,8 +6366,8 @@ index 14e7c8d..84ae3da 100644
 +static void ff_hevc_flush_buffer_lines(HEVCContext *s, int start, int end, int flush_luma, int flush_chroma)
 +{
 +    rpi_cache_flush_env_t * const rfe = rpi_cache_flush_init();
-+    rpi_cache_flush_add_frame_lines(rfe, s->frame, RPI_CACHE_FLUSH_MODE_WB_INVALIDATE,
-+      start, end - start, s->ps.sps->vshift[1], flush_luma, flush_chroma);
++    rpi_cache_flush_add_frame_block(rfe, s->frame, RPI_CACHE_FLUSH_MODE_WB_INVALIDATE,
++      0, start, s->ps.sps->width, end - start, 0, s->ps.sps->vshift[1], flush_luma, flush_chroma);
 +    rpi_cache_flush_finish(rfe);
 +}
 +#endif
@@ -6381,10 +6381,11 @@ index 14e7c8d..84ae3da 100644
 +        const int d0 = ((int *)f->progress->data)[0];
 +        const unsigned int curr_y = d0 == -1 ? 0 : d0;  // At start of time progress is -1
 +
-+        if (curr_y < (unsigned int)f->f->height) {
++        if (curr_y < (unsigned int)s->ps.sps->height) {
 +            rpi_cache_flush_env_t * const rfe = rpi_cache_flush_init();
-+            rpi_cache_flush_add_frame_lines(rfe, s->frame, RPI_CACHE_FLUSH_MODE_WB_INVALIDATE,
-+              curr_y, FFMIN(n, (unsigned int)f->f->height) - curr_y, s->ps.sps->vshift[1], 1, 1);
++            rpi_cache_flush_add_frame_block(rfe, s->frame, RPI_CACHE_FLUSH_MODE_WB_INVALIDATE,
++              0, curr_y, s->ps.sps->width, FFMIN(n, (unsigned int)s->ps.sps->height) - curr_y,
++              s->ps.sps->vshift[1], 1, 1);
 +            rpi_cache_flush_finish(rfe);
 +        }
 +    }
@@ -6461,7 +6462,7 @@ index 14e7c8d..84ae3da 100644
      if (s->ps.sps->sao_enabled) {
          int y_end = y >= s->ps.sps->height - ctb_size;
          if (y && x)
-@@ -852,16 +1182,46 @@ void ff_hevc_hls_filter(HEVCContext *s, int x, int y, int ctb_size)
+@@ -852,16 +1183,46 @@ void ff_hevc_hls_filter(HEVCContext *s, int x, int y, int ctb_size)
              sao_filter_CTB(s, x - ctb_size, y);
          if (y && x_end) {
              sao_filter_CTB(s, x, y - ctb_size);
@@ -6537,8 +6538,58 @@ index acd55cc..c1716c2 100644
      sps->pcm_enabled_flag = get_bits1(gb);
      if (sps->pcm_enabled_flag) {
          sps->pcm.bit_depth   = get_bits(gb, 4) + 1;
+diff --git a/libavcodec/hevc_refs.c b/libavcodec/hevc_refs.c
+index 9103c84..eb26e7d 100644
+--- a/libavcodec/hevc_refs.c
++++ b/libavcodec/hevc_refs.c
+@@ -206,7 +206,8 @@ int ff_hevc_output_frame(HEVCContext *s, AVFrame *out, int flush)
+             HEVCFrame *frame = &s->DPB[min_idx];
+             AVFrame *dst = out;
+             AVFrame *src = frame->frame;
+-            const AVPixFmtDescriptor *desc = av_pix_fmt_desc_get(src->format);
++            const int fmt = src->format;
++            const AVPixFmtDescriptor *desc = av_pix_fmt_desc_get(fmt);
+             int pixel_shift = !!(desc->comp[0].depth > 8);
+ 
+             ret = av_frame_ref(out, src);
+@@ -217,12 +218,29 @@ int ff_hevc_output_frame(HEVCContext *s, AVFrame *out, int flush)
+             if (ret < 0)
+                 return ret;
+ 
+-            for (i = 0; i < 3; i++) {
+-                int hshift = (i > 0) ? desc->log2_chroma_w : 0;
+-                int vshift = (i > 0) ? desc->log2_chroma_h : 0;
+-                int off = ((frame->window.left_offset >> hshift) << pixel_shift) +
+-                          (frame->window.top_offset   >> vshift) * dst->linesize[i];
+-                dst->data[i] += off;
++            if (fmt == AV_PIX_FMT_SAND128)
++            {
++                // Sand cannot be windowed by offset so add side data if we have an offset
++                const HEVCWindow * const window = &frame->window;
++                if (window->left_offset + window->right_offset + window->top_offset + window->bottom_offset != 0)
++                {
++                    AVFrameSideData *const sd = av_frame_new_side_data(dst, AV_FRAME_DATA_SAND_INFO, sizeof(AVPanScan));
++                    AVFrameDataSandInfo *const si = (AVFrameDataSandInfo *)sd->data;
++                    si->left_offset = window->left_offset;
++                    si->top_offset = window->top_offset;
++                    si->pic_width = s->ps.sps->width;
++                    si->pic_height = s->ps.sps->height;
++                }
++            }
++            else
++            {
++                for (i = 0; i < 3; i++) {
++                    int hshift = (i > 0) ? desc->log2_chroma_w : 0;
++                    int vshift = (i > 0) ? desc->log2_chroma_h : 0;
++                    int off = ((frame->window.left_offset >> hshift) << pixel_shift) +
++                              (frame->window.top_offset   >> vshift) * dst->linesize[i];
++                    dst->data[i] += off;
++                }
+             }
+             av_log(s->avctx, AV_LOG_DEBUG,
+                    "Output frame with POC %d.\n", frame->poc);
 diff --git a/libavcodec/hevcdec.c b/libavcodec/hevcdec.c
-index f9e8ff0..1885eb7 100644
+index f9e8ff0..8a3d874 100644
 --- a/libavcodec/hevcdec.c
 +++ b/libavcodec/hevcdec.c
 @@ -42,8 +42,207 @@
@@ -8003,7 +8054,7 @@ index f9e8ff0..1885eb7 100644
  
                  if (ret < 0)
                      return ret;
-@@ -2306,6 +3429,374 @@ static void hls_decode_neighbour(HEVCContext *s, int x_ctb, int y_ctb,
+@@ -2306,6 +3429,373 @@ static void hls_decode_neighbour(HEVCContext *s, int x_ctb, int y_ctb,
      lc->ctb_up_left_flag = ((x_ctb > 0) && (y_ctb > 0)  && (ctb_addr_in_slice-1 >= s->ps.sps->ctb_width) && (s->ps.pps->tile_id[ctb_addr_ts] == s->ps.pps->tile_id[s->ps.pps->ctb_addr_rs_to_ts[ctb_addr_rs-1 - s->ps.sps->ctb_width]]));
  }
  
@@ -8304,14 +8355,13 @@ index f9e8ff0..1885eb7 100644
 +            flush_start = FFMIN(flush_start, y);
 +            high=FFMAX(high,y);
 +        }
-+        // Avoid flushing past end of frame
-+        flush_count = FFMIN(high + (1 << s->ps.sps->log2_ctb_size), s->frame->height) - flush_start;
++        flush_count = FFMIN(high + (1 << s->ps.sps->log2_ctb_size), s->ps.sps->height) - flush_start;
 +    }
 +
 +    if (mc_terminate_add(s, vqj, rfe, &s->jobs[job].chroma_ip) != 0)
 +    {
-+        rpi_cache_flush_add_frame_lines(rfe, s->frame, RPI_CACHE_FLUSH_MODE_WB_INVALIDATE,
-+          flush_start, flush_count, s->ps.sps->vshift[1], 0, 1);
++        rpi_cache_flush_add_frame_block(rfe, s->frame, RPI_CACHE_FLUSH_MODE_WB_INVALIDATE,
++          0, flush_start, s->ps.sps->width, flush_count, s->ps.sps->vshift[1], 0, 1);
 +    }
 +
 +// We can take a sync here and try to locally overlap QPU processing with ARM
@@ -8322,8 +8372,8 @@ index f9e8ff0..1885eb7 100644
 +
 +    if (mc_terminate_add(s, vqj, rfe, &s->jobs[job].luma_ip) != 0)
 +    {
-+        rpi_cache_flush_add_frame_lines(rfe, s->frame, RPI_CACHE_FLUSH_MODE_WB_INVALIDATE,
-+          flush_start, flush_count, s->ps.sps->vshift[1], 1, 0);
++        rpi_cache_flush_add_frame_block(rfe, s->frame, RPI_CACHE_FLUSH_MODE_WB_INVALIDATE,
++          0, flush_start, s->ps.sps->width, flush_count, s->ps.sps->vshift[1], 1, 0);
 +    }
 +#endif
 +
@@ -8378,7 +8428,7 @@ index f9e8ff0..1885eb7 100644
  static int hls_decode_entry(AVCodecContext *avctxt, void *isFilterThread)
  {
      HEVCContext *s  = avctxt->priv_data;
-@@ -2315,6 +3806,18 @@ static int hls_decode_entry(AVCodecContext *avctxt, void *isFilterThread)
+@@ -2315,6 +3805,18 @@ static int hls_decode_entry(AVCodecContext *avctxt, void *isFilterThread)
      int y_ctb       = 0;
      int ctb_addr_ts = s->ps.pps->ctb_addr_rs_to_ts[s->sh.slice_ctb_addr_rs];
  
@@ -8397,7 +8447,7 @@ index f9e8ff0..1885eb7 100644
      if (!ctb_addr_ts && s->sh.dependent_slice_segment_flag) {
          av_log(s->avctx, AV_LOG_ERROR, "Impossible initial tile.\n");
          return AVERROR_INVALIDDATA;
-@@ -2328,6 +3831,14 @@ static int hls_decode_entry(AVCodecContext *avctxt, void *isFilterThread)
+@@ -2328,6 +3830,14 @@ static int hls_decode_entry(AVCodecContext *avctxt, void *isFilterThread)
          }
      }
  
@@ -8412,7 +8462,7 @@ index f9e8ff0..1885eb7 100644
      while (more_data && ctb_addr_ts < s->ps.sps->ctb_size) {
          int ctb_addr_rs = s->ps.pps->ctb_addr_ts_to_rs[ctb_addr_ts];
  
-@@ -2335,6 +3846,7 @@ static int hls_decode_entry(AVCodecContext *avctxt, void *isFilterThread)
+@@ -2335,6 +3845,7 @@ static int hls_decode_entry(AVCodecContext *avctxt, void *isFilterThread)
          y_ctb = (ctb_addr_rs / ((s->ps.sps->width + ctb_size - 1) >> s->ps.sps->log2_ctb_size)) << s->ps.sps->log2_ctb_size;
          hls_decode_neighbour(s, x_ctb, y_ctb, ctb_addr_ts);
  
@@ -8420,7 +8470,7 @@ index f9e8ff0..1885eb7 100644
          ff_hevc_cabac_init(s, ctb_addr_ts);
  
          hls_sao_param(s, x_ctb >> s->ps.sps->log2_ctb_size, y_ctb >> s->ps.sps->log2_ctb_size);
-@@ -2344,6 +3856,49 @@ static int hls_decode_entry(AVCodecContext *avctxt, void *isFilterThread)
+@@ -2344,6 +3855,49 @@ static int hls_decode_entry(AVCodecContext *avctxt, void *isFilterThread)
          s->filter_slice_edges[ctb_addr_rs]  = s->sh.slice_loop_filter_across_slices_enabled_flag;
  
          more_data = hls_coding_quadtree(s, x_ctb, y_ctb, s->ps.sps->log2_ctb_size, 0);
@@ -8470,7 +8520,7 @@ index f9e8ff0..1885eb7 100644
          if (more_data < 0) {
              s->tab_slice_address[ctb_addr_rs] = -1;
              return more_data;
-@@ -2352,9 +3907,42 @@ static int hls_decode_entry(AVCodecContext *avctxt, void *isFilterThread)
+@@ -2352,9 +3906,42 @@ static int hls_decode_entry(AVCodecContext *avctxt, void *isFilterThread)
  
          ctb_addr_ts++;
          ff_hevc_save_states(s, ctb_addr_ts);
@@ -8513,7 +8563,7 @@ index f9e8ff0..1885eb7 100644
      if (x_ctb + ctb_size >= s->ps.sps->width &&
          y_ctb + ctb_size >= s->ps.sps->height)
          ff_hevc_hls_filter(s, x_ctb, y_ctb, ctb_size);
-@@ -2389,6 +3977,11 @@ static int hls_decode_entry_wpp(AVCodecContext *avctxt, void *input_ctb_row, int
+@@ -2389,6 +3976,11 @@ static int hls_decode_entry_wpp(AVCodecContext *avctxt, void *input_ctb_row, int
      s = s1->sList[self_id];
      lc = s->HEVClc;
  
@@ -8525,7 +8575,7 @@ index f9e8ff0..1885eb7 100644
      if(ctb_row) {
          ret = init_get_bits8(&lc->gb, s->data + s->sh.offset[ctb_row - 1], s->sh.size[ctb_row - 1]);
  
-@@ -2771,6 +4364,33 @@ static int decode_nal_unit(HEVCContext *s, const H2645NAL *nal)
+@@ -2771,6 +4363,33 @@ static int decode_nal_unit(HEVCContext *s, const H2645NAL *nal)
          if (ret < 0)
              return ret;
  
@@ -8559,7 +8609,7 @@ index f9e8ff0..1885eb7 100644
          if (s->sh.first_slice_in_pic_flag) {
              if (s->max_ra == INT_MAX) {
                  if (s->nal_unit_type == HEVC_NAL_CRA_NUT || IS_BLA(s)) {
-@@ -2894,10 +4514,19 @@ static int decode_nal_units(HEVCContext *s, const uint8_t *buf, int length)
+@@ -2894,10 +4513,19 @@ static int decode_nal_units(HEVCContext *s, const uint8_t *buf, int length)
          }
      }
  
@@ -8582,7 +8632,7 @@ index f9e8ff0..1885eb7 100644
      return ret;
  }
  
-@@ -3150,6 +4779,48 @@ fail:
+@@ -3150,6 +4778,48 @@ fail:
      return AVERROR(ENOMEM);
  }
  
@@ -8631,7 +8681,7 @@ index f9e8ff0..1885eb7 100644
  static av_cold int hevc_decode_free(AVCodecContext *avctx)
  {
      HEVCContext       *s = avctx->priv_data;
-@@ -3161,6 +4832,27 @@ static av_cold int hevc_decode_free(AVCodecContext *avctx)
+@@ -3161,6 +4831,27 @@ static av_cold int hevc_decode_free(AVCodecContext *avctx)
  
      av_freep(&s->cabac_state);
  
@@ -8659,7 +8709,7 @@ index f9e8ff0..1885eb7 100644
      for (i = 0; i < 3; i++) {
          av_freep(&s->sao_pixel_buffer_h[i]);
          av_freep(&s->sao_pixel_buffer_v[i]);
-@@ -3202,10 +4894,14 @@ static av_cold int hevc_decode_free(AVCodecContext *avctx)
+@@ -3202,10 +4893,14 @@ static av_cold int hevc_decode_free(AVCodecContext *avctx)
      return 0;
  }
  
@@ -8674,7 +8724,7 @@ index f9e8ff0..1885eb7 100644
  
      s->avctx = avctx;
  
-@@ -3215,6 +4911,59 @@ static av_cold int hevc_init_context(AVCodecContext *avctx)
+@@ -3215,6 +4910,59 @@ static av_cold int hevc_init_context(AVCodecContext *avctx)
      s->HEVClcList[0] = s->HEVClc;
      s->sList[0] = s;
  
@@ -8734,7 +8784,7 @@ index f9e8ff0..1885eb7 100644
      s->cabac_state = av_malloc(HEVC_CONTEXTS);
      if (!s->cabac_state)
          goto fail;
-@@ -3357,9 +5106,9 @@ static av_cold int hevc_decode_init(AVCodecContext *avctx)
+@@ -3357,9 +5105,9 @@ static av_cold int hevc_decode_init(AVCodecContext *avctx)
      }
  
      if((avctx->active_thread_type & FF_THREAD_FRAME) && avctx->thread_count > 1)
@@ -8747,7 +8797,7 @@ index f9e8ff0..1885eb7 100644
  
      return 0;
  }
-@@ -3418,6 +5167,8 @@ AVCodec ff_hevc_decoder = {
+@@ -3418,6 +5166,8 @@ AVCodec ff_hevc_decoder = {
      .update_thread_context = hevc_update_thread_context,
      .init_thread_copy      = hevc_init_thread_copy,
      .capabilities          = AV_CODEC_CAP_DR1 | AV_CODEC_CAP_DELAY |
@@ -10644,22 +10694,74 @@ index 7146e3a..240b274 100644
      { AV_PIX_FMT_RGB565LE,MKTAG( 3 ,  0 ,  0 ,  0 ) }, /* flipped RGB565LE */
      { AV_PIX_FMT_YUV444P, MKTAG('Y', 'V', '2', '4') }, /* YUV444P, swapped UV */
 diff --git a/libavcodec/rawenc.c b/libavcodec/rawenc.c
-index d181b74..2a2f218 100644
+index d181b74..84f8e8c 100644
 --- a/libavcodec/rawenc.c
 +++ b/libavcodec/rawenc.c
-@@ -49,6 +49,47 @@ FF_ENABLE_DEPRECATION_WARNINGS
+@@ -31,6 +31,7 @@
+ #include "libavutil/intreadwrite.h"
+ #include "libavutil/imgutils.h"
+ #include "libavutil/internal.h"
++#include "libavutil/avassert.h"
+ 
+ static av_cold int raw_encode_init(AVCodecContext *avctx)
+ {
+@@ -49,6 +50,101 @@ FF_ENABLE_DEPRECATION_WARNINGS
      return 0;
  }
  
-+static uint8_t * cpy_sand_c(uint8_t * dst, const AVFrame * const frame, const int c_off)
++// x0 & width in luma units (so chroma * 2)
++// x0 odd for v
++static uint8_t * sand_copy_line_u(uint8_t * dst, const uint8_t * src,
++                           unsigned int x0, const unsigned int width,
++                           const unsigned int stride1, const unsigned int stride2)
 +{
-+    for (int y = 0; y != frame->height / 2; ++y) {
-+        for (int x = 0; x < frame->width; x += frame->linesize[0]) {
-+            const uint8_t * p = frame->data[1] + x * frame->linesize[3] + y * frame->linesize[0] + c_off;
-+            const int w = FFMIN(frame->linesize[0], frame->width - x) / 2;
-+            for (int i = 0; i < w; ++i)
-+                *dst++ = p[i * 2];
-+        }
++    unsigned int xend;
++
++    // Skip any empty slices
++    src += (x0 & ~(stride1 - 1)) * stride2;
++    x0 &= (stride1 - 1);
++
++    xend = x0 + width;
++    for (unsigned int x = 0; x < xend; x += stride1)
++    {
++        const unsigned int w = FFMIN(stride1, xend - x) - x0;
++        for (unsigned int i = 0; i < w; i += 2)
++            *dst++ = src[x0 + i];
++        src += stride1 * stride2;
++        x0 &= 1;
++    }
++
++    return dst;
++}
++
++static uint8_t * cpy_sand_c(uint8_t * dst, const AVFrame * const frame,
++                            const unsigned int x0, const unsigned int y0,
++                            const unsigned int width, const unsigned int height)
++{
++    for (unsigned int y = y0; y < height + y0; ++y) {
++        dst = sand_copy_line_u(dst, frame->data[1] + y * frame->linesize[1], x0, width, frame->linesize[1], frame->linesize[3]);
++    }
++    return dst;
++}
++
++static uint8_t * sand_copy_line_y(uint8_t * dst, const uint8_t * src,
++                           unsigned int x0, const unsigned int width,
++                           const unsigned int stride1, const unsigned int stride2)
++{
++    unsigned int xend;
++
++    // Skip any empty slices
++    src += (x0 & ~(stride1 - 1)) * stride2;
++    x0 &= (stride1 - 1);
++
++    xend = x0 + width;
++    for (unsigned int x = 0; x < xend; x += stride1)
++    {
++        const unsigned int w = FFMIN(stride1, xend - x) - x0;
++        memcpy(dst, src + x0, w);
++        dst += w;
++        src += stride1 * stride2;
++        x0 = 0;
 +    }
 +    return dst;
 +}
@@ -10667,35 +10769,45 @@ index d181b74..2a2f218 100644
 +static int raw_sand_as_yuv420(AVCodecContext *avctx, AVPacket *pkt,
 +                      const AVFrame *frame)
 +{
-+    int size = frame->width * frame->height * 3 / 2;
++    const AVFrameSideData *const sd = av_frame_get_side_data(frame, AV_FRAME_DATA_SAND_INFO);
++    int size;
++    int width = frame->width;
++    int height = frame->height;
++    int x0 = 0;
++    int y0 = 0;
 +    uint8_t * dst;
 +    int ret;
 +
++    if (sd != NULL) {
++        const AVFrameDataSandInfo *const si = (AVFrameDataSandInfo *)sd->data;
++
++//        printf("PScan: h/w=%d/%d, off=%d,%d\n", pscan->height, pscan->width, pscan->position[0][0], pscan->position[0][0]);
++
++        x0 = si->left_offset;
++        y0 = si->top_offset;
++    }
++
++    size = width * height * 3 / 2;
 +    if ((ret = ff_alloc_packet2(avctx, pkt, size, size)) < 0)
 +        return ret;
 +
 +    dst = pkt->data;
 +
 +    // Luma is "easy"
-+    for (int y = 0; y != frame->height; ++y) {
-+        for (int x = 0; x < frame->width; x += frame->linesize[0]) {
-+            const int w = FFMIN(frame->linesize[0], frame->width - x);
-+            memcpy(dst,
-+                frame->data[0] + x * frame->linesize[3] + y * frame->linesize[0], w);
-+            dst += w;
-+        }
++    for (int y = y0; y < height + y0; ++y) {
++        dst = sand_copy_line_y(dst, frame->data[0] + y * frame->linesize[0], x0, width, frame->linesize[0], frame->linesize[3]);
 +    }
-+    // Chroma is dull
-+    dst = cpy_sand_c(dst, frame, 0);
-+    dst = cpy_sand_c(dst, frame, 1);
 +
++    // Chroma is dull
++    dst = cpy_sand_c(dst, frame, x0 & ~1, y0 / 2, width, height / 2);
++    dst = cpy_sand_c(dst, frame, x0 | 1,  y0 / 2, width, height / 2);
 +    return 0;
 +}
 +
  static int raw_encode(AVCodecContext *avctx, AVPacket *pkt,
                        const AVFrame *frame, int *got_packet)
  {
-@@ -58,6 +99,12 @@ static int raw_encode(AVCodecContext *avctx, AVPacket *pkt,
+@@ -58,6 +154,12 @@ static int raw_encode(AVCodecContext *avctx, AVPacket *pkt,
      if (ret < 0)
          return ret;
  
@@ -14928,10 +15040,10 @@ index 0000000..b316878
 +#endif
 diff --git a/libavcodec/rpi_qpu.c b/libavcodec/rpi_qpu.c
 new file mode 100644
-index 0000000..b026818
+index 0000000..36c8ab6
 --- /dev/null
 +++ b/libavcodec/rpi_qpu.c
-@@ -0,0 +1,873 @@
+@@ -0,0 +1,878 @@
 +#ifdef RPI
 +#include <stdio.h>
 +#include <stdlib.h>
@@ -15468,21 +15580,25 @@ index 0000000..b026818
 +  }
 +}
 +
-+void rpi_cache_flush_add_frame_lines(rpi_cache_flush_env_t * const rfe, const AVFrame * const frame, const unsigned int mode,
-+  const unsigned int start_line, const unsigned int n, const unsigned int uv_shift, const int do_luma, const int do_chroma)
++void rpi_cache_flush_add_frame_block(rpi_cache_flush_env_t * const rfe, const AVFrame * const frame, const unsigned int mode,
++  const unsigned int x0, const unsigned int y0, const unsigned int width, const unsigned int height,
++  const unsigned int uv_shift, const int do_luma, const int do_chroma)
 +{
-+  const unsigned int y_offset = frame->linesize[0] * start_line;
-+  const unsigned int y_size = frame->linesize[0] * n;
++  const unsigned int y_offset = frame->linesize[0] * y0;
++  const unsigned int y_size = frame->linesize[0] * height;
 +  // Round UV up/down to get everything
 +  const unsigned int uv_rnd = (1U << uv_shift) >> 1;
-+  const unsigned int uv_offset = frame->linesize[1] * (start_line >> uv_shift);
-+  const unsigned int uv_size = frame->linesize[1] * ((start_line + n + uv_rnd) >> uv_shift) - uv_offset;
++  const unsigned int uv_offset = frame->linesize[1] * (y0 >> uv_shift);
++  const unsigned int uv_size = frame->linesize[1] * ((y0 + height + uv_rnd) >> uv_shift) - uv_offset;
 +
++#if 0
++  // *** frame->height is cropped height so not good
 +  // As all unsigned they will also reject -ve
 +  // Test individually as well as added to reject overflow
-+  av_assert0(start_line <= (unsigned int)frame->height);
++  av_assert0(start_line <= (unsigned int)frame->height);  // ***** frame height cropped
 +  av_assert0(n <= (unsigned int)frame->height);
 +  av_assert0(start_line + n <= (unsigned int)frame->height);
++#endif
 +
 +  if (!gpu_is_buf1(frame))
 +  {
@@ -15509,13 +15625,14 @@ index 0000000..b026818
 +  {
 +    const GPU_MEM_PTR_T * const gm = gpu_buf1_gmem(frame);
 +//    printf("%s: start_line=%d, lines=%d, %c%c\n", __func__, start_line, n, do_luma ? 'l' : ' ', do_chroma ? 'c' : ' ');
-+    for (int x = 0; x < frame->width; x += frame->linesize[0]) {
++    // **** Use x0!
++    for (int x = 0; x < x0 + width; x += frame->linesize[0]) {
 +      if (do_luma) {
-+        rpi_cache_flush_add_gm_range(rfe, gm, mode, rpi_sliced_frame_off_y(frame, x, start_line), y_size);
++        rpi_cache_flush_add_gm_range(rfe, gm, mode, rpi_sliced_frame_off_y(frame, x, y0), y_size);
 +      }
 +      if (do_chroma) {
 +        rpi_cache_flush_add_gm_range(rfe, gm, mode,
-+                                     (frame->data[1] - gm->arm) + rpi_sliced_frame_off_c(frame, x >> 1, start_line >> 1), uv_size);
++                                     (frame->data[1] - gm->arm) + rpi_sliced_frame_off_c(frame, x >> 1, y0 >> 1), uv_size);
 +      }
 +    }
 +  }
@@ -15807,10 +15924,10 @@ index 0000000..b026818
 +#endif // RPI
 diff --git a/libavcodec/rpi_qpu.h b/libavcodec/rpi_qpu.h
 new file mode 100644
-index 0000000..4a74aa4
+index 0000000..636e420
 --- /dev/null
 +++ b/libavcodec/rpi_qpu.h
-@@ -0,0 +1,200 @@
+@@ -0,0 +1,201 @@
 +#ifndef RPI_QPU_H
 +#define RPI_QPU_H
 +
@@ -15956,8 +16073,9 @@ index 0000000..4a74aa4
 +void rpi_cache_flush_add_gm_range(rpi_cache_flush_env_t * const rfe, const GPU_MEM_PTR_T * const gm, const rpi_cache_flush_mode_t mode,
 +  const unsigned int offset, const unsigned int size);
 +void rpi_cache_flush_add_frame(rpi_cache_flush_env_t * const rfe, const AVFrame * const frame, const rpi_cache_flush_mode_t mode);
-+void rpi_cache_flush_add_frame_lines(rpi_cache_flush_env_t * const rfe, const AVFrame * const frame, const rpi_cache_flush_mode_t mode,
-+  const unsigned int start_line, const unsigned int n, const unsigned int uv_shift, const int do_luma, const int do_chroma);
++void rpi_cache_flush_add_frame_block(rpi_cache_flush_env_t * const rfe, const AVFrame * const frame, const rpi_cache_flush_mode_t mode,
++  const unsigned int x0, const unsigned int y0, const unsigned int width, const unsigned int height,
++  const unsigned int uv_shift, const int do_luma, const int do_chroma);
 +
 +// init, add, finish for one gm ptr
 +void rpi_cache_flush_one_gm_ptr(const GPU_MEM_PTR_T * const p, const rpi_cache_flush_mode_t mode);
@@ -16013,10 +16131,10 @@ index 0000000..4a74aa4
 +#endif
 diff --git a/libavcodec/rpi_shader.c b/libavcodec/rpi_shader.c
 new file mode 100644
-index 0000000..18827f7
+index 0000000..f2842b6
 --- /dev/null
 +++ b/libavcodec/rpi_shader.c
-@@ -0,0 +1,753 @@
+@@ -0,0 +1,734 @@
 +#include "rpi_shader.h"
 +
 +#ifdef _MSC_VER
@@ -16052,719 +16170,700 @@ index 0000000..18827f7
 +/* [0x00000030] */ 0x0d801dc0, 0xd00217a7, // sub rb_max_y, unif, 1
 +/* [0x00000038] */ 0xff100100, 0xe0020527, // mov ra_kff100100, 0xff100100
 +/* [0x00000040] */ 0x000000ff, 0xe00215a7, // mov rb_k255, 255
-+/* [0x00000048] */ 0x00000000, 0xe0024104, // mov ra4, 0 ; mov rb4, 0
-+/* [0x00000050] */ 0x00000000, 0xe0024145, // mov ra5, 0 ; mov rb5, 0
-+/* [0x00000058] */ 0x00000000, 0xe0024186, // mov ra6, 0 ; mov rb6, 0
-+/* [0x00000060] */ 0x00000000, 0xe00241c7, // mov ra7, 0 ; mov rb7, 0
-+/* [0x00000068] */ 0xc0000000, 0xe0020867, // mov r1, vdw_setup_1(0)
-+/* [0x00000070] */ 0x95800dbf, 0xd002550c, // mov rb_xpitch, unif   ; mov ra12, 0
-+/* [0x00000078] */ 0x95800dbf, 0xd002540d, // mov rb_pitch, unif    ; mov ra13, 0
-+/* [0x00000080] */ 0x00000000, 0xe00059ce, // nop                   ; mov ra14, 0
-+/* [0x00000088] */ 0x8c5103f6, 0x1802560f, // add rb_dma1_base, r1, rb_pitch ; mov ra15, ra_k0
-+/* [0x00000090] */ 0x14981f80, 0xd0020827, // and r0, 1, elem_num
-+/* [0x00000098] */ 0x409c7007, 0xd00049e0, // nop                   ; mul24 r0, r0, 7
-+/* [0x000000a0] */ 0x0c9a7180, 0x100210a7, // add rb_elem_x, r0, elem_num
-+/* [0x000000a8] */ 0x0c027d80, 0x14020827, // add r0, ra0.16b, ra0.16b
-+/* [0x000000b0] */ 0x0c9c21c0, 0x10020827, // add r0, r0, rb_elem_x
-+/* [0x000000b8] */ 0x930001f6, 0xd2225811, // max r0, r0, 0         ; mov ra_y, ra0.16a
-+/* [0x000000c0] */ 0x129d91c0, 0x10020827, // min r0, r0, rb_max_x
-+/* [0x000000c8] */ 0x119c31c0, 0xd0220567, // shl ra_xshift_next, r0, 3
-+/* [0x000000d0] */ 0x149dc1c0, 0xd0020827, // and r0, r0, -4
-+/* [0x000000d8] */ 0x0d510dc0, 0x18020867, // sub r1, ra_k0, rb_pitch
-+/* [0x000000e0] */ 0x149e7040, 0x10020867, // and r1, r0, r1
-+/* [0x000000e8] */ 0x569d404f, 0x10024821, // xor r0, r0, r1        ; mul24 r1, r1, rb_xpitch
-+/* [0x000000f0] */ 0x0c9e7040, 0x10020827, // add r0, r0, r1
-+/* [0x000000f8] */ 0x0c627c00, 0x10020627, // add ra_base, ra_base, r0
-+/* [0x00000100] */ 0x0c809f80, 0xd0021367, // add rb_wt_den_p15, 9, unif
-+/* [0x00000108] */ 0x159e6fc0, 0x100208a7, // mov r2, qpu_num
-+/* [0x00000110] */ 0x0f9c25c0, 0xd0020867, // asr r1, r2, 2
-+/* [0x00000118] */ 0x119c63c0, 0xd0020867, // shl r1, r1, 6
-+/* [0x00000120] */ 0x149c35c0, 0xd0020827, // and r0, r2, 3
-+/* [0x00000128] */ 0x159e7040, 0x10020827, // or  r0, r0, r1
-+/* [0x00000130] */ 0x00004800, 0xe0020867, // mov r1, vpm_setup(0, 4, h8p(0, 0))
-+/* [0x00000138] */ 0x0c9e7040, 0x10021727, // add r_vpm, r0, r1
-+/* [0x00000140] */ 0x80004004, 0xe0020867, // mov r1, vdw_setup_0(0, 0, dma_h8p(0,0,0))
-+/* [0x00000148] */ 0x119c51c0, 0xd0020827, // shl r0, r0, 5
-+/* [0x00000150] */ 0x0c9e7040, 0x100216e7, // add r_dma, r0, r1
-+/* [0x00000158] */ 0x15827d80, 0x10020027, // mov ra0, unif
-+/* [0x00000160] */ 0x15827d80, 0x10020667, // mov ra_base2, unif
-+/* [0x00000168] */ 0x0c027d80, 0x14020827, // add r0, ra0.16b, ra0.16b
-+/* [0x00000170] */ 0x8c0021f6, 0x12125811, // add r0, r0, rb_elem_x ; mov ra_y2, ra0.16a
-+/* [0x00000178] */ 0x139c01c0, 0xd0020827, // max r0, r0, 0
-+/* [0x00000180] */ 0x129d91c0, 0x10020827, // min r0, r0, rb_max_x
-+/* [0x00000188] */ 0x119c31c0, 0xd0021067, // shl rb_xshift2_next, r0, 3
-+/* [0x00000190] */ 0x149dc1c0, 0xd0020827, // and r0, r0, -4
-+/* [0x00000198] */ 0x0d510dc0, 0x18020867, // sub r1, ra_k0, rb_pitch
-+/* [0x000001a0] */ 0x149e7040, 0x10020867, // and r1, r0, r1
-+/* [0x000001a8] */ 0x569d404f, 0x10024821, // xor r0, r0, r1        ; mul24 r1, r1, rb_xpitch
-+/* [0x000001b0] */ 0x8c467076, 0x12024822, // add r0, r0, r1        ; mov r2, ra_y2
-+/* [0x000001b8] */ 0x0c667c00, 0x10020667, // add ra_base2, ra_base2, r0
-+/* [0x000001c0] */ 0x95442ff6, 0xd40248e0, // mov r3, PREREAD       ; mov r0, ra_y
-+/* [0x000001c8] */ 0x15827d80, 0x100207a7, // mov ra_link, unif
++/* [0x00000048] */ 0xc0000000, 0xe0020867, // mov r1, vdw_setup_1(0)
++/* [0x00000050] */ 0x95800dbf, 0xd002550c, // mov rb_xpitch, unif   ; mov ra12, 0
++/* [0x00000058] */ 0x95800dbf, 0xd002540d, // mov rb_pitch, unif    ; mov ra13, 0
++/* [0x00000060] */ 0x00000000, 0xe00059ce, // nop                   ; mov ra14, 0
++/* [0x00000068] */ 0x8c5103f6, 0x1802560f, // add rb_dma1_base, r1, rb_pitch ; mov ra15, ra_k0
++/* [0x00000070] */ 0x14981f80, 0xd0020827, // and r0, 1, elem_num
++/* [0x00000078] */ 0x409c5007, 0xd00049e0, // nop                   ; mul24 r0, r0, 5
++/* [0x00000080] */ 0x0c9a7180, 0x100210a7, // add rb_elem_x, r0, elem_num
++/* [0x00000088] */ 0x0c027d80, 0x14020827, // add r0, ra0.16b, ra0.16b
++/* [0x00000090] */ 0x0c9c21c0, 0x10020827, // add r0, r0, rb_elem_x
++/* [0x00000098] */ 0x930001f6, 0xd2225811, // max r0, r0, 0         ; mov ra_y, ra0.16a
++/* [0x000000a0] */ 0x129d91c0, 0x10020827, // min r0, r0, rb_max_x
++/* [0x000000a8] */ 0x119c31c0, 0xd0220567, // shl ra_xshift_next, r0, 3
++/* [0x000000b0] */ 0x149dc1c0, 0xd0020827, // and r0, r0, -4
++/* [0x000000b8] */ 0x0d510dc0, 0x18020867, // sub r1, ra_k0, rb_pitch
++/* [0x000000c0] */ 0x149e7040, 0x10020867, // and r1, r0, r1
++/* [0x000000c8] */ 0x569d404f, 0x10024821, // xor r0, r0, r1        ; mul24 r1, r1, rb_xpitch
++/* [0x000000d0] */ 0x0c9e7040, 0x10020827, // add r0, r0, r1
++/* [0x000000d8] */ 0x0c627c00, 0x10020627, // add ra_base, ra_base, r0
++/* [0x000000e0] */ 0x0c809f80, 0xd0021367, // add rb_wt_den_p15, 9, unif
++/* [0x000000e8] */ 0x159e6fc0, 0x100208a7, // mov r2, qpu_num
++/* [0x000000f0] */ 0x0f9c25c0, 0xd0020867, // asr r1, r2, 2
++/* [0x000000f8] */ 0x119c63c0, 0xd0020867, // shl r1, r1, 6
++/* [0x00000100] */ 0x149c35c0, 0xd0020827, // and r0, r2, 3
++/* [0x00000108] */ 0x159e7040, 0x10020827, // or  r0, r0, r1
++/* [0x00000110] */ 0x00004800, 0xe0020867, // mov r1, vpm_setup(0, 4, h8p(0, 0))
++/* [0x00000118] */ 0x0c9e7040, 0x10021727, // add r_vpm, r0, r1
++/* [0x00000120] */ 0x80004004, 0xe0020867, // mov r1, vdw_setup_0(0, 0, dma_h8p(0,0,0))
++/* [0x00000128] */ 0x119c51c0, 0xd0020827, // shl r0, r0, 5
++/* [0x00000130] */ 0x0c9e7040, 0x100216e7, // add r_dma, r0, r1
++/* [0x00000138] */ 0x15827d80, 0x10020027, // mov ra0, unif
++/* [0x00000140] */ 0x15827d80, 0x10020667, // mov ra_base2, unif
++/* [0x00000148] */ 0x0c027d80, 0x14020827, // add r0, ra0.16b, ra0.16b
++/* [0x00000150] */ 0x8c0021f6, 0x12125811, // add r0, r0, rb_elem_x ; mov ra_y2, ra0.16a
++/* [0x00000158] */ 0x139c01c0, 0xd0020827, // max r0, r0, 0
++/* [0x00000160] */ 0x129d91c0, 0x10020827, // min r0, r0, rb_max_x
++/* [0x00000168] */ 0x119c31c0, 0xd0021067, // shl rb_xshift2_next, r0, 3
++/* [0x00000170] */ 0x149dc1c0, 0xd0020827, // and r0, r0, -4
++/* [0x00000178] */ 0x0d510dc0, 0x18020867, // sub r1, ra_k0, rb_pitch
++/* [0x00000180] */ 0x149e7040, 0x10020867, // and r1, r0, r1
++/* [0x00000188] */ 0x569d404f, 0x10024821, // xor r0, r0, r1        ; mul24 r1, r1, rb_xpitch
++/* [0x00000190] */ 0x8c467076, 0x12024822, // add r0, r0, r1        ; mov r2, ra_y2
++/* [0x00000198] */ 0x0c667c00, 0x10020667, // add ra_base2, ra_base2, r0
++/* [0x000001a0] */ 0x95442ff6, 0xd40248e0, // mov r3, PREREAD       ; mov r0, ra_y
 +// :c_preload
-+/* [0x000001d0] */ 0x0d9c17c0, 0xd00228e7, // sub.setf r3, r3, 1
-+/* [0x000001d8] */ 0x139c01c0, 0xd0020867, // max r1, r0, 0
++/* [0x000001a8] */ 0x0d9c17c0, 0xd00228e7, // sub.setf r3, r3, 1
++/* [0x000001b0] */ 0x139c01c0, 0xd0020867, // max r1, r0, 0
++/* [0x000001b8] */ 0x129de3c0, 0x10020867, // min r1, r1, rb_max_y
++/* [0x000001c0] */ 0x4c51018f, 0x1a024821, // add r0, r0, ra_k1     ; mul24 r1, r1, rb_pitch
++/* [0x000001c8] */ 0x8c627c40, 0x10225e11, // add t0s, ra_base, r1  ; mov ra_y, r0
++/* [0x000001d0] */ 0x139c05c0, 0xd0020867, // max r1, r2, 0
++/* [0x000001d8] */ 0xffffffb0, 0xf03809e7, // brr.anynz -, r:c_preload
 +/* [0x000001e0] */ 0x129de3c0, 0x10020867, // min r1, r1, rb_max_y
-+/* [0x000001e8] */ 0x4c51018f, 0x1a024821, // add r0, r0, ra_k1     ; mul24 r1, r1, rb_pitch
-+/* [0x000001f0] */ 0x0c627c40, 0x10020e27, // add t0s, ra_base, r1
-+/* [0x000001f8] */ 0x139c05c0, 0xd0020867, // max r1, r2, 0
-+/* [0x00000200] */ 0xffffffb0, 0xf03809e7, // brr.anynz -, r:c_preload
-+/* [0x00000208] */ 0x129de3c0, 0x10020867, // min r1, r1, rb_max_y
-+/* [0x00000210] */ 0x4c51058f, 0x1a0248a1, // add r2, r2, ra_k1     ; mul24 r1, r1, rb_pitch
-+/* [0x00000218] */ 0x0c667c40, 0x10020f27, // add t1s, ra_base2, r1
-+/* [0x00000220] */ 0x00000000, 0xf0f7c9e7, // bra -, ra_link
-+/* [0x00000228] */ 0x159e7000, 0x10220467, // mov ra_y, r0
-+/* [0x00000230] */ 0x159e7480, 0x10120467, // mov ra_y2, r2
-+/* [0x00000238] */ 0x009e7000, 0x100009e7, // nop
++/* [0x000001e8] */ 0x4c51058f, 0x1a0248a1, // add r2, r2, ra_k1     ; mul24 r1, r1, rb_pitch
++/* [0x000001f0] */ 0x8c667c52, 0x10125f11, // add t1s, ra_base2, r1 ; mov ra_y2, r2
++/* [0x000001f8] */ 0x15827d80, 0x100207a7, // mov ra_link, unif
++/* [0x00000200] */ 0x00000000, 0xe0024104, // mov ra4, 0 ; mov rb4, 0
++/* [0x00000208] */ 0x00000000, 0xf0f7c9e7, // bra -, ra_link
++/* [0x00000210] */ 0x00000000, 0xe0024145, // mov ra5, 0 ; mov rb5, 0
++/* [0x00000218] */ 0x00000000, 0xe0024186, // mov ra6, 0 ; mov rb6, 0
++/* [0x00000220] */ 0x00000000, 0xe00241c7, // mov ra7, 0 ; mov rb7, 0
 +// ::mc_filter_uv
-+/* [0x00000240] */ 0x159dcfc0, 0x10021c67, // mov vw_setup, rb_vpm_init
-+/* [0x00000248] */ 0x15827d80, 0x100200a7, // mov ra2, unif
-+/* [0x00000250] */ 0x14981dc0, 0xd00229e7, // and.setf -, elem_num, 1
-+/* [0x00000258] */ 0xec0a7d89, 0x14024821, // add r0, ra2.16b, ra2.16b ; v8subs r1, r1, r1
-+/* [0x00000260] */ 0x0c9c21c0, 0x10020827, // add r0, r0, rb_elem_x
-+/* [0x00000268] */ 0x8d8103f6, 0x10024863, // sub r1, r1, rb_pitch  ; mov r3, unif
-+/* [0x00000270] */ 0x935401f6, 0xd4125815, // max r0, r0, 0         ; mov ra_xshift, ra_xshift_next
-+/* [0x00000278] */ 0x928191f6, 0x10025801, // min r0, r0, rb_max_x  ; mov ra1, unif
-+/* [0x00000280] */ 0x119c31c0, 0xd0220567, // shl ra_xshift_next, r0, 3
-+/* [0x00000288] */ 0x9481c1f6, 0xd0025800, // and r0, r0, -4        ; mov ra0, unif
-+/* [0x00000290] */ 0x800a7036, 0x122059d3, // nop                   ; mov ra_y_next, ra2.16a
-+/* [0x00000298] */ 0x54042077, 0xd4024862, // and r1, r0, r1        ; mul24 r2, ra1.16b, 2
-+/* [0x000002a0] */ 0x569d404f, 0x10024821, // xor r0, r0, r1        ; mul24 r1, r1, rb_xpitch
-+/* [0x000002a8] */ 0x8c067076, 0x12024821, // add r0, r0, r1        ; mov r1, ra1.16a
-+/* [0x000002b0] */ 0x0c9e7600, 0x100206a7, // add ra_base_next, r3, r0
-+/* [0x000002b8] */ 0x119c73c0, 0xd0020827, // shl r0, r1, 7
-+/* [0x000002c0] */ 0x8d818eb6, 0x10025743, // sub rb_dma1, rb_dma1_base, r2 ; mov ra3, unif
-+/* [0x000002c8] */ 0x8c8013f6, 0xd0025456, // add rb_i_tmu, r1, 3 - PREREAD ; mov ra_wt_off_mul_l0, unif
-+/* [0x000002d0] */ 0x8c8033f6, 0xd002d496, // add rb_lcount, r1, 3  ; mov.ifnz ra_wt_off_mul_l0, unif
-+/* [0x000002d8] */ 0x8c0e70b6, 0x18024808, // add r0, r0, r2      ; mov rb8,  ra3.8a
-+/* [0x000002e0] */ 0x910d01f6, 0xda024809, // shl r0, r0, i_shift16 ; mov rb9,  ra3.8b
-+/* [0x000002e8] */ 0x8c59b1f6, 0x140256a1, // add rb_dma0, r0, rb_dma0_base ; mov r1, ra_wt_off_l0
-+/* [0x000002f0] */ 0x9581edbf, 0x100255c9, // mov rb_dest, unif     ; mov ra9, rb_max_y
-+/* [0x000002f8] */ 0x910cd3f6, 0x1c02484a, // shl r1, r1, rb_wt_den_p15 ; mov rb10, ra3.8c
-+/* [0x00000300] */ 0x950c0ff6, 0xde02494b, // mov r5quad, 0             ; mov rb11, ra3.8d
-+/* [0x00000308] */ 0x8f8013f6, 0xd002531e, // asr rb_wt_off, r1, 1  ; mov ra_link, unif
-+/* [0x00000310] */ 0x11581dc0, 0xd21205a7, // shl ra_wt_mul_l0, ra_wt_mul_l0, 1
++/* [0x00000228] */ 0x9581cff6, 0x10025c42, // mov vw_setup, rb_vpm_init ; mov ra2, unif
++/* [0x00000230] */ 0x14981dc0, 0xd00229e7, // and.setf -, elem_num, 1
++/* [0x00000238] */ 0xec0a7d89, 0x14024821, // add r0, ra2.16b, ra2.16b ; v8subs r1, r1, r1
++/* [0x00000240] */ 0x0c9c21c0, 0x10020827, // add r0, r0, rb_elem_x
++/* [0x00000248] */ 0x8d8103f6, 0x10024863, // sub r1, r1, rb_pitch  ; mov r3, unif
++/* [0x00000250] */ 0x935401f6, 0xd4024800, // max r0, r0, 0         ; mov rb_xshift2, ra_xshift_next
++/* [0x00000258] */ 0x928191f6, 0x10025801, // min r0, r0, rb_max_x  ; mov ra1, unif
++/* [0x00000260] */ 0x119c31c0, 0xd0220567, // shl ra_xshift_next, r0, 3
++/* [0x00000268] */ 0x9481c1f6, 0xd0025800, // and r0, r0, -4        ; mov ra0, unif
++/* [0x00000270] */ 0x800a7036, 0x122059d3, // nop                   ; mov ra_y_next, ra2.16a
++/* [0x00000278] */ 0x54042077, 0xd4024862, // and r1, r0, r1        ; mul24 r2, ra1.16b, 2
++/* [0x00000280] */ 0x569d404f, 0x10024821, // xor r0, r0, r1        ; mul24 r1, r1, rb_xpitch
++/* [0x00000288] */ 0x8c067076, 0x12024821, // add r0, r0, r1        ; mov r1, ra1.16a
++/* [0x00000290] */ 0x0c9e7600, 0x100206a7, // add ra_base_next, r3, r0
++/* [0x00000298] */ 0x119c73c0, 0xd0020827, // shl r0, r1, 7
++/* [0x000002a0] */ 0x8d818eb6, 0x10025743, // sub rb_dma1, rb_dma1_base, r2 ; mov ra3, unif
++/* [0x000002a8] */ 0x8c8013f6, 0xd0025456, // add rb_i_tmu, r1, 3 - PREREAD ; mov ra_wt_off_mul_l0, unif
++/* [0x000002b0] */ 0x8c8033f6, 0xd002d496, // add rb_lcount, r1, 3  ; mov.ifnz ra_wt_off_mul_l0, unif
++/* [0x000002b8] */ 0x8c0e70b6, 0x18024808, // add r0, r0, r2        ; mov rb8,  ra3.8a
++/* [0x000002c0] */ 0x910d01f6, 0xda024809, // shl r0, r0, i_shift16 ; mov rb9,  ra3.8b
++/* [0x000002c8] */ 0x8c59b1f6, 0x140256a1, // add rb_dma0, r0, rb_dma0_base ; mov r1, ra_wt_off_l0
++/* [0x000002d0] */ 0x9581edbf, 0x100255c9, // mov rb_dest, unif     ; mov ra9, rb_max_y
++/* [0x000002d8] */ 0x910cd3f6, 0x1c02484a, // shl r1, r1, rb_wt_den_p15 ; mov rb10, ra3.8c
++/* [0x000002e0] */ 0x950c0ff6, 0xde02494b, // mov r5quad, 0         ; mov rb11, ra3.8d
++/* [0x000002e8] */ 0x8f8013f6, 0xd002531e, // asr rb_wt_off, r1, 1  ; mov ra_link, unif
++/* [0x000002f0] */ 0x11581dc0, 0xd21205a7, // shl ra_wt_mul_l0, ra_wt_mul_l0, 1
++/* [0x000002f8] */ 0x0000ff00, 0xe20210e7, // mov rb3, [0,0,0,0,0,0,0,0,1,1,1,1,1,1,1,1]
 +// :uvloop
-+/* [0x00000318] */ 0xcd511bee, 0xaa0269e5, // sub.setf -, r5, rb_i_tmu ; v8adds r5rep, r5, ra_k1 ; ldtmu0
-+/* [0x00000320] */ 0x0e567980, 0x120208a7, // shr r2, r4, ra_xshift
-+/* [0x00000328] */ 0x804e7036, 0x140089e3, // nop                   ; mov.ifz r3, ra_y_next
-+/* [0x00000330] */ 0x8e4485f6, 0xd402c863, // shr r1, r2, 8         ; mov.ifnz r3, ra_y
-+/* [0x00000338] */ 0x8c6817f6, 0xd0029818, // add r0, r3, 1         ; mov.ifz ra_base, ra_base_next
-+/* [0x00000340] */ 0x94981f80, 0xd02279d1, // and.setf -, 1, elem_num ; mov ra_y, r0
-+/* [0x00000348] */ 0x93531789, 0xd80248e0, // max r3, r3, ra_k0     ; mov      r0, r1 << 15
-+/* [0x00000350] */ 0x9227f792, 0xd00288e1, // min r3, r3, ra9       ; mov.ifz  r1, r2 << 1
-+/* [0x00000358] */ 0x559d049f, 0x10044822, // mov.ifz r0, r2        ; mul24 r2, r3, rb_pitch
-+/* [0x00000360] */ 0x8c616c87, 0x10024e20, // add t0s, ra_base, r2  ; v8min r0, r0, rb_k255
-+/* [0x00000368] */ 0x0000ff00, 0xe20229e7, // mov.setf -, [0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1]
-+/* [0x00000370] */ 0x540163f0, 0x18024863, // and r1, r1, rb_k255   ; mul24      r3, ra0.8a,       r0
-+/* [0x00000378] */ 0x4003e030, 0xda0049e2, // nop                   ; mul24      r2, ra0.8b << 2,  r0 << 2  @ "mul_used", 0
-+/* [0x00000380] */ 0x40038031, 0xd800c9e3, // nop                   ; mul24.ifnz r3, ra0.8a << 8,  r1 << 8  @ "mul_used", 0
-+/* [0x00000388] */ 0x40036031, 0xda00c9e2, // nop                   ; mul24.ifnz r2, ra0.8b << 10, r1 << 10 @ "mul_used", 0
-+/* [0x00000390] */ 0x4d03c4f0, 0xdc0248a3, // sub r2, r2, r3        ; mul24      r3, ra0.8c << 4,  r0 << 4  @ "mul_used", 0
-+/* [0x00000398] */ 0x40034031, 0xdc00c9e3, // nop                   ; mul24.ifnz r3, ra0.8c << 12, r1 << 12 @ "mul_used", 0
-+/* [0x000003a0] */ 0x4c03a4f0, 0xde0248a3, // add r2, r2, r3        ; mul24      r3, ra0.8d << 6,  r0 << 6  @ "mul_used", 0
-+/* [0x000003a8] */ 0x40032031, 0xde00c9e3, // nop                   ; mul24.ifnz r3, ra0.8d << 14, r1 << 14 @ "mul_used", 0
-+/* [0x000003b0] */ 0x0d9e74c0, 0x10020827, // sub r0, r2, r3
-+/* [0x000003b8] */ 0x8d144bf6, 0xd00279c4, // sub.setf -, r5, 4     ; mov ra4, ra5
-+/* [0x000003c0] */ 0xffffff38, 0xf06809e7, // brr.anyn -, r:uvloop
-+/* [0x000003c8] */ 0x55189db7, 0x10024161, // mov ra5, ra6          ; mul24 r1, ra6, rb9
-+/* [0x000003d0] */ 0x151e7d80, 0x100201a7, // mov ra6, ra7
-+/* [0x000003d8] */ 0x55108037, 0x100241e0, // mov ra7, r0           ; mul24 r0, ra4, rb8
-+/* [0x000003e0] */ 0x4d18a237, 0x10024860, // sub r1, r1, r0        ; mul24 r0, ra6, rb10
-+/* [0x000003e8] */ 0x4c1cb237, 0x10024860, // add r1, r1, r0        ; mul24 r0, ra7, rb11
-+/* [0x000003f0] */ 0x0d9e7200, 0x10020867, // sub r1, r1, r0
-+/* [0x000003f8] */ 0x4d512bce, 0x120269e1, // sub.setf -, r5, rb_lcount ; mul24 r1, r1, ra_k256
-+/* [0x00000400] */ 0x0f9ce3c0, 0xd0020867, // asr r1, r1, 14
-+/* [0x00000408] */ 0x405a700e, 0x120049e1, // nop                   ; mul24 r1, r1, ra_wt_mul_l0
-+/* [0x00000410] */ 0x119c83c0, 0xd0020867, // shl r1, r1, 8
-+/* [0x00000418] */ 0x0c9cc3c0, 0x10020867, // add r1, r1, rb_wt_off
-+/* [0x00000420] */ 0xfffffed8, 0xf06809e7, // brr.anyn -, r:uvloop
-+/* [0x00000428] */ 0x0f9cd3c0, 0x10c20067, // asr ra1.8as, r1, rb_wt_den_p15
-+/* [0x00000430] */ 0x159f2fc0, 0x100009e7, // mov -, vw_wait
-+/* [0x00000438] */ 0x15067d80, 0x18020c27, // mov vpm, ra1.8a
-+/* [0x00000440] */ 0x00000000, 0xf0f7c9e7, // bra -, ra_link
-+/* [0x00000448] */ 0x159dafc0, 0x10021c67, // mov vw_setup, rb_dma0
-+/* [0x00000450] */ 0x159ddfc0, 0x10021c67, // mov vw_setup, rb_dma1
-+/* [0x00000458] */ 0x159d7fc0, 0x10021ca7, // mov vw_addr, rb_dest
++/* [0x00000300] */ 0xcd511bee, 0xaa0269e5, // sub.setf -, r5, rb_i_tmu ; v8adds r5rep, r5, ra_k1 ; ldtmu0
++/* [0x00000308] */ 0x8e4c09f6, 0x140288a3, // shr r2, r4, rb_xshift2 ; mov.ifz r3, ra_y_next
++/* [0x00000310] */ 0x8e4485f6, 0xd402c863, // shr r1, r2, 8         ; mov.ifnz r3, ra_y
++/* [0x00000318] */ 0x8c6817f6, 0xd0029818, // add r0, r3, 1         ; mov.ifz ra_base, ra_base_next
++/* [0x00000320] */ 0x94981f80, 0xd02279d1, // and.setf -, 1, elem_num ; mov ra_y, r0
++/* [0x00000328] */ 0x93531789, 0xd80248e0, // max r3, r3, ra_k0     ; mov      r0, r1 << 15
++/* [0x00000330] */ 0x9227f792, 0xd00288e1, // min r3, r3, ra9       ; mov.ifz  r1, r2 << 1
++/* [0x00000338] */ 0x559d049f, 0x10044822, // mov.ifz r0, r2        ; mul24 r2, r3, rb_pitch
++/* [0x00000340] */ 0x8c616c87, 0x10024e20, // add t0s, ra_base, r2  ; v8min r0, r0, rb_k255
++/* [0x00000348] */ 0x95143ff6, 0x100279c4, // mov.setf -, rb3       ; mov ra4, ra5
++/* [0x00000350] */ 0x540163f0, 0x18024863, // and r1, r1, rb_k255   ; mul24      r3, ra0.8a,       r0
++/* [0x00000358] */ 0x4003e030, 0xda0049e2, // nop                   ; mul24      r2, ra0.8b << 2,  r0 << 2  @ "mul_used", 0
++/* [0x00000360] */ 0x40034031, 0xda00c9e2, // nop                   ; mul24.ifnz r2, ra0.8b << 12, r1 << 12 @ "mul_used", 0
++/* [0x00000368] */ 0x4d03c4f0, 0xdc0248a3, // sub r2, r2, r3        ; mul24      r3, ra0.8c << 4,  r0 << 4  @ "mul_used", 0
++/* [0x00000370] */ 0x40032031, 0xdc00c9e3, // nop                   ; mul24.ifnz r3, ra0.8c << 14, r1 << 14 @ "mul_used", 0
++/* [0x00000378] */ 0x4d004bf1, 0xde0269e0, // sub.setf -, r5, 4     ; mul24      r0, ra0.8d      , r1
++/* [0x00000380] */ 0xffffff60, 0xf06809e7, // brr.anyn -, r:uvloop
++/* [0x00000388] */ 0x8c1a74f6, 0x10025885, // add r2, r2, r3        ; mov ra5, ra6
++/* [0x00000390] */ 0x551cadb7, 0x100241a1, // mov ra6, ra7          ; mul24 r1, ra7, rb10
++/* [0x00000398] */ 0x4d108437, 0x100241e0, // sub ra7, r2, r0       ; mul24 r0, ra4, rb8
++/* [0x000003a0] */ 0x4d149237, 0x10024860, // sub r1, r1, r0        ; mul24 r0, ra5, rb9
++/* [0x000003a8] */ 0x4c1cb237, 0x10024860, // add r1, r1, r0        ; mul24 r0, ra7, rb11
++/* [0x000003b0] */ 0x0d9e7200, 0x10020867, // sub r1, r1, r0
++/* [0x000003b8] */ 0x4d512bce, 0x120269e1, // sub.setf -, r5, rb_lcount ; mul24 r1, r1, ra_k256
++/* [0x000003c0] */ 0x0f9ce3c0, 0xd0020867, // asr r1, r1, 14
++/* [0x000003c8] */ 0x405a700e, 0x120049e1, // nop                   ; mul24 r1, r1, ra_wt_mul_l0
++/* [0x000003d0] */ 0x119c83c0, 0xd0020867, // shl r1, r1, 8
++/* [0x000003d8] */ 0x0c9cc3c0, 0x10020867, // add r1, r1, rb_wt_off
++/* [0x000003e0] */ 0xffffff00, 0xf06809e7, // brr.anyn -, r:uvloop
++/* [0x000003e8] */ 0x0f9cd3c0, 0x10c20067, // asr ra1.8as, r1, rb_wt_den_p15
++/* [0x000003f0] */ 0x159f2fc0, 0x100009e7, // mov -, vw_wait
++/* [0x000003f8] */ 0x15067d80, 0x18020c27, // mov vpm, ra1.8a
++/* [0x00000400] */ 0x00000000, 0xf0f7c9e7, // bra -, ra_link
++/* [0x00000408] */ 0x159dafc0, 0x10021c67, // mov vw_setup, rb_dma0
++/* [0x00000410] */ 0x159ddfc0, 0x10021c67, // mov vw_setup, rb_dma1
++/* [0x00000418] */ 0x159d7fc0, 0x10021ca7, // mov vw_addr, rb_dest
 +// ::mc_filter_uv_b0
-+/* [0x00000460] */ 0x9581cff6, 0x10025c42, // mov vw_setup, rb_vpm_init ; mov ra2, unif
-+/* [0x00000468] */ 0x14981dc0, 0xd00229e7, // and.setf -, elem_num, 1
-+/* [0x00000470] */ 0xec0a7d89, 0x14024821, // add r0, ra2.16b, ra2.16b ; v8subs r1, r1, r1
-+/* [0x00000478] */ 0x8c0821f6, 0x12225813, // add r0, r0, rb_elem_x ; mov ra_y_next, ra2.16a
-+/* [0x00000480] */ 0x8d8103f6, 0x10024863, // sub r1, r1, rb_pitch  ; mov r3, unif
-+/* [0x00000488] */ 0x935401f6, 0xd4125815, // max r0, r0, 0         ; mov ra_xshift, ra_xshift_next
-+/* [0x00000490] */ 0x928191f6, 0x10025801, // min r0, r0, rb_max_x  ; mov ra1, unif
-+/* [0x00000498] */ 0x119c31c0, 0xd0220567, // shl ra_xshift_next, r0, 3
-+/* [0x000004a0] */ 0x9481c1f6, 0xd0025800, // and r0, r0, -4        ; mov ra0, unif
-+/* [0x000004a8] */ 0x54042077, 0xd4024862, // and r1, r0, r1        ; mul24 r2, ra1.16b, 2
-+/* [0x000004b0] */ 0x569d404f, 0x10024821, // xor r0, r0, r1        ; mul24 r1, r1, rb_xpitch
-+/* [0x000004b8] */ 0x8c067076, 0x12024821, // add r0, r0, r1        ; mov r1, ra1.16a
-+/* [0x000004c0] */ 0x0c9e7600, 0x100206a7, // add ra_base_next, r3, r0
-+/* [0x000004c8] */ 0x918073f6, 0xd0025802, // shl r0, r1, 7         ; mov ra2, unif
-+/* [0x000004d0] */ 0x0d9d8e80, 0x10021767, // sub rb_dma1, rb_dma1_base, r2
-+/* [0x000004d8] */ 0x0c9c13c0, 0xd0021467, // add rb_i_tmu, r1, 3 - PREREAD
-+/* [0x000004e0] */ 0x0c9c33c0, 0xd00214a7, // add rb_lcount, r1, 3
-+/* [0x000004e8] */ 0x8c8270b6, 0x10125816, // add r0, r0, r2        ; mov ra_wt_mul_l0, unif
-+/* [0x000004f0] */ 0x915201bf, 0x1c12d816, // shl r0, r0, ra_k16    ; mov.ifnz ra_wt_mul_l0, unif
-+/* [0x000004f8] */ 0x8c81b1f6, 0x10025683, // add rb_dma0, r0, rb_dma0_base ; mov ra3, unif
-+/* [0x00000500] */ 0x159defc0, 0x10020267, // mov ra9, rb_max_y
-+/* [0x00000508] */ 0xec0e7d89, 0x14024821, // add r0, ra3.16b, ra3.16b ; v8subs r1, r1, r1
-+/* [0x00000510] */ 0x8c0c21f6, 0x12125813, // add r0, r0, rb_elem_x ; mov ra_y2_next, ra3.16a
-+/* [0x00000518] */ 0x8d8103f6, 0x10024863, // sub r1, r1, rb_pitch  ; mov r3, unif
-+/* [0x00000520] */ 0x935011bf, 0x18024800, // max r0, r0, ra_k0     ; mov rb_xshift2, rb_xshift2_next
-+/* [0x00000528] */ 0x928191f6, 0x10025801, // min r0, r0, rb_max_x  ; mov ra1, unif
-+/* [0x00000530] */ 0x119c31c0, 0xd0021067, // shl rb_xshift2_next, r0, 3
-+/* [0x00000538] */ 0x149dc1c0, 0xd0020827, // and r0, r0, -4
-+/* [0x00000540] */ 0x94827076, 0x10025843, // and r1, r0, r1        ; mov ra3, unif
-+/* [0x00000548] */ 0x569d404f, 0x10024821, // xor r0, r0, r1        ; mul24 r1, r1, rb_xpitch
-+/* [0x00000550] */ 0x8c0e7076, 0x18024808, // add r0, r0, r1        ; mov rb8,  ra3.8a
-+/* [0x00000558] */ 0x0c9e7600, 0x100214e7, // add rb_base2_next, r3, r0
-+/* [0x00000560] */ 0x950e0ff6, 0x1a024489, // mov ra_wt_off_mul_l1, unif        ; mov rb9,  ra3.8b
-+/* [0x00000568] */ 0x950e0ff6, 0x1c06448a, // mov.ifnz ra_wt_off_mul_l1, unif   ; mov rb10, ra3.8c
-+/* [0x00000570] */ 0x15827d80, 0x100215e7, // mov rb_dest, unif
-+/* [0x00000578] */ 0x950c0ff6, 0xde02494b, // mov r5quad,0          ; mov rb11, ra3.8d
-+/* [0x00000580] */ 0x1148ddc0, 0x14020867, // shl r1, ra_wt_off_l1, rb_wt_den_p15
-+/* [0x00000588] */ 0x8f8093f6, 0xd002531e, // asr rb_wt_off, r1, 9  ; mov ra_link, unif
++/* [0x00000420] */ 0x9581cff6, 0x10025c42, // mov vw_setup, rb_vpm_init ; mov ra2, unif
++/* [0x00000428] */ 0x14981dc0, 0xd00229e7, // and.setf -, elem_num, 1
++/* [0x00000430] */ 0xec0a7d89, 0x14024821, // add r0, ra2.16b, ra2.16b ; v8subs r1, r1, r1
++/* [0x00000438] */ 0x8c0821f6, 0x12225813, // add r0, r0, rb_elem_x ; mov ra_y_next, ra2.16a
++/* [0x00000440] */ 0x8d8103f6, 0x10024863, // sub r1, r1, rb_pitch  ; mov r3, unif
++/* [0x00000448] */ 0x935401f6, 0xd4125815, // max r0, r0, 0         ; mov ra_xshift, ra_xshift_next
++/* [0x00000450] */ 0x928191f6, 0x10025801, // min r0, r0, rb_max_x  ; mov ra1, unif
++/* [0x00000458] */ 0x119c31c0, 0xd0220567, // shl ra_xshift_next, r0, 3
++/* [0x00000460] */ 0x9481c1f6, 0xd0025800, // and r0, r0, -4        ; mov ra0, unif
++/* [0x00000468] */ 0x54042077, 0xd4024862, // and r1, r0, r1        ; mul24 r2, ra1.16b, 2
++/* [0x00000470] */ 0x569d404f, 0x10024821, // xor r0, r0, r1        ; mul24 r1, r1, rb_xpitch
++/* [0x00000478] */ 0x8c067076, 0x12024821, // add r0, r0, r1        ; mov r1, ra1.16a
++/* [0x00000480] */ 0x0c9e7600, 0x100206a7, // add ra_base_next, r3, r0
++/* [0x00000488] */ 0x918073f6, 0xd0025802, // shl r0, r1, 7         ; mov ra2, unif
++/* [0x00000490] */ 0x0d9d8e80, 0x10021767, // sub rb_dma1, rb_dma1_base, r2
++/* [0x00000498] */ 0x0c9c13c0, 0xd0021467, // add rb_i_tmu, r1, 3 - PREREAD
++/* [0x000004a0] */ 0x0c9c33c0, 0xd00214a7, // add rb_lcount, r1, 3
++/* [0x000004a8] */ 0x8c8270b6, 0x10125816, // add r0, r0, r2        ; mov ra_wt_mul_l0, unif
++/* [0x000004b0] */ 0x915201bf, 0x1c12d816, // shl r0, r0, ra_k16    ; mov.ifnz ra_wt_mul_l0, unif
++/* [0x000004b8] */ 0x8c81b1f6, 0x10025683, // add rb_dma0, r0, rb_dma0_base ; mov ra3, unif
++/* [0x000004c0] */ 0x159defc0, 0x10020267, // mov ra9, rb_max_y
++/* [0x000004c8] */ 0xec0e7d89, 0x14024821, // add r0, ra3.16b, ra3.16b ; v8subs r1, r1, r1
++/* [0x000004d0] */ 0x8c0c21f6, 0x12125813, // add r0, r0, rb_elem_x ; mov ra_y2_next, ra3.16a
++/* [0x000004d8] */ 0x8d8103f6, 0x10024863, // sub r1, r1, rb_pitch  ; mov r3, unif
++/* [0x000004e0] */ 0x935011bf, 0x18024800, // max r0, r0, ra_k0     ; mov rb_xshift2, rb_xshift2_next
++/* [0x000004e8] */ 0x928191f6, 0x10025801, // min r0, r0, rb_max_x  ; mov ra1, unif
++/* [0x000004f0] */ 0x119c31c0, 0xd0021067, // shl rb_xshift2_next, r0, 3
++/* [0x000004f8] */ 0x149dc1c0, 0xd0020827, // and r0, r0, -4
++/* [0x00000500] */ 0x94827076, 0x10025843, // and r1, r0, r1        ; mov ra3, unif
++/* [0x00000508] */ 0x569d404f, 0x10024821, // xor r0, r0, r1        ; mul24 r1, r1, rb_xpitch
++/* [0x00000510] */ 0x8c0e7076, 0x18024808, // add r0, r0, r1        ; mov rb8,  ra3.8a
++/* [0x00000518] */ 0x0c9e7600, 0x100214e7, // add rb_base2_next, r3, r0
++/* [0x00000520] */ 0x950e0ff6, 0x1a024489, // mov ra_wt_off_mul_l1, unif        ; mov rb9,  ra3.8b
++/* [0x00000528] */ 0x950e0ff6, 0x1c06448a, // mov.ifnz ra_wt_off_mul_l1, unif   ; mov rb10, ra3.8c
++/* [0x00000530] */ 0x15827d80, 0x100215e7, // mov rb_dest, unif
++/* [0x00000538] */ 0x950c0ff6, 0xde02494b, // mov r5quad,0          ; mov rb11, ra3.8d
++/* [0x00000540] */ 0x1148ddc0, 0x14020867, // shl r1, ra_wt_off_l1, rb_wt_den_p15
++/* [0x00000548] */ 0x8f8093f6, 0xd002531e, // asr rb_wt_off, r1, 9  ; mov ra_link, unif
++/* [0x00000550] */ 0x0000ff00, 0xe20210e7, // mov rb3, [0,0,0,0,0,0,0,0,1,1,1,1,1,1,1,1]
 +// :uvloop_b
-+/* [0x00000590] */ 0xcd511bee, 0xaa0269e5, // sub.setf -, r5, rb_i_tmu ; v8adds r5rep, r5, ra_k1 ; ldtmu0
-+/* [0x00000598] */ 0x8e5539bf, 0x12029899, // shr r2, r4, ra_xshift ; mov.ifz ra_base2, rb_base2_next
-+/* [0x000005a0] */ 0x8e4c85f6, 0xd0029851, // shr r1, r2, 8         ; mov.ifz ra_y_y2, ra_y_y2_next
-+/* [0x000005a8] */ 0x95685ff6, 0x10029118, // mov rb4, rb5          ; mov.ifz ra_base, ra_base_next
-+/* [0x000005b0] */ 0x8c441fb6, 0xd4224463, // add ra_y, 1, ra_y     ; mov r3, ra_y
-+/* [0x000005b8] */ 0x14981f80, 0xd00229e7, // and.setf -, 1, elem_num
-+/* [0x000005c0] */ 0x93531789, 0xd80248e0, // max r3, r3, ra_k0     ; mov      r0, r1 << 15
-+/* [0x000005c8] */ 0x9227f792, 0xd00288e1, // min r3, r3, ra9       ; mov.ifz  r1, r2 << 1
-+/* [0x000005d0] */ 0x559d049f, 0x10044823, // mov.ifz r0, r2        ; mul24 r3, r3, rb_pitch
-+/* [0x000005d8] */ 0x8c616cc7, 0x10024e20, // add t0s, ra_base, r3  ; v8min r0, r0, rb_k255
-+/* [0x000005e0] */ 0x0000ff00, 0xe20229e7, // mov.setf -, [0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1]
-+/* [0x000005e8] */ 0x540163f0, 0x18024863, // and r1, r1, rb_k255   ; mul24      r3, ra0.8a,       r0
-+/* [0x000005f0] */ 0x4003e030, 0xda0049e2, // nop                   ; mul24      r2, ra0.8b << 2,  r0 << 2  @ "mul_used", 0
-+/* [0x000005f8] */ 0x40038031, 0xd800c9e3, // nop                   ; mul24.ifnz r3, ra0.8a << 8,  r1 << 8  @ "mul_used", 0
-+/* [0x00000600] */ 0x40036031, 0xda00c9e2, // nop                   ; mul24.ifnz r2, ra0.8b << 10, r1 << 10 @ "mul_used", 0
-+/* [0x00000608] */ 0x4d03c4f0, 0xdc0248a3, // sub r2, r2, r3        ; mul24      r3, ra0.8c << 4,  r0 << 4  @ "mul_used", 0
-+/* [0x00000610] */ 0x40034031, 0xdc00c9e3, // nop                   ; mul24.ifnz r3, ra0.8c << 12, r1 << 12 @ "mul_used", 0
-+/* [0x00000618] */ 0x4c03a4f0, 0xde0248a3, // add r2, r2, r3        ; mul24      r3, ra0.8d << 6,  r0 << 6  @ "mul_used", 0
-+/* [0x00000620] */ 0x40032031, 0xde00c9e3, // nop                   ; mul24.ifnz r3, ra0.8d << 14, r1 << 14 @ "mul_used", 0
-+/* [0x00000628] */ 0x8d9c64ff, 0xb00240c5, // sub ra3, r2, r3       ; mov rb5, rb6          ; ldtmu1
-+/* [0x00000630] */ 0x8e1409f6, 0x10025884, // shr r2, r4, rb_xshift2 ; mov ra4, ra5
-+/* [0x00000638] */ 0x8e4485f6, 0xd2024863, // shr r1, r2, 8         ; mov r3, ra_y2
-+/* [0x00000640] */ 0x8c5077bf, 0x1a124446, // add ra_y2, r3, ra_k1  ; mov rb6, rb7
-+/* [0x00000648] */ 0x14981f80, 0xd00229e7, // and.setf -, 1, elem_num
-+/* [0x00000650] */ 0x93531789, 0xd80248e0, // max r3, r3, ra_k0     ; mov      r0, r1 << 15
-+/* [0x00000658] */ 0x9227f792, 0xd00288e1, // min r3, r3, ra9       ; mov.ifz  r1, r2 << 1
-+/* [0x00000660] */ 0x559d049f, 0x10044823, // mov.ifz r0, r2        ; mul24 r3, r3, rb_pitch
-+/* [0x00000668] */ 0x8c656cc7, 0x10024f20, // add t1s, ra_base2, r3 ; v8min r0, r0, rb_k255
-+/* [0x00000670] */ 0x0000ff00, 0xe20229e7, // mov.setf -, [0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1]
-+/* [0x00000678] */ 0x540563f0, 0x18024863, // and r1, r1, rb_k255   ; mul24      r3, ra1.8a,       r0
-+/* [0x00000680] */ 0x4007e030, 0xda0049e2, // nop                   ; mul24      r2, ra1.8b << 2,  r0 << 2  @ "mul_used", 0
-+/* [0x00000688] */ 0x40078031, 0xd800c9e3, // nop                   ; mul24.ifnz r3, ra1.8a << 8,  r1 << 8  @ "mul_used", 0
-+/* [0x00000690] */ 0x40076031, 0xda00c9e2, // nop                   ; mul24.ifnz r2, ra1.8b << 10, r1 << 10 @ "mul_used", 0
-+/* [0x00000698] */ 0x4d07c4f0, 0xdc0248a3, // sub r2, r2, r3        ; mul24      r3, ra1.8c << 4,  r0 << 4  @ "mul_used", 0
-+/* [0x000006a0] */ 0x40074031, 0xdc00c9e3, // nop                   ; mul24.ifnz r3, ra1.8c << 12, r1 << 12 @ "mul_used", 0
-+/* [0x000006a8] */ 0x4c07a4f0, 0xde0248a3, // add r2, r2, r3        ; mul24      r3, ra1.8d << 6,  r0 << 6  @ "mul_used", 0
-+/* [0x000006b0] */ 0x40072031, 0xde00c9e3, // nop                   ; mul24.ifnz r3, ra1.8d << 14, r1 << 14 @ "mul_used", 0
-+/* [0x000006b8] */ 0x8d184bf6, 0xd00279c5, // sub.setf -, r5, 4     ; mov ra5, ra6
-+/* [0x000006c0] */ 0xfffffeb0, 0xf06809e7, // brr.anyn -, r:uvloop_b
-+/* [0x000006c8] */ 0x8d1e74f6, 0x10025806, // sub r0, r2, r3        ; mov ra6, ra7
-+/* [0x000006d0] */ 0x950e7036, 0x100241c7, // mov ra7, r0           ; mov rb7, ra3
-+/* [0x000006d8] */ 0x4008403e, 0x180049e0, // nop                   ; mul24 r0, rb4, ra2.8a
-+/* [0x000006e0] */ 0x4008503e, 0x1a0049e1, // nop                   ; mul24 r1, rb5, ra2.8b
-+/* [0x000006e8] */ 0x4d08623e, 0x1c024860, // sub r1, r1, r0        ; mul24 r0, rb6, ra2.8c
-+/* [0x000006f0] */ 0x4c08723e, 0x1e024860, // add r1, r1, r0        ; mul24 r0, rb7, ra2.8d
-+/* [0x000006f8] */ 0x4d108237, 0x100248a0, // sub r2, r1, r0        ; mul24 r0, ra4, rb8
-+/* [0x00000700] */ 0x40149037, 0x100049e1, // nop                   ; mul24 r1, ra5, rb9
-+/* [0x00000708] */ 0x4d18a237, 0x10024860, // sub r1, r1, r0        ; mul24 r0, ra6, rb10
-+/* [0x00000710] */ 0x4c1cb237, 0x10024860, // add r1, r1, r0        ; mul24 r0, ra7, rb11
-+/* [0x00000718] */ 0x4d527216, 0x12024862, // sub r1, r1, r0        ; mul24 r2, r2, ra_k256
-+/* [0x00000720] */ 0x4f50e5ce, 0xd20248a1, // asr r2, r2, 14        ; mul24 r1, r1, ra_k256
-+/* [0x00000728] */ 0x4f58e3d6, 0xd2024862, // asr r1, r1, 14        ; mul24 r2, r2, ra_wt_mul_l0
-+/* [0x00000730] */ 0x4c48c5ce, 0x120248a1, // add r2, r2, rb_wt_off ; mul24 r1, r1, ra_wt_mul_l1
-+/* [0x00000738] */ 0x0c9e7280, 0x10020867, // add r1, r1, r2
-+/* [0x00000740] */ 0x4d512bce, 0x120269e1, // sub.setf -, r5, rb_lcount ; mul24 r1, r1, ra_k256
-+/* [0x00000748] */ 0xfffffe28, 0xf06809e7, // brr.anyn -, r:uvloop_b
-+/* [0x00000750] */ 0x0f9cd3c0, 0x10c200e7, // asr ra3.8as, r1, rb_wt_den_p15
-+/* [0x00000758] */ 0x159f2fc0, 0x100009e7, // mov -, vw_wait
-+/* [0x00000760] */ 0x150e7d80, 0x18020c27, // mov vpm, ra3.8a
-+/* [0x00000768] */ 0x00000000, 0xf0f7c9e7, // bra -, ra_link
-+/* [0x00000770] */ 0x159dafc0, 0x10021c67, // mov vw_setup, rb_dma0
-+/* [0x00000778] */ 0x159ddfc0, 0x10021c67, // mov vw_setup, rb_dma1
-+/* [0x00000780] */ 0x159d7fc0, 0x10021ca7, // mov vw_addr, rb_dest
++/* [0x00000558] */ 0xcd511bee, 0xaa0269e5, // sub.setf -, r5, rb_i_tmu ; v8adds r5rep, r5, ra_k1 ; ldtmu0
++/* [0x00000560] */ 0x8e5539bf, 0x12029899, // shr r2, r4, ra_xshift ; mov.ifz ra_base2, rb_base2_next
++/* [0x00000568] */ 0x8e4c85f6, 0xd0029851, // shr r1, r2, 8         ; mov.ifz ra_y_y2, ra_y_y2_next
++/* [0x00000570] */ 0x95685ff6, 0x10029118, // mov rb4, rb5          ; mov.ifz ra_base, ra_base_next
++/* [0x00000578] */ 0x8c441fb6, 0xd4224463, // add ra_y, 1, ra_y     ; mov r3, ra_y
++/* [0x00000580] */ 0x14981f80, 0xd00229e7, // and.setf -, 1, elem_num
++/* [0x00000588] */ 0x93531789, 0xd80248e0, // max r3, r3, ra_k0     ; mov      r0, r1 << 15
++/* [0x00000590] */ 0x9227f792, 0xd00288e1, // min r3, r3, ra9       ; mov.ifz  r1, r2 << 1
++/* [0x00000598] */ 0x559d049f, 0x10044823, // mov.ifz r0, r2        ; mul24 r3, r3, rb_pitch
++/* [0x000005a0] */ 0x8c616cc7, 0x10024e20, // add t0s, ra_base, r3  ; v8min r0, r0, rb_k255
++/* [0x000005a8] */ 0x95143ff6, 0x100279c4, // mov.setf -, rb3       ; mov ra4, ra5
++/* [0x000005b0] */ 0x540163f0, 0x18024863, // and r1, r1, rb_k255   ; mul24      r3, ra0.8a,       r0
++/* [0x000005b8] */ 0x4003e030, 0xda0049e2, // nop                   ; mul24      r2, ra0.8b << 2,  r0 << 2  @ "mul_used", 0
++/* [0x000005c0] */ 0x40034031, 0xda00c9e2, // nop                   ; mul24.ifnz r2, ra0.8b << 12, r1 << 12 @ "mul_used", 0
++/* [0x000005c8] */ 0x4d03c4f0, 0xdc0248a3, // sub r2, r2, r3        ; mul24      r3, ra0.8c << 4,  r0 << 4  @ "mul_used", 0
++/* [0x000005d0] */ 0x40032031, 0xdc00c9e3, // nop                   ; mul24.ifnz r3, ra0.8c << 14, r1 << 14 @ "mul_used", 0
++/* [0x000005d8] */ 0x4c0274f1, 0x1e0248a3, // add r2, r2, r3        ; mul24      r3, ra0.8d,       r1
++/* [0x000005e0] */ 0x8d9c64ff, 0xb00240c5, // sub ra3, r2, r3       ; mov rb5, rb6          ; ldtmu1
++/* [0x000005e8] */ 0x8e1809f6, 0x10025885, // shr r2, r4, rb_xshift2 ; mov ra5, ra6
++/* [0x000005f0] */ 0x8e4485f6, 0xd2024863, // shr r1, r2, 8         ; mov r3, ra_y2
++/* [0x000005f8] */ 0x8c5077bf, 0x1a124446, // add ra_y2, r3, ra_k1  ; mov rb6, rb7
++/* [0x00000600] */ 0x14981f80, 0xd00229e7, // and.setf -, 1, elem_num
++/* [0x00000608] */ 0x93531789, 0xd80248e0, // max r3, r3, ra_k0     ; mov      r0, r1 << 15
++/* [0x00000610] */ 0x9227f792, 0xd00288e1, // min r3, r3, ra9       ; mov.ifz  r1, r2 << 1
++/* [0x00000618] */ 0x559d049f, 0x10044823, // mov.ifz r0, r2        ; mul24 r3, r3, rb_pitch
++/* [0x00000620] */ 0x8c656cc7, 0x10024f20, // add t1s, ra_base2, r3 ; v8min r0, r0, rb_k255
++/* [0x00000628] */ 0x950c3ff6, 0x100269c7, // mov.setf -, rb3       ; mov rb7, ra3
++/* [0x00000630] */ 0x540563f0, 0x18024863, // and r1, r1, rb_k255   ; mul24      r3, ra1.8a,       r0
++/* [0x00000638] */ 0x4007e030, 0xda0049e2, // nop                   ; mul24      r2, ra1.8b << 2,  r0 << 2  @ "mul_used", 0
++/* [0x00000640] */ 0x40074031, 0xda00c9e2, // nop                   ; mul24.ifnz r2, ra1.8b << 12, r1 << 12 @ "mul_used", 0
++/* [0x00000648] */ 0x4d07c4f0, 0xdc0248a3, // sub r2, r2, r3        ; mul24      r3, ra1.8c << 4,  r0 << 4  @ "mul_used", 0
++/* [0x00000650] */ 0x40072031, 0xdc00c9e3, // nop                   ; mul24.ifnz r3, ra1.8c << 14, r1 << 14 @ "mul_used", 0
++/* [0x00000658] */ 0x4d044bf1, 0xde0269e0, // sub.setf -, r5, 4     ; mul24      r0, ra1.8d,       r1
++/* [0x00000660] */ 0xfffffed8, 0xf06809e7, // brr.anyn -, r:uvloop_b
++/* [0x00000668] */ 0x4c0854fe, 0x1a0248a1, // add r2, r2, r3        ; mul24 r1, rb5, ra2.8b
++/* [0x00000670] */ 0x551cadb7, 0x100241a3, // mov ra6, ra7          ; mul24 r3, ra7, rb10
++/* [0x00000678] */ 0x4d08443e, 0x180241e0, // sub ra7, r2, r0       ; mul24 r0, rb4, ra2.8a
++/* [0x00000680] */ 0x4d08623e, 0x1c024860, // sub r1, r1, r0        ; mul24 r0, rb6, ra2.8c
++/* [0x00000688] */ 0x4c08723e, 0x1e024860, // add r1, r1, r0        ; mul24 r0, rb7, ra2.8d
++/* [0x00000690] */ 0x4d108237, 0x100248a0, // sub r2, r1, r0        ; mul24 r0, ra4, rb8
++/* [0x00000698] */ 0x4d149637, 0x10024860, // sub r1, r3, r0        ; mul24 r0, ra5, rb9
++/* [0x000006a0] */ 0x4c1cb237, 0x10024860, // add r1, r1, r0        ; mul24 r0, ra7, rb11
++/* [0x000006a8] */ 0x4d527216, 0x12024862, // sub r1, r1, r0        ; mul24 r2, r2, ra_k256
++/* [0x000006b0] */ 0x4f50e5ce, 0xd20248a1, // asr r2, r2, 14        ; mul24 r1, r1, ra_k256
++/* [0x000006b8] */ 0x4f58e3d6, 0xd2024862, // asr r1, r1, 14        ; mul24 r2, r2, ra_wt_mul_l0
++/* [0x000006c0] */ 0x4c48c5ce, 0x120248a1, // add r2, r2, rb_wt_off ; mul24 r1, r1, ra_wt_mul_l1
++/* [0x000006c8] */ 0x0c9e7280, 0x10020867, // add r1, r1, r2
++/* [0x000006d0] */ 0x4d512bce, 0x120269e1, // sub.setf -, r5, rb_lcount ; mul24 r1, r1, ra_k256
++/* [0x000006d8] */ 0xfffffe60, 0xf06809e7, // brr.anyn -, r:uvloop_b
++/* [0x000006e0] */ 0x0f9cd3c0, 0x10c200e7, // asr ra3.8as, r1, rb_wt_den_p15
++/* [0x000006e8] */ 0x159f2fc0, 0x100009e7, // mov -, vw_wait
++/* [0x000006f0] */ 0x150e7d80, 0x18020c27, // mov vpm, ra3.8a
++/* [0x000006f8] */ 0x00000000, 0xf0f7c9e7, // bra -, ra_link
++/* [0x00000700] */ 0x159dafc0, 0x10021c67, // mov vw_setup, rb_dma0
++/* [0x00000708] */ 0x159ddfc0, 0x10021c67, // mov vw_setup, rb_dma1
++/* [0x00000710] */ 0x159d7fc0, 0x10021ca7, // mov vw_addr, rb_dest
 +// ::mc_sync_q0
-+/* [0x00000788] */ 0x15827d80, 0x100207a7, // mov ra_link, unif
-+/* [0x00000790] */ 0x159f2fc0, 0x100009e7, // mov -, vw_wait
-+/* [0x00000798] */ 0x00000010, 0xe80009e7, // mov  dst, sacq(i)
-+/* [0x000007a0] */ 0x00000010, 0xe80009e7, // mov  dst, sacq(i)
-+/* [0x000007a8] */ 0x00000010, 0xe80009e7, // mov  dst, sacq(i)
-+/* [0x000007b0] */ 0x00000000, 0xf0f7c9e7, // bra -, ra_link
-+/* [0x000007b8] */ 0x0000001c, 0xe80009e7, // mov  dst, sacq(i)
-+/* [0x000007c0] */ 0x00000001, 0xe80009e7, // mov  dst, srel(i)
-+/* [0x000007c8] */ 0x0000000d, 0xe80009e7, // mov  dst, srel(i)
++/* [0x00000718] */ 0x15827d80, 0x100207a7, // mov ra_link, unif
++/* [0x00000720] */ 0x159f2fc0, 0x100009e7, // mov -, vw_wait
++/* [0x00000728] */ 0x00000010, 0xe80009e7, // mov  dst, sacq(i)
++/* [0x00000730] */ 0x00000010, 0xe80009e7, // mov  dst, sacq(i)
++/* [0x00000738] */ 0x00000010, 0xe80009e7, // mov  dst, sacq(i)
++/* [0x00000740] */ 0x00000000, 0xf0f7c9e7, // bra -, ra_link
++/* [0x00000748] */ 0x0000001c, 0xe80009e7, // mov  dst, sacq(i)
++/* [0x00000750] */ 0x00000001, 0xe80009e7, // mov  dst, srel(i)
++/* [0x00000758] */ 0x0000000d, 0xe80009e7, // mov  dst, srel(i)
 +// ::mc_sync_q1
-+/* [0x000007d0] */ 0x15827d80, 0x100207a7, // mov ra_link, unif
-+/* [0x000007d8] */ 0x159f2fc0, 0x100009e7, // mov -, vw_wait
-+/* [0x000007e0] */ 0x00000000, 0xf0f7c9e7, // bra -, ra_link
-+/* [0x000007e8] */ 0x00000000, 0xe80009e7, // mov  dst, srel(i)
-+/* [0x000007f0] */ 0x00000011, 0xe80009e7, // mov  dst, sacq(i)
-+/* [0x000007f8] */ 0x00000002, 0xe80009e7, // mov  dst, srel(i)
++/* [0x00000760] */ 0x15827d80, 0x100207a7, // mov ra_link, unif
++/* [0x00000768] */ 0x159f2fc0, 0x100009e7, // mov -, vw_wait
++/* [0x00000770] */ 0x00000000, 0xf0f7c9e7, // bra -, ra_link
++/* [0x00000778] */ 0x00000000, 0xe80009e7, // mov  dst, srel(i)
++/* [0x00000780] */ 0x00000011, 0xe80009e7, // mov  dst, sacq(i)
++/* [0x00000788] */ 0x00000002, 0xe80009e7, // mov  dst, srel(i)
 +// ::mc_sync_q2
-+/* [0x00000800] */ 0x15827d80, 0x100207a7, // mov ra_link, unif
-+/* [0x00000808] */ 0x159f2fc0, 0x100009e7, // mov -, vw_wait
-+/* [0x00000810] */ 0x00000000, 0xf0f7c9e7, // bra -, ra_link
-+/* [0x00000818] */ 0x00000000, 0xe80009e7, // mov  dst, srel(i)
-+/* [0x00000820] */ 0x00000012, 0xe80009e7, // mov  dst, sacq(i)
-+/* [0x00000828] */ 0x00000003, 0xe80009e7, // mov  dst, srel(i)
++/* [0x00000790] */ 0x15827d80, 0x100207a7, // mov ra_link, unif
++/* [0x00000798] */ 0x159f2fc0, 0x100009e7, // mov -, vw_wait
++/* [0x000007a0] */ 0x00000000, 0xf0f7c9e7, // bra -, ra_link
++/* [0x000007a8] */ 0x00000000, 0xe80009e7, // mov  dst, srel(i)
++/* [0x000007b0] */ 0x00000012, 0xe80009e7, // mov  dst, sacq(i)
++/* [0x000007b8] */ 0x00000003, 0xe80009e7, // mov  dst, srel(i)
 +// ::mc_sync_q3
-+/* [0x00000830] */ 0x15827d80, 0x100207a7, // mov ra_link, unif
-+/* [0x00000838] */ 0x159f2fc0, 0x100009e7, // mov -, vw_wait
-+/* [0x00000840] */ 0x00000000, 0xf0f7c9e7, // bra -, ra_link
-+/* [0x00000848] */ 0x00000000, 0xe80009e7, // mov  dst, srel(i)
-+/* [0x00000850] */ 0x00000013, 0xe80009e7, // mov  dst, sacq(i)
-+/* [0x00000858] */ 0x009e7000, 0x100009e7, // nop
++/* [0x000007c0] */ 0x15827d80, 0x100207a7, // mov ra_link, unif
++/* [0x000007c8] */ 0x159f2fc0, 0x100009e7, // mov -, vw_wait
++/* [0x000007d0] */ 0x00000000, 0xf0f7c9e7, // bra -, ra_link
++/* [0x000007d8] */ 0x00000000, 0xe80009e7, // mov  dst, srel(i)
++/* [0x000007e0] */ 0x00000013, 0xe80009e7, // mov  dst, sacq(i)
++/* [0x000007e8] */ 0x009e7000, 0x100009e7, // nop
 +// ::mc_sync_q4
-+/* [0x00000860] */ 0x15827d80, 0x100207a7, // mov ra_link, unif
-+/* [0x00000868] */ 0x159f2fc0, 0x100009e7, // mov -, vw_wait
-+/* [0x00000870] */ 0x00000014, 0xe80009e7, // mov  dst, sacq(i)
-+/* [0x00000878] */ 0x00000014, 0xe80009e7, // mov  dst, sacq(i)
-+/* [0x00000880] */ 0x00000014, 0xe80009e7, // mov  dst, sacq(i)
-+/* [0x00000888] */ 0x00000000, 0xf0f7c9e7, // bra -, ra_link
-+/* [0x00000890] */ 0x0000001d, 0xe80009e7, // mov  dst, sacq(i)
-+/* [0x00000898] */ 0x00000005, 0xe80009e7, // mov  dst, srel(i)
-+/* [0x000008a0] */ 0x0000000e, 0xe80009e7, // mov  dst, srel(i)
++/* [0x000007f0] */ 0x15827d80, 0x100207a7, // mov ra_link, unif
++/* [0x000007f8] */ 0x159f2fc0, 0x100009e7, // mov -, vw_wait
++/* [0x00000800] */ 0x00000014, 0xe80009e7, // mov  dst, sacq(i)
++/* [0x00000808] */ 0x00000014, 0xe80009e7, // mov  dst, sacq(i)
++/* [0x00000810] */ 0x00000014, 0xe80009e7, // mov  dst, sacq(i)
++/* [0x00000818] */ 0x00000000, 0xf0f7c9e7, // bra -, ra_link
++/* [0x00000820] */ 0x0000001d, 0xe80009e7, // mov  dst, sacq(i)
++/* [0x00000828] */ 0x00000005, 0xe80009e7, // mov  dst, srel(i)
++/* [0x00000830] */ 0x0000000e, 0xe80009e7, // mov  dst, srel(i)
 +// ::mc_sync_q5
-+/* [0x000008a8] */ 0x15827d80, 0x100207a7, // mov ra_link, unif
-+/* [0x000008b0] */ 0x159f2fc0, 0x100009e7, // mov -, vw_wait
-+/* [0x000008b8] */ 0x00000000, 0xf0f7c9e7, // bra -, ra_link
-+/* [0x000008c0] */ 0x00000004, 0xe80009e7, // mov  dst, srel(i)
-+/* [0x000008c8] */ 0x00000015, 0xe80009e7, // mov  dst, sacq(i)
-+/* [0x000008d0] */ 0x00000006, 0xe80009e7, // mov  dst, srel(i)
++/* [0x00000838] */ 0x15827d80, 0x100207a7, // mov ra_link, unif
++/* [0x00000840] */ 0x159f2fc0, 0x100009e7, // mov -, vw_wait
++/* [0x00000848] */ 0x00000000, 0xf0f7c9e7, // bra -, ra_link
++/* [0x00000850] */ 0x00000004, 0xe80009e7, // mov  dst, srel(i)
++/* [0x00000858] */ 0x00000015, 0xe80009e7, // mov  dst, sacq(i)
++/* [0x00000860] */ 0x00000006, 0xe80009e7, // mov  dst, srel(i)
 +// ::mc_sync_q6
-+/* [0x000008d8] */ 0x15827d80, 0x100207a7, // mov ra_link, unif
-+/* [0x000008e0] */ 0x159f2fc0, 0x100009e7, // mov -, vw_wait
-+/* [0x000008e8] */ 0x00000000, 0xf0f7c9e7, // bra -, ra_link
-+/* [0x000008f0] */ 0x00000004, 0xe80009e7, // mov  dst, srel(i)
-+/* [0x000008f8] */ 0x00000016, 0xe80009e7, // mov  dst, sacq(i)
-+/* [0x00000900] */ 0x00000007, 0xe80009e7, // mov  dst, srel(i)
++/* [0x00000868] */ 0x15827d80, 0x100207a7, // mov ra_link, unif
++/* [0x00000870] */ 0x159f2fc0, 0x100009e7, // mov -, vw_wait
++/* [0x00000878] */ 0x00000000, 0xf0f7c9e7, // bra -, ra_link
++/* [0x00000880] */ 0x00000004, 0xe80009e7, // mov  dst, srel(i)
++/* [0x00000888] */ 0x00000016, 0xe80009e7, // mov  dst, sacq(i)
++/* [0x00000890] */ 0x00000007, 0xe80009e7, // mov  dst, srel(i)
 +// ::mc_sync_q7
-+/* [0x00000908] */ 0x15827d80, 0x100207a7, // mov ra_link, unif
-+/* [0x00000910] */ 0x159f2fc0, 0x100009e7, // mov -, vw_wait
-+/* [0x00000918] */ 0x00000000, 0xf0f7c9e7, // bra -, ra_link
-+/* [0x00000920] */ 0x00000004, 0xe80009e7, // mov  dst, srel(i)
-+/* [0x00000928] */ 0x00000017, 0xe80009e7, // mov  dst, sacq(i)
-+/* [0x00000930] */ 0x009e7000, 0x100009e7, // nop
++/* [0x00000898] */ 0x15827d80, 0x100207a7, // mov ra_link, unif
++/* [0x000008a0] */ 0x159f2fc0, 0x100009e7, // mov -, vw_wait
++/* [0x000008a8] */ 0x00000000, 0xf0f7c9e7, // bra -, ra_link
++/* [0x000008b0] */ 0x00000004, 0xe80009e7, // mov  dst, srel(i)
++/* [0x000008b8] */ 0x00000017, 0xe80009e7, // mov  dst, sacq(i)
++/* [0x000008c0] */ 0x009e7000, 0x100009e7, // nop
 +// ::mc_sync_q8
-+/* [0x00000938] */ 0x15827d80, 0x100207a7, // mov ra_link, unif
-+/* [0x00000940] */ 0x159f2fc0, 0x100009e7, // mov -, vw_wait
-+/* [0x00000948] */ 0x00000018, 0xe80009e7, // mov  dst, sacq(i)
-+/* [0x00000950] */ 0x00000018, 0xe80009e7, // mov  dst, sacq(i)
-+/* [0x00000958] */ 0x00000018, 0xe80009e7, // mov  dst, sacq(i)
-+/* [0x00000960] */ 0x00000000, 0xf0f7c9e7, // bra -, ra_link
-+/* [0x00000968] */ 0x0000001e, 0xe80009e7, // mov  dst, sacq(i)
-+/* [0x00000970] */ 0x00000009, 0xe80009e7, // mov  dst, srel(i)
-+/* [0x00000978] */ 0x0000000c, 0xe80009e7, // mov  dst, srel(i)
++/* [0x000008c8] */ 0x15827d80, 0x100207a7, // mov ra_link, unif
++/* [0x000008d0] */ 0x159f2fc0, 0x100009e7, // mov -, vw_wait
++/* [0x000008d8] */ 0x00000018, 0xe80009e7, // mov  dst, sacq(i)
++/* [0x000008e0] */ 0x00000018, 0xe80009e7, // mov  dst, sacq(i)
++/* [0x000008e8] */ 0x00000018, 0xe80009e7, // mov  dst, sacq(i)
++/* [0x000008f0] */ 0x00000000, 0xf0f7c9e7, // bra -, ra_link
++/* [0x000008f8] */ 0x0000001e, 0xe80009e7, // mov  dst, sacq(i)
++/* [0x00000900] */ 0x00000009, 0xe80009e7, // mov  dst, srel(i)
++/* [0x00000908] */ 0x0000000c, 0xe80009e7, // mov  dst, srel(i)
 +// ::mc_sync_q9
-+/* [0x00000980] */ 0x15827d80, 0x100207a7, // mov ra_link, unif
-+/* [0x00000988] */ 0x159f2fc0, 0x100009e7, // mov -, vw_wait
-+/* [0x00000990] */ 0x00000000, 0xf0f7c9e7, // bra -, ra_link
-+/* [0x00000998] */ 0x00000008, 0xe80009e7, // mov  dst, srel(i)
-+/* [0x000009a0] */ 0x00000019, 0xe80009e7, // mov  dst, sacq(i)
-+/* [0x000009a8] */ 0x0000000a, 0xe80009e7, // mov  dst, srel(i)
++/* [0x00000910] */ 0x15827d80, 0x100207a7, // mov ra_link, unif
++/* [0x00000918] */ 0x159f2fc0, 0x100009e7, // mov -, vw_wait
++/* [0x00000920] */ 0x00000000, 0xf0f7c9e7, // bra -, ra_link
++/* [0x00000928] */ 0x00000008, 0xe80009e7, // mov  dst, srel(i)
++/* [0x00000930] */ 0x00000019, 0xe80009e7, // mov  dst, sacq(i)
++/* [0x00000938] */ 0x0000000a, 0xe80009e7, // mov  dst, srel(i)
 +// ::mc_sync_q10
-+/* [0x000009b0] */ 0x15827d80, 0x100207a7, // mov ra_link, unif
-+/* [0x000009b8] */ 0x159f2fc0, 0x100009e7, // mov -, vw_wait
-+/* [0x000009c0] */ 0x00000000, 0xf0f7c9e7, // bra -, ra_link
-+/* [0x000009c8] */ 0x00000008, 0xe80009e7, // mov  dst, srel(i)
-+/* [0x000009d0] */ 0x0000001a, 0xe80009e7, // mov  dst, sacq(i)
-+/* [0x000009d8] */ 0x0000000b, 0xe80009e7, // mov  dst, srel(i)
++/* [0x00000940] */ 0x15827d80, 0x100207a7, // mov ra_link, unif
++/* [0x00000948] */ 0x159f2fc0, 0x100009e7, // mov -, vw_wait
++/* [0x00000950] */ 0x00000000, 0xf0f7c9e7, // bra -, ra_link
++/* [0x00000958] */ 0x00000008, 0xe80009e7, // mov  dst, srel(i)
++/* [0x00000960] */ 0x0000001a, 0xe80009e7, // mov  dst, sacq(i)
++/* [0x00000968] */ 0x0000000b, 0xe80009e7, // mov  dst, srel(i)
 +// ::mc_sync_q11
-+/* [0x000009e0] */ 0x15827d80, 0x100207a7, // mov ra_link, unif
-+/* [0x000009e8] */ 0x159f2fc0, 0x100009e7, // mov -, vw_wait
-+/* [0x000009f0] */ 0x00000000, 0xf0f7c9e7, // bra -, ra_link
-+/* [0x000009f8] */ 0x00000008, 0xe80009e7, // mov  dst, srel(i)
-+/* [0x00000a00] */ 0x0000001b, 0xe80009e7, // mov  dst, sacq(i)
-+/* [0x00000a08] */ 0x009e7000, 0x100009e7, // nop
++/* [0x00000970] */ 0x15827d80, 0x100207a7, // mov ra_link, unif
++/* [0x00000978] */ 0x159f2fc0, 0x100009e7, // mov -, vw_wait
++/* [0x00000980] */ 0x00000000, 0xf0f7c9e7, // bra -, ra_link
++/* [0x00000988] */ 0x00000008, 0xe80009e7, // mov  dst, srel(i)
++/* [0x00000990] */ 0x0000001b, 0xe80009e7, // mov  dst, sacq(i)
++/* [0x00000998] */ 0x009e7000, 0x100009e7, // nop
 +// ::mc_exit
 +// ::mc_exit_c
-+/* [0x00000a10] */ 0x009e7000, 0xa00009e7, // nop                   ; nop           ; ldtmu0
-+/* [0x00000a18] */ 0x009e7000, 0xb00009e7, // nop                   ; nop           ; ldtmu1
-+/* [0x00000a20] */ 0x009e7000, 0xa00009e7, // nop                   ; nop           ; ldtmu0
-+/* [0x00000a28] */ 0x159f2fc0, 0xb00009e7, // mov -, vw_wait        ; nop           ; ldtmu1
-+/* [0x00000a30] */ 0x009e7000, 0x300009e7, // nop                   ; nop           ; thrend
-+/* [0x00000a38] */ 0x009e7000, 0x100009e7, // nop
-+/* [0x00000a40] */ 0x009e7000, 0x100009e7, // nop
++/* [0x000009a0] */ 0x009e7000, 0xa00009e7, // nop                   ; nop           ; ldtmu0
++/* [0x000009a8] */ 0x009e7000, 0xb00009e7, // nop                   ; nop           ; ldtmu1
++/* [0x000009b0] */ 0x009e7000, 0xa00009e7, // nop                   ; nop           ; ldtmu0
++/* [0x000009b8] */ 0x159f2fc0, 0xb00009e7, // mov -, vw_wait        ; nop           ; ldtmu1
++/* [0x000009c0] */ 0x009e7000, 0x300009e7, // nop                   ; nop           ; thrend
++/* [0x000009c8] */ 0x009e7000, 0x100009e7, // nop
++/* [0x000009d0] */ 0x009e7000, 0x100009e7, // nop
 +// ::mc_interrupt_exit12
 +// ::mc_interrupt_exit12c
-+/* [0x00000a48] */ 0x009e7000, 0xa00009e7, // nop                   ; nop           ; ldtmu0
-+/* [0x00000a50] */ 0x009e7000, 0xb00009e7, // nop                   ; nop           ; ldtmu1
-+/* [0x00000a58] */ 0x009e7000, 0xa00009e7, // nop                   ; nop           ; ldtmu0
-+/* [0x00000a60] */ 0x159f2fc0, 0xb00009e7, // mov -, vw_wait        ; nop           ; ldtmu1
-+/* [0x00000a68] */ 0x0000001c, 0xe80009e7, // mov  dst, sacq(i)
-+/* [0x00000a70] */ 0x009e7000, 0x300009e7, // nop                   ; nop           ; thrend
-+/* [0x00000a78] */ 0x00000001, 0xe00209a7, // mov interrupt, 1
-+/* [0x00000a80] */ 0x009e7000, 0x100009e7, // nop
++/* [0x000009d8] */ 0x009e7000, 0xa00009e7, // nop                   ; nop           ; ldtmu0
++/* [0x000009e0] */ 0x009e7000, 0xb00009e7, // nop                   ; nop           ; ldtmu1
++/* [0x000009e8] */ 0x009e7000, 0xa00009e7, // nop                   ; nop           ; ldtmu0
++/* [0x000009f0] */ 0x159f2fc0, 0xb00009e7, // mov -, vw_wait        ; nop           ; ldtmu1
++/* [0x000009f8] */ 0x0000001c, 0xe80009e7, // mov  dst, sacq(i)
++/* [0x00000a00] */ 0x009e7000, 0x300009e7, // nop                   ; nop           ; thrend
++/* [0x00000a08] */ 0x00000001, 0xe00209a7, // mov interrupt, 1
++/* [0x00000a10] */ 0x009e7000, 0x100009e7, // nop
 +// ::mc_setup_y_q0
-+/* [0x00000a88] */ 0x0000000c, 0xe80009e7, // mov  dst, srel(i)
++/* [0x00000a18] */ 0x0000000c, 0xe80009e7, // mov  dst, srel(i)
 +// ::mc_setup_y_qn
-+/* [0x00000a90] */ 0x95801ff6, 0xd0025900, // mov tmurs, 1          ; mov ra0, unif
-+/* [0x00000a98] */ 0x15827d80, 0x10020267, // mov ra9, unif
-+/* [0x00000aa0] */ 0x15827d80, 0x10020067, // mov ra1, unif
-+/* [0x00000aa8] */ 0x15827d80, 0x100202e7, // mov ra11, unif
-+/* [0x00000ab0] */ 0xff100100, 0xe0020527, // mov ra_kff100100, 0xff100100
-+/* [0x00000ab8] */ 0x000000ff, 0xe00215a7, // mov rb_k255, 255
-+/* [0x00000ac0] */ 0x15827d80, 0x100200e7, // mov ra3, unif
-+/* [0x00000ac8] */ 0x15827d80, 0x10021527, // mov rb_xpitch, unif
-+/* [0x00000ad0] */ 0x0d0c1dc0, 0xd4021667, // sub rb_max_x, ra3.16b, 1
-+/* [0x00000ad8] */ 0x0d0c1dc0, 0xd20217a7, // sub rb_max_y, ra3.16a, 1
-+/* [0x00000ae0] */ 0x15827d80, 0x10021427, // mov rb_pitch, unif
-+/* [0x00000ae8] */ 0xc0000000, 0xe0020867, // mov r1, vdw_setup_1(0)
-+/* [0x00000af0] */ 0x159d03c0, 0x10021627, // or  rb_dma1_base, r1, rb_pitch
-+/* [0x00000af8] */ 0x159a7d80, 0x100208e7, // mov r3, elem_num
-+/* [0x00000b00] */ 0x0c027cc0, 0x14020827, // add r0, ra0.16b, r3
-+/* [0x00000b08] */ 0x139c01c0, 0xd0020827, // max r0, r0, 0
-+/* [0x00000b10] */ 0x129d91c0, 0x10020827, // min r0, r0, rb_max_x
-+/* [0x00000b18] */ 0x119c31c0, 0xd0220567, // shl ra_xshift_next, r0, 3
-+/* [0x00000b20] */ 0xf49dc1d2, 0xd0024822, // and r0, r0, -4        ; v8subs r2, r2, r2
-+/* [0x00000b28] */ 0x0d9d05c0, 0x100208a7, // sub r2, r2, rb_pitch
-+/* [0x00000b30] */ 0x149e7080, 0x10020867, // and r1, r0, r2
-+/* [0x00000b38] */ 0x569d404f, 0x10024821, // xor r0, r0, r1        ; mul24 r1, r1, rb_xpitch
-+/* [0x00000b40] */ 0x0c9e7040, 0x10020827, // add r0, r0, r1
-+/* [0x00000b48] */ 0x0c267c00, 0x10020627, // add ra_base, ra9, r0
-+/* [0x00000b50] */ 0x0c067cc0, 0x14020827, // add r0, ra1.16b, r3
-+/* [0x00000b58] */ 0x139c01c0, 0xd0020827, // max r0, r0, 0
-+/* [0x00000b60] */ 0x129d91c0, 0x10020827, // min r0, r0, rb_max_x
-+/* [0x00000b68] */ 0x119c31c0, 0xd0021067, // shl rb_xshift2_next, r0, 3
-+/* [0x00000b70] */ 0x149dc1c0, 0xd0020827, // and r0, r0, -4
-+/* [0x00000b78] */ 0x149e7080, 0x10020867, // and r1, r0, r2
-+/* [0x00000b80] */ 0x569d404f, 0x10024821, // xor r0, r0, r1        ; mul24 r1, r1, rb_xpitch
-+/* [0x00000b88] */ 0x0c9e7040, 0x10020827, // add r0, r0, r1
-+/* [0x00000b90] */ 0x0c2e7c00, 0x10020667, // add ra_base2, ra11, r0
-+/* [0x00000b98] */ 0x15027d80, 0x12020827, // mov r0, ra0.16a
-+/* [0x00000ba0] */ 0x15067d80, 0x120208a7, // mov r2, ra1.16a
-+/* [0x00000ba8] */ 0x00000002, 0xe00208e7, // mov r3, PREREAD
++/* [0x00000a20] */ 0x95801ff6, 0xd0025900, // mov tmurs, 1          ; mov ra0, unif
++/* [0x00000a28] */ 0x15827d80, 0x10020267, // mov ra9, unif
++/* [0x00000a30] */ 0x15827d80, 0x10020067, // mov ra1, unif
++/* [0x00000a38] */ 0x15827d80, 0x100202e7, // mov ra11, unif
++/* [0x00000a40] */ 0xff100100, 0xe0020527, // mov ra_kff100100, 0xff100100
++/* [0x00000a48] */ 0x000000ff, 0xe00215a7, // mov rb_k255, 255
++/* [0x00000a50] */ 0x15827d80, 0x100200e7, // mov ra3, unif
++/* [0x00000a58] */ 0x15827d80, 0x10021527, // mov rb_xpitch, unif
++/* [0x00000a60] */ 0x0d0c1dc0, 0xd4021667, // sub rb_max_x, ra3.16b, 1
++/* [0x00000a68] */ 0x0d0c1dc0, 0xd20217a7, // sub rb_max_y, ra3.16a, 1
++/* [0x00000a70] */ 0x15827d80, 0x10021427, // mov rb_pitch, unif
++/* [0x00000a78] */ 0xc0000000, 0xe0020867, // mov r1, vdw_setup_1(0)
++/* [0x00000a80] */ 0x159d03c0, 0x10021627, // or  rb_dma1_base, r1, rb_pitch
++/* [0x00000a88] */ 0x159a7d80, 0x100208e7, // mov r3, elem_num
++/* [0x00000a90] */ 0x0c027cc0, 0x14020827, // add r0, ra0.16b, r3
++/* [0x00000a98] */ 0x139c01c0, 0xd0020827, // max r0, r0, 0
++/* [0x00000aa0] */ 0x129d91c0, 0x10020827, // min r0, r0, rb_max_x
++/* [0x00000aa8] */ 0x119c31c0, 0xd0220567, // shl ra_xshift_next, r0, 3
++/* [0x00000ab0] */ 0xf49dc1d2, 0xd0024822, // and r0, r0, -4        ; v8subs r2, r2, r2
++/* [0x00000ab8] */ 0x0d9d05c0, 0x100208a7, // sub r2, r2, rb_pitch
++/* [0x00000ac0] */ 0x149e7080, 0x10020867, // and r1, r0, r2
++/* [0x00000ac8] */ 0x569d404f, 0x10024821, // xor r0, r0, r1        ; mul24 r1, r1, rb_xpitch
++/* [0x00000ad0] */ 0x0c9e7040, 0x10020827, // add r0, r0, r1
++/* [0x00000ad8] */ 0x0c267c00, 0x10020627, // add ra_base, ra9, r0
++/* [0x00000ae0] */ 0x0c067cc0, 0x14020827, // add r0, ra1.16b, r3
++/* [0x00000ae8] */ 0x139c01c0, 0xd0020827, // max r0, r0, 0
++/* [0x00000af0] */ 0x129d91c0, 0x10020827, // min r0, r0, rb_max_x
++/* [0x00000af8] */ 0x119c31c0, 0xd0021067, // shl rb_xshift2_next, r0, 3
++/* [0x00000b00] */ 0x149dc1c0, 0xd0020827, // and r0, r0, -4
++/* [0x00000b08] */ 0x149e7080, 0x10020867, // and r1, r0, r2
++/* [0x00000b10] */ 0x569d404f, 0x10024821, // xor r0, r0, r1        ; mul24 r1, r1, rb_xpitch
++/* [0x00000b18] */ 0x0c9e7040, 0x10020827, // add r0, r0, r1
++/* [0x00000b20] */ 0x0c2e7c00, 0x10020667, // add ra_base2, ra11, r0
++/* [0x00000b28] */ 0x80027036, 0x120049e0, // nop                   ; mov r0, ra0.16a
++/* [0x00000b30] */ 0x95042ff6, 0xd20248e2, // mov r3, PREREAD       ; mov r2, ra1.16a
 +// :y_preload
-+/* [0x00000bb0] */ 0x0d9c17c0, 0xd00228e7, // sub.setf r3, r3, 1
-+/* [0x00000bb8] */ 0x139c01c0, 0xd0020867, // max r1, r0, 0
-+/* [0x00000bc0] */ 0x129de3c0, 0x10020867, // min r1, r1, rb_max_y
-+/* [0x00000bc8] */ 0x4c51018f, 0x1a024821, // add r0, r0, ra_k1     ; mul24 r1, r1, rb_pitch
-+/* [0x00000bd0] */ 0x0c627c40, 0x10020e27, // add t0s, ra_base, r1
-+/* [0x00000bd8] */ 0x139c05c0, 0xd0020867, // max r1, r2, 0
-+/* [0x00000be0] */ 0xffffffb0, 0xf03809e7, // brr.anynz -, r:y_preload
-+/* [0x00000be8] */ 0x129de3c0, 0x10020867, // min r1, r1, rb_max_y
-+/* [0x00000bf0] */ 0x4c51058f, 0x1a0248a1, // add r2, r2, ra_k1     ; mul24 r1, r1, rb_pitch
-+/* [0x00000bf8] */ 0x0c667c40, 0x10020f27, // add t1s, ra_base2, r1
-+/* [0x00000c00] */ 0x159e7000, 0x10220467, // mov ra_y, r0
-+/* [0x00000c08] */ 0x159e7480, 0x10120467, // mov ra_y2, r2
-+/* [0x00000c10] */ 0x0c809dc0, 0xd0021367, // add rb_wt_den_p15, unif, 9
-+/* [0x00000c18] */ 0x159e6fc0, 0x100208a7, // mov r2, qpu_num
-+/* [0x00000c20] */ 0x0f9c25c0, 0xd0020867, // asr r1, r2, 2
-+/* [0x00000c28] */ 0x119c63c0, 0xd0020867, // shl r1, r1, 6
-+/* [0x00000c30] */ 0x149c35c0, 0xd0020827, // and r0, r2, 3
-+/* [0x00000c38] */ 0x159e7040, 0x10020827, // or  r0, r0, r1
-+/* [0x00000c40] */ 0x00004800, 0xe0020867, // mov r1, vpm_setup(0, 4, h8p(0, 0))
-+/* [0x00000c48] */ 0x0c9e7040, 0x10021727, // add r_vpm, r0, r1
-+/* [0x00000c50] */ 0x80004004, 0xe0020867, // mov r1, vdw_setup_0(0, 0, dma_h8p(0,0,0))
-+/* [0x00000c58] */ 0x119c51c0, 0xd0020827, // shl r0, r0, 5
-+/* [0x00000c60] */ 0x0c9e7040, 0x100216e7, // add r_dma, r0, r1
-+/* [0x00000c68] */ 0x15827d80, 0x100207a7, // mov ra_link, unif
-+/* [0x00000c70] */ 0x00000000, 0xe0024208, // mov ra8,  0           ; mov rb8,  0
-+/* [0x00000c78] */ 0x00000000, 0xf0f7c9e7, // bra -, ra_link
-+/* [0x00000c80] */ 0x00000000, 0xe0024249, // mov ra9,  0           ; mov rb9,  0
-+/* [0x00000c88] */ 0x00000000, 0xe002428a, // mov ra10, 0           ; mov rb10, 0
-+/* [0x00000c90] */ 0x00000000, 0xe00242cb, // mov ra11, 0           ; mov rb11, 0
++/* [0x00000b38] */ 0x0d9c17c0, 0xd00228e7, // sub.setf r3, r3, 1
++/* [0x00000b40] */ 0x139c01c0, 0xd0020867, // max r1, r0, 0
++/* [0x00000b48] */ 0x129de3c0, 0x10020867, // min r1, r1, rb_max_y
++/* [0x00000b50] */ 0x4c51018f, 0x1a024821, // add r0, r0, ra_k1     ; mul24 r1, r1, rb_pitch
++/* [0x00000b58] */ 0x8c627c40, 0x10225e11, // add t0s, ra_base, r1  ; mov ra_y, r0
++/* [0x00000b60] */ 0x139c05c0, 0xd0020867, // max r1, r2, 0
++/* [0x00000b68] */ 0xffffffb0, 0xf03809e7, // brr.anynz -, r:y_preload
++/* [0x00000b70] */ 0x129de3c0, 0x10020867, // min r1, r1, rb_max_y
++/* [0x00000b78] */ 0x4c51058f, 0x1a0248a1, // add r2, r2, ra_k1     ; mul24 r1, r1, rb_pitch
++/* [0x00000b80] */ 0x8c667c52, 0x10125f11, // add t1s, ra_base2, r1 ; mov ra_y2, r2
++/* [0x00000b88] */ 0x0c809dc0, 0xd0021367, // add rb_wt_den_p15, unif, 9
++/* [0x00000b90] */ 0x159e6fc0, 0x100208a7, // mov r2, qpu_num
++/* [0x00000b98] */ 0x0f9c25c0, 0xd0020867, // asr r1, r2, 2
++/* [0x00000ba0] */ 0x119c63c0, 0xd0020867, // shl r1, r1, 6
++/* [0x00000ba8] */ 0x149c35c0, 0xd0020827, // and r0, r2, 3
++/* [0x00000bb0] */ 0x159e7040, 0x10020827, // or  r0, r0, r1
++/* [0x00000bb8] */ 0x00004800, 0xe0020867, // mov r1, vpm_setup(0, 4, h8p(0, 0))
++/* [0x00000bc0] */ 0x0c9e7040, 0x10021727, // add r_vpm, r0, r1
++/* [0x00000bc8] */ 0x80004004, 0xe0020867, // mov r1, vdw_setup_0(0, 0, dma_h8p(0,0,0))
++/* [0x00000bd0] */ 0x119c51c0, 0xd0020827, // shl r0, r0, 5
++/* [0x00000bd8] */ 0x0c9e7040, 0x100216e7, // add r_dma, r0, r1
++/* [0x00000be0] */ 0x15827d80, 0x100207a7, // mov ra_link, unif
++/* [0x00000be8] */ 0x00000000, 0xe0024208, // mov ra8,  0           ; mov rb8,  0
++/* [0x00000bf0] */ 0x00000000, 0xf0f7c9e7, // bra -, ra_link
++/* [0x00000bf8] */ 0x00000000, 0xe0024249, // mov ra9,  0           ; mov rb9,  0
++/* [0x00000c00] */ 0x00000000, 0xe002428a, // mov ra10, 0           ; mov rb10, 0
++/* [0x00000c08] */ 0x00000000, 0xe00242cb, // mov ra11, 0           ; mov rb11, 0
 +// :per_block_setup
-+/* [0x00000c98] */ 0x935401f6, 0xd4125815, // max r0, r0, 0         ; mov ra_xshift, ra_xshift_next
-+/* [0x00000ca0] */ 0x129d91c0, 0x10020827, // min r0, r0, rb_max_x
-+/* [0x00000ca8] */ 0x119c31c0, 0xd0220567, // shl ra_xshift_next, r0, 3
-+/* [0x00000cb0] */ 0xf49dc1d2, 0xd0024822, // and r0, r0, -4        ; v8subs r2, r2, r2
-+/* [0x00000cb8] */ 0x8d8105f6, 0x1002589a, // sub r2, r2, rb_pitch  ; mov ra_base_next, unif
-+/* [0x00000cc0] */ 0x940270b6, 0x12225853, // and r1, r0, r2        ; mov ra_y_next, ra0.16a
-+/* [0x00000cc8] */ 0x569d404f, 0x10024821, // xor r0, r0, r1        ; mul24 r1, r1, rb_xpitch
-+/* [0x00000cd0] */ 0x8c827076, 0x10025801, // add r0, r0, r1        ; mov ra1, unif
-+/* [0x00000cd8] */ 0x0c6a7c00, 0x100206a7, // add ra_base_next, ra_base_next, r0
-+/* [0x00000ce0] */ 0x0c067cc0, 0x14020827, // add r0, ra1.16b, r3
-+/* [0x00000ce8] */ 0x930401f6, 0xd2125813, // max r0, r0, 0         ; mov ra_y2_next, ra1.16a
-+/* [0x00000cf0] */ 0x928191f6, 0x10024813, // min r0, r0, rb_max_x  ; mov rb_base2_next, unif
-+/* [0x00000cf8] */ 0x119c31c0, 0xd0021067, // shl rb_xshift2_next, r0, 3
-+/* [0x00000d00] */ 0x9481c1f6, 0xd0025810, // and r0, r0, -4        ; mov ra_width_height, unif
-+/* [0x00000d08] */ 0x149e7080, 0x10020867, // and r1, r0, r2
-+/* [0x00000d10] */ 0x569d404f, 0x10024821, // xor r0, r0, r1        ; mul24 r1, r1, rb_xpitch
-+/* [0x00000d18] */ 0x8c9dc07f, 0x10024831, // add r0, r0, r1        ; mov vw_setup, rb_vpm_init
-+/* [0x00000d20] */ 0x0c9d3e00, 0x100214e7, // add rb_base2_next, rb_base2_next, r0
-+/* [0x00000d28] */ 0x0d418f80, 0x14021767, // sub rb_dma1, rb_dma1_base, ra_width
-+/* [0x00000d30] */ 0x8c405df6, 0xd2025460, // add rb_i_tmu, ra_height, 7 - PREREAD ; mov r0, ra_height
-+/* [0x00000d38] */ 0x12527180, 0x1c020827, // min r0, r0, ra_k16
-+/* [0x00000d40] */ 0x0c9c71c0, 0xd00214a7, // add rb_lcount, r0, 7
-+/* [0x00000d48] */ 0x119c71c0, 0xd0020827, // shl r0,   r0, 7
-+/* [0x00000d50] */ 0x0c427180, 0x14020827, // add r0,   r0, ra_width
-+/* [0x00000d58] */ 0x119d01c0, 0xd0020827, // shl r0,   r0, i_shift16
-+/* [0x00000d60] */ 0x8c81b1f6, 0x100256a0, // add rb_dma0, r0, rb_dma0_base ; mov r0, unif
-+/* [0x00000d68] */ 0x918101f6, 0xd0045816, // shl.ifz r0, r0, i_shift16 ; mov ra_wt_off_mul_l0, unif
-+/* [0x00000d70] */ 0x119c31c0, 0xd0020227, // shl ra8, r0, 3
-+/* [0x00000d78] */ 0x00010100, 0xe0020867, // mov r1,0x00010100
-+/* [0x00000d80] */ 0x10227380, 0x1e4200a7, // ror ra2.8a, r1, ra8.8d
-+/* [0x00000d88] */ 0x10227380, 0x1c420027, // ror ra0.8a, r1, ra8.8c
-+/* [0x00000d90] */ 0x01040400, 0xe0020867, // mov r1, 0x01040400
-+/* [0x00000d98] */ 0x10227380, 0x1e5200a7, // ror ra2.8b, r1, ra8.8d
-+/* [0x00000da0] */ 0x10227380, 0x1c520027, // ror ra0.8b, r1, ra8.8c
-+/* [0x00000da8] */ 0x050b0a00, 0xe0020867, // mov r1,0x050b0a00
-+/* [0x00000db0] */ 0x10227380, 0x1e6200a7, // ror ra2.8c, r1, ra8.8d
-+/* [0x00000db8] */ 0x10227380, 0x1c620027, // ror ra0.8c, r1, ra8.8c
-+/* [0x00000dc0] */ 0x11283a40, 0xe0020867, // mov r1,0x11283a40
-+/* [0x00000dc8] */ 0x10227380, 0x1e7200a7, // ror ra2.8d, r1, ra8.8d
-+/* [0x00000dd0] */ 0x10227380, 0x1c720027, // ror ra0.8d, r1, ra8.8c
-+/* [0x00000dd8] */ 0x3a281100, 0xe0020867, // mov r1,0x3a281100
-+/* [0x00000de0] */ 0x902203bf, 0x1e025812, // ror r0, r1, ra8.8d    ; mov ra_wt_off_mul_l1, unif
-+/* [0x00000de8] */ 0x90216387, 0x1c424044, // ror ra1.8a, r1, ra8.8c ; v8min rb4, r0, rb_k255
-+/* [0x00000df0] */ 0x0a0b0500, 0xe0020867, // mov r1,0x0a0b0500
-+/* [0x00000df8] */ 0x10227380, 0x1e020827, // ror r0, r1, ra8.8d
-+/* [0x00000e00] */ 0x90216387, 0x1c524045, // ror ra1.8b, r1, ra8.8c ; v8min rb5, r0, rb_k255
-+/* [0x00000e08] */ 0x04040100, 0xe0020867, // mov r1,0x04040100
-+/* [0x00000e10] */ 0x10227380, 0x1e020827, // ror r0, r1, ra8.8d
-+/* [0x00000e18] */ 0x90216387, 0x1c624046, // ror ra1.8c, r1, ra8.8c ; v8min rb6, r0, rb_k255
-+/* [0x00000e20] */ 0x954a0dbf, 0x10064597, // mov.ifnz ra_wt_off_mul_l0, ra_wt_off_mul_l1 ; mov rb_dest, unif
-+/* [0x00000e28] */ 0x01010000, 0xe0020867, // mov r1,0x01010000
-+/* [0x00000e30] */ 0x10227380, 0x1e020827, // ror r0, r1, ra8.8d
-+/* [0x00000e38] */ 0x00000000, 0xf0f7c9e7, // bra -, ra_link
-+/* [0x00000e40] */ 0x90216387, 0x1c724047, // ror ra1.8d, r1, ra8.8c ; v8min rb7, r0, rb_k255
-+/* [0x00000e48] */ 0xf158dddb, 0x14024825, // shl r0, ra_wt_off_l0, rb_wt_den_p15 ; v8subs r5rep, r3, r3
-+/* [0x00000e50] */ 0x8f8091f6, 0xd002531e, // asr rb_wt_off, r0, 9  ; mov ra_link, unif
++/* [0x00000c10] */ 0x935401f6, 0xd4125815, // max r0, r0, 0         ; mov ra_xshift, ra_xshift_next
++/* [0x00000c18] */ 0x129d91c0, 0x10020827, // min r0, r0, rb_max_x
++/* [0x00000c20] */ 0x119c31c0, 0xd0220567, // shl ra_xshift_next, r0, 3
++/* [0x00000c28] */ 0xf49dc1d2, 0xd0024822, // and r0, r0, -4        ; v8subs r2, r2, r2
++/* [0x00000c30] */ 0x8d8105f6, 0x1002589a, // sub r2, r2, rb_pitch  ; mov ra_base_next, unif
++/* [0x00000c38] */ 0x940270b6, 0x12225853, // and r1, r0, r2        ; mov ra_y_next, ra0.16a
++/* [0x00000c40] */ 0x569d404f, 0x10024821, // xor r0, r0, r1        ; mul24 r1, r1, rb_xpitch
++/* [0x00000c48] */ 0x8c827076, 0x10025801, // add r0, r0, r1        ; mov ra1, unif
++/* [0x00000c50] */ 0x0c6a7c00, 0x100206a7, // add ra_base_next, ra_base_next, r0
++/* [0x00000c58] */ 0x0c067cc0, 0x14020827, // add r0, ra1.16b, r3
++/* [0x00000c60] */ 0x930401f6, 0xd2125813, // max r0, r0, 0         ; mov ra_y2_next, ra1.16a
++/* [0x00000c68] */ 0x928191f6, 0x10024813, // min r0, r0, rb_max_x  ; mov rb_base2_next, unif
++/* [0x00000c70] */ 0x119c31c0, 0xd0021067, // shl rb_xshift2_next, r0, 3
++/* [0x00000c78] */ 0x9481c1f6, 0xd0025810, // and r0, r0, -4        ; mov ra_width_height, unif
++/* [0x00000c80] */ 0x149e7080, 0x10020867, // and r1, r0, r2
++/* [0x00000c88] */ 0x569d404f, 0x10024821, // xor r0, r0, r1        ; mul24 r1, r1, rb_xpitch
++/* [0x00000c90] */ 0x8c9dc07f, 0x10024831, // add r0, r0, r1        ; mov vw_setup, rb_vpm_init
++/* [0x00000c98] */ 0x0c9d3e00, 0x100214e7, // add rb_base2_next, rb_base2_next, r0
++/* [0x00000ca0] */ 0x0d418f80, 0x14021767, // sub rb_dma1, rb_dma1_base, ra_width
++/* [0x00000ca8] */ 0x8c405df6, 0xd2025460, // add rb_i_tmu, ra_height, 7 - PREREAD ; mov r0, ra_height
++/* [0x00000cb0] */ 0x12527180, 0x1c020827, // min r0, r0, ra_k16
++/* [0x00000cb8] */ 0x0c9c71c0, 0xd00214a7, // add rb_lcount, r0, 7
++/* [0x00000cc0] */ 0x119c71c0, 0xd0020827, // shl r0,   r0, 7
++/* [0x00000cc8] */ 0x0c427180, 0x14020827, // add r0,   r0, ra_width
++/* [0x00000cd0] */ 0x119d01c0, 0xd0020827, // shl r0,   r0, i_shift16
++/* [0x00000cd8] */ 0x8c81b1f6, 0x100256a0, // add rb_dma0, r0, rb_dma0_base ; mov r0, unif
++/* [0x00000ce0] */ 0x918101f6, 0xd0045816, // shl.ifz r0, r0, i_shift16 ; mov ra_wt_off_mul_l0, unif
++/* [0x00000ce8] */ 0x119c31c0, 0xd0020227, // shl ra8, r0, 3
++/* [0x00000cf0] */ 0x00010100, 0xe0020867, // mov r1,0x00010100
++/* [0x00000cf8] */ 0x10227380, 0x1e4200a7, // ror ra2.8a, r1, ra8.8d
++/* [0x00000d00] */ 0x10227380, 0x1c420027, // ror ra0.8a, r1, ra8.8c
++/* [0x00000d08] */ 0x01040400, 0xe0020867, // mov r1, 0x01040400
++/* [0x00000d10] */ 0x10227380, 0x1e5200a7, // ror ra2.8b, r1, ra8.8d
++/* [0x00000d18] */ 0x10227380, 0x1c520027, // ror ra0.8b, r1, ra8.8c
++/* [0x00000d20] */ 0x050b0a00, 0xe0020867, // mov r1,0x050b0a00
++/* [0x00000d28] */ 0x10227380, 0x1e6200a7, // ror ra2.8c, r1, ra8.8d
++/* [0x00000d30] */ 0x10227380, 0x1c620027, // ror ra0.8c, r1, ra8.8c
++/* [0x00000d38] */ 0x11283a40, 0xe0020867, // mov r1,0x11283a40
++/* [0x00000d40] */ 0x10227380, 0x1e7200a7, // ror ra2.8d, r1, ra8.8d
++/* [0x00000d48] */ 0x10227380, 0x1c720027, // ror ra0.8d, r1, ra8.8c
++/* [0x00000d50] */ 0x3a281100, 0xe0020867, // mov r1,0x3a281100
++/* [0x00000d58] */ 0x902203bf, 0x1e025812, // ror r0, r1, ra8.8d    ; mov ra_wt_off_mul_l1, unif
++/* [0x00000d60] */ 0x90216387, 0x1c424044, // ror ra1.8a, r1, ra8.8c ; v8min rb4, r0, rb_k255
++/* [0x00000d68] */ 0x0a0b0500, 0xe0020867, // mov r1,0x0a0b0500
++/* [0x00000d70] */ 0x10227380, 0x1e020827, // ror r0, r1, ra8.8d
++/* [0x00000d78] */ 0x90216387, 0x1c524045, // ror ra1.8b, r1, ra8.8c ; v8min rb5, r0, rb_k255
++/* [0x00000d80] */ 0x04040100, 0xe0020867, // mov r1,0x04040100
++/* [0x00000d88] */ 0x10227380, 0x1e020827, // ror r0, r1, ra8.8d
++/* [0x00000d90] */ 0x90216387, 0x1c624046, // ror ra1.8c, r1, ra8.8c ; v8min rb6, r0, rb_k255
++/* [0x00000d98] */ 0x954a0dbf, 0x10064597, // mov.ifnz ra_wt_off_mul_l0, ra_wt_off_mul_l1 ; mov rb_dest, unif
++/* [0x00000da0] */ 0x01010000, 0xe0020867, // mov r1,0x01010000
++/* [0x00000da8] */ 0x10227380, 0x1e020827, // ror r0, r1, ra8.8d
++/* [0x00000db0] */ 0x00000000, 0xf0f7c9e7, // bra -, ra_link
++/* [0x00000db8] */ 0x90216387, 0x1c724047, // ror ra1.8d, r1, ra8.8c ; v8min rb7, r0, rb_k255
++/* [0x00000dc0] */ 0xf158dddb, 0x14024825, // shl r0, ra_wt_off_l0, rb_wt_den_p15 ; v8subs r5rep, r3, r3
++/* [0x00000dc8] */ 0x8f8091f6, 0xd002531e, // asr rb_wt_off, r0, 9  ; mov ra_link, unif
 +// ::mc_filter
-+/* [0x00000e58] */ 0xfffffe20, 0xf0f807a7, // brr ra_link, r:per_block_setup
-+/* [0x00000e60] */ 0x959a0ff6, 0x10024023, // mov ra0, unif         ; mov r3, elem_num
-+/* [0x00000e68] */ 0x0000ff00, 0xe20229e7, // mov.setf -, [0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1]
-+/* [0x00000e70] */ 0x8c001cff, 0x14024800, // add r0, ra0.16b, r3   ; mov rb_xshift2, rb_xshift2_next
-+/* [0x00000e78] */ 0x11581dc0, 0xd21205a7, // shl ra_wt_mul_l0, ra_wt_mul_l0, 1
++/* [0x00000dd0] */ 0xfffffe20, 0xf0f807a7, // brr ra_link, r:per_block_setup
++/* [0x00000dd8] */ 0x959a0ff6, 0x10024023, // mov ra0, unif         ; mov r3, elem_num
++/* [0x00000de0] */ 0x0000ff00, 0xe20229e7, // mov.setf -, [0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1]
++/* [0x00000de8] */ 0x8c001cff, 0x14024800, // add r0, ra0.16b, r3   ; mov rb_xshift2, rb_xshift2_next
++/* [0x00000df0] */ 0x11581dc0, 0xd21205a7, // shl ra_wt_mul_l0, ra_wt_mul_l0, 1
 +// :yloop
-+/* [0x00000e80] */ 0xcd511bee, 0xba0269e5, // sub.setf -, r5, rb_i_tmu      ; v8adds r5rep, r5, ra_k1            ; ldtmu1
-+/* [0x00000e88] */ 0x8e4c09f6, 0xa0029851, // shr r1, r4, rb_xshift2        ; mov.ifz ra_y_y2, ra_y_y2_next      ; ldtmu0
-+/* [0x00000e90] */ 0x8e5509bf, 0x12024823, // shr r0, r4, ra_xshift         ; mov r3, rb_pitch
-+/* [0x00000e98] */ 0x13440dc0, 0xd40208a7, // max r2, ra_y, 0
-+/* [0x00000ea0] */ 0x9269e5f6, 0x10029898, // min r2, r2, rb_max_y          ; mov.ifz ra_base, ra_base_next
-+/* [0x00000ea8] */ 0x4c441dd3, 0xd4224462, // add ra_y, ra_y, 1             ; mul24 r2, r2, r3
-+/* [0x00000eb0] */ 0x8c613cbf, 0x10029e19, // add t0s, ra_base, r2          ; mov.ifz ra_base2, rb_base2_next
-+/* [0x00000eb8] */ 0x13440dc0, 0xd20208a7, // max r2, ra_y2, 0
-+/* [0x00000ec0] */ 0x129de5c0, 0x100208a7, // min r2, r2, rb_max_y
-+/* [0x00000ec8] */ 0x4c441dd3, 0xd2124462, // add ra_y2, ra_y2, 1           ; mul24 r2, r2, r3
-+/* [0x00000ed0] */ 0x8c656c87, 0x10024f20, // add t1s, ra_base2, r2         ; v8min r0, r0, rb_k255
-+/* [0x00000ed8] */ 0x0000ff00, 0xe20229e7, // mov.setf -, [0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1]
-+/* [0x00000ee0] */ 0x540163f0, 0x18024863, // and r1, r1, rb_k255   ; mul24      r3, ra0.8a,      r0
-+/* [0x00000ee8] */ 0x4003f030, 0xda0049e2, // nop                   ; mul24      r2, ra0.8b << 1, r0 << 1    @ "mul_used", 0
-+/* [0x00000ef0] */ 0x40038031, 0xd800c9e3, // nop                   ; mul24.ifnz r3, ra0.8a << 8, r1 << 8    @ "mul_used", 0
-+/* [0x00000ef8] */ 0x40037031, 0xda00c9e2, // nop                   ; mul24.ifnz r2, ra0.8b << 9, r1 << 9    @ "mul_used", 0
-+/* [0x00000f00] */ 0x4d03e4f0, 0xdc0248a3, // sub r2, r2, r3        ; mul24      r3, ra0.8c << 2, r0 << 2    @ "mul_used", 0
-+/* [0x00000f08] */ 0x40036031, 0xdc00c9e3, // nop                   ; mul24.ifnz r3, ra0.8c << 10, r1 << 10  @ "mul_used", 0
-+/* [0x00000f10] */ 0x4d03d4f0, 0xde0248a3, // sub r2, r2, r3        ; mul24      r3, ra0.8d << 3, r0 << 3    @ "mul_used", 0
-+/* [0x00000f18] */ 0x40035031, 0xde00c9e3, // nop                   ; mul24.ifnz r3, ra0.8d << 11, r1 << 11  @ "mul_used", 0
-+/* [0x00000f20] */ 0x4c07c4f0, 0xd80248a3, // add r2, r2, r3        ; mul24      r3, ra1.8a << 4, r0 << 4    @ "mul_used", 0
-+/* [0x00000f28] */ 0x40074031, 0xd800c9e3, // nop                   ; mul24.ifnz r3, ra1.8a << 12, r1 << 12  @ "mul_used", 0
-+/* [0x00000f30] */ 0x4c07b4f0, 0xda0248a3, // add r2, r2, r3        ; mul24      r3, ra1.8b << 5, r0 << 5    @ "mul_used", 0
-+/* [0x00000f38] */ 0x40073031, 0xda00c9e3, // nop                   ; mul24.ifnz r3, ra1.8b << 13, r1 << 13  @ "mul_used", 0
-+/* [0x00000f40] */ 0x4d07a4f0, 0xdc0248a3, // sub r2, r2, r3        ; mul24      r3, ra1.8c << 6, r0 << 6    @ "mul_used", 0
-+/* [0x00000f48] */ 0x40072031, 0xdc00c9e3, // nop                   ; mul24.ifnz r3, ra1.8c << 14, r1 << 14  @ "mul_used", 0
-+/* [0x00000f50] */ 0x4c0794f0, 0xde0248a3, // add r2, r2, r3        ; mul24      r3, ra1.8d << 7, r0 << 7    @ "mul_used", 0
-+/* [0x00000f58] */ 0x40071031, 0xde00c9e3, // nop                   ; mul24.ifnz r3, ra1.8d << 15, r1 << 15  @ "mul_used", 0
-+/* [0x00000f60] */ 0x0d9e74c0, 0x10020827, // sub r0, r2, r3
-+/* [0x00000f68] */ 0x8d208bf6, 0xd00269e1, // sub.setf -, r5, 8     ; mov r1,   ra8
-+/* [0x00000f70] */ 0x95249dbf, 0x10024208, // mov ra8,  ra9         ; mov rb8,  rb9
-+/* [0x00000f78] */ 0xfffffee8, 0xf06809e7, // brr.anyn -, r:yloop
-+/* [0x00000f80] */ 0x9528adbf, 0x10024249, // mov ra9,  ra10        ; mov rb9,  rb10
-+/* [0x00000f88] */ 0x952cbdbf, 0x1002428a, // mov ra10, ra11        ; mov rb10, rb11
-+/* [0x00000f90] */ 0x959e7009, 0x100242cb, // mov ra11, r0          ; mov rb11, r1
-+/* [0x00000f98] */ 0x4008803e, 0x180049e0, // nop                   ; mul24 r0, rb8,  ra2.8a
-+/* [0x00000fa0] */ 0x4008903e, 0x1a0049e1, // nop                   ; mul24 r1, rb9,  ra2.8b
-+/* [0x00000fa8] */ 0x4d08a23e, 0x1c024860, // sub r1, r1, r0        ; mul24 r0, rb10, ra2.8c
-+/* [0x00000fb0] */ 0x4d08b23e, 0x1e024860, // sub r1, r1, r0        ; mul24 r0, rb11, ra2.8d
-+/* [0x00000fb8] */ 0x4c204237, 0x10024860, // add r1, r1, r0        ; mul24 r0, ra8,  rb4
-+/* [0x00000fc0] */ 0x4c245237, 0x10024860, // add r1, r1, r0        ; mul24 r0, ra9,  rb5
-+/* [0x00000fc8] */ 0x4d286237, 0x10024860, // sub r1, r1, r0        ; mul24 r0, ra10, rb6
-+/* [0x00000fd0] */ 0x4c2c7237, 0x10024860, // add r1, r1, r0        ; mul24 r0, ra11, rb7
-+/* [0x00000fd8] */ 0x8d9f223f, 0x10020867, // sub r1, r1, r0        ; mov -, vw_wait
-+/* [0x00000fe0] */ 0x4d512bce, 0x120269e1, // sub.setf -, r5, rb_lcount ; mul24 r1, r1, ra_k256
-+/* [0x00000fe8] */ 0x0f9ce3c0, 0xd0020867, // asr r1, r1, 14
-+/* [0x00000ff0] */ 0x405a700e, 0x120049e1, // nop                   ; mul24 r1, r1, ra_wt_mul_l0
-+/* [0x00000ff8] */ 0x0c9cc3c0, 0x10020867, // add r1, r1, rb_wt_off
-+/* [0x00001000] */ 0x914083f6, 0xd2024860, // shl r1, r1, 8         ; mov r0, ra_height
-+/* [0x00001008] */ 0xfffffe58, 0xf06809e7, // brr.anyn -, r:yloop
-+/* [0x00001010] */ 0x0f9cd3c0, 0x10c200e7, // asr ra3.8as, r1, rb_wt_den_p15
-+/* [0x00001018] */ 0x00000010, 0xe0020867, // mov r1, 16
-+/* [0x00001020] */ 0x8d0e7076, 0x18024830, // sub r0, r0, r1        ; mov vpm, ra3.8a
-+/* [0x00001028] */ 0x939c01c0, 0xd01279d0, // max.setf -, r0, 0     ; mov ra_height, r0
-+/* [0x00001030] */ 0x00000000, 0xf027c9e7, // bra.anyz -, ra_link
-+/* [0x00001038] */ 0x929da07f, 0x10024831, // min r0, r0, r1        ; mov vw_setup, rb_dma0
-+/* [0x00001040] */ 0x8d9dd07f, 0x100248b1, // sub r2, r0, r1        ; mov vw_setup, rb_dma1
-+/* [0x00001048] */ 0x809d703f, 0x100049f2, // nop                   ; mov vw_addr, rb_dest
-+/* [0x00001050] */ 0x0c9d2e00, 0x100214a7, // add rb_lcount, rb_lcount, r0
-+/* [0x00001058] */ 0x119d75c0, 0xd0020827, // shl r0, r2, i_shift23
-+/* [0x00001060] */ 0x0c9dae00, 0x100216a7, // add rb_dma0, rb_dma0, r0
-+/* [0x00001068] */ 0xfffffdf8, 0xf0f809e7, // brr -, r:yloop
-+/* [0x00001070] */ 0x409d000f, 0x100049e0, // nop                   ; mul24 r0, r1, rb_pitch
-+/* [0x00001078] */ 0x0c9d7e00, 0x100215e7, // add rb_dest, rb_dest, r0
-+/* [0x00001080] */ 0x159dcfc0, 0x10021c67, // mov vw_setup, rb_vpm_init
++/* [0x00000df8] */ 0xcd511bee, 0xba0269e5, // sub.setf -, r5, rb_i_tmu      ; v8adds r5rep, r5, ra_k1            ; ldtmu1
++/* [0x00000e00] */ 0x8e4c09f6, 0xa0029851, // shr r1, r4, rb_xshift2        ; mov.ifz ra_y_y2, ra_y_y2_next      ; ldtmu0
++/* [0x00000e08] */ 0x8e5509bf, 0x12024823, // shr r0, r4, ra_xshift         ; mov r3, rb_pitch
++/* [0x00000e10] */ 0x13440dc0, 0xd40208a7, // max r2, ra_y, 0
++/* [0x00000e18] */ 0x9269e5f6, 0x10029898, // min r2, r2, rb_max_y          ; mov.ifz ra_base, ra_base_next
++/* [0x00000e20] */ 0x4c441dd3, 0xd4224462, // add ra_y, ra_y, 1             ; mul24 r2, r2, r3
++/* [0x00000e28] */ 0x8c613cbf, 0x10029e19, // add t0s, ra_base, r2          ; mov.ifz ra_base2, rb_base2_next
++/* [0x00000e30] */ 0x13440dc0, 0xd20208a7, // max r2, ra_y2, 0
++/* [0x00000e38] */ 0x129de5c0, 0x100208a7, // min r2, r2, rb_max_y
++/* [0x00000e40] */ 0x4c441dd3, 0xd2124462, // add ra_y2, ra_y2, 1           ; mul24 r2, r2, r3
++/* [0x00000e48] */ 0x8c656c87, 0x10024f20, // add t1s, ra_base2, r2         ; v8min r0, r0, rb_k255
++/* [0x00000e50] */ 0x0000ff00, 0xe20229e7, // mov.setf -, [0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1]
++/* [0x00000e58] */ 0x540163f0, 0x18024863, // and r1, r1, rb_k255   ; mul24      r3, ra0.8a,      r0
++/* [0x00000e60] */ 0x4003f030, 0xda0049e2, // nop                   ; mul24      r2, ra0.8b << 1, r0 << 1    @ "mul_used", 0
++/* [0x00000e68] */ 0x40038031, 0xd800c9e3, // nop                   ; mul24.ifnz r3, ra0.8a << 8, r1 << 8    @ "mul_used", 0
++/* [0x00000e70] */ 0x40037031, 0xda00c9e2, // nop                   ; mul24.ifnz r2, ra0.8b << 9, r1 << 9    @ "mul_used", 0
++/* [0x00000e78] */ 0x4d03e4f0, 0xdc0248a3, // sub r2, r2, r3        ; mul24      r3, ra0.8c << 2, r0 << 2    @ "mul_used", 0
++/* [0x00000e80] */ 0x40036031, 0xdc00c9e3, // nop                   ; mul24.ifnz r3, ra0.8c << 10, r1 << 10  @ "mul_used", 0
++/* [0x00000e88] */ 0x4d03d4f0, 0xde0248a3, // sub r2, r2, r3        ; mul24      r3, ra0.8d << 3, r0 << 3    @ "mul_used", 0
++/* [0x00000e90] */ 0x40035031, 0xde00c9e3, // nop                   ; mul24.ifnz r3, ra0.8d << 11, r1 << 11  @ "mul_used", 0
++/* [0x00000e98] */ 0x4c07c4f0, 0xd80248a3, // add r2, r2, r3        ; mul24      r3, ra1.8a << 4, r0 << 4    @ "mul_used", 0
++/* [0x00000ea0] */ 0x40074031, 0xd800c9e3, // nop                   ; mul24.ifnz r3, ra1.8a << 12, r1 << 12  @ "mul_used", 0
++/* [0x00000ea8] */ 0x4c07b4f0, 0xda0248a3, // add r2, r2, r3        ; mul24      r3, ra1.8b << 5, r0 << 5    @ "mul_used", 0
++/* [0x00000eb0] */ 0x40073031, 0xda00c9e3, // nop                   ; mul24.ifnz r3, ra1.8b << 13, r1 << 13  @ "mul_used", 0
++/* [0x00000eb8] */ 0x4d07a4f0, 0xdc0248a3, // sub r2, r2, r3        ; mul24      r3, ra1.8c << 6, r0 << 6    @ "mul_used", 0
++/* [0x00000ec0] */ 0x40072031, 0xdc00c9e3, // nop                   ; mul24.ifnz r3, ra1.8c << 14, r1 << 14  @ "mul_used", 0
++/* [0x00000ec8] */ 0x4c0794f0, 0xde0248a3, // add r2, r2, r3        ; mul24      r3, ra1.8d << 7, r0 << 7    @ "mul_used", 0
++/* [0x00000ed0] */ 0x40071031, 0xde00c9e3, // nop                   ; mul24.ifnz r3, ra1.8d << 15, r1 << 15  @ "mul_used", 0
++/* [0x00000ed8] */ 0x8d208bf6, 0xd00269e1, // sub.setf -, r5, 8     ; mov r1,   ra8
++/* [0x00000ee0] */ 0x95249dbf, 0x10024208, // mov ra8,  ra9         ; mov rb8,  rb9
++/* [0x00000ee8] */ 0xfffffef0, 0xf06809e7, // brr.anyn -, r:yloop
++/* [0x00000ef0] */ 0x9528adbf, 0x10024249, // mov ra9,  ra10        ; mov rb9,  rb10
++/* [0x00000ef8] */ 0x952cbdbf, 0x1002428a, // mov ra10, ra11        ; mov rb10, rb11
++/* [0x00000f00] */ 0x8d9e74c9, 0x100242cb, // sub ra11, r2, r3      ; mov rb11, r1
++/* [0x00000f08] */ 0x4008803e, 0x180049e0, // nop                   ; mul24 r0, rb8,  ra2.8a
++/* [0x00000f10] */ 0x4008903e, 0x1a0049e1, // nop                   ; mul24 r1, rb9,  ra2.8b
++/* [0x00000f18] */ 0x4d08a23e, 0x1c024860, // sub r1, r1, r0        ; mul24 r0, rb10, ra2.8c
++/* [0x00000f20] */ 0x4d08b23e, 0x1e024860, // sub r1, r1, r0        ; mul24 r0, rb11, ra2.8d
++/* [0x00000f28] */ 0x4c204237, 0x10024860, // add r1, r1, r0        ; mul24 r0, ra8,  rb4
++/* [0x00000f30] */ 0x4c245237, 0x10024860, // add r1, r1, r0        ; mul24 r0, ra9,  rb5
++/* [0x00000f38] */ 0x4d286237, 0x10024860, // sub r1, r1, r0        ; mul24 r0, ra10, rb6
++/* [0x00000f40] */ 0x4c2c7237, 0x10024860, // add r1, r1, r0        ; mul24 r0, ra11, rb7
++/* [0x00000f48] */ 0x0d9e7200, 0x10020867, // sub r1, r1, r0
++/* [0x00000f50] */ 0x4d512bce, 0x120269e1, // sub.setf -, r5, rb_lcount ; mul24 r1, r1, ra_k256
++/* [0x00000f58] */ 0x0f9ce3c0, 0xd0020867, // asr r1, r1, 14
++/* [0x00000f60] */ 0x405a700e, 0x120049e1, // nop                   ; mul24 r1, r1, ra_wt_mul_l0
++/* [0x00000f68] */ 0x0c9cc3c0, 0x10020867, // add r1, r1, rb_wt_off
++/* [0x00000f70] */ 0x914083f6, 0xd2024860, // shl r1, r1, 8         ; mov r0, ra_height
++/* [0x00000f78] */ 0xfffffe60, 0xf06809e7, // brr.anyn -, r:yloop
++/* [0x00000f80] */ 0x0f9cd3c0, 0x10c200e7, // asr ra3.8as, r1, rb_wt_den_p15
++/* [0x00000f88] */ 0x95532dbf, 0x1c020867, // mov r1, ra_k16        ; mov -, vw_wait
++/* [0x00000f90] */ 0x8d0e7076, 0x18024830, // sub r0, r0, r1        ; mov vpm, ra3.8a
++/* [0x00000f98] */ 0x939c01c0, 0xd01279d0, // max.setf -, r0, 0     ; mov ra_height, r0
++/* [0x00000fa0] */ 0x00000000, 0xf027c9e7, // bra.anyz -, ra_link
++/* [0x00000fa8] */ 0x929da07f, 0x10024831, // min r0, r0, r1        ; mov vw_setup, rb_dma0
++/* [0x00000fb0] */ 0x8d9dd07f, 0x100248b1, // sub r2, r0, r1        ; mov vw_setup, rb_dma1
++/* [0x00000fb8] */ 0x809d703f, 0x100049f2, // nop                   ; mov vw_addr, rb_dest
++/* [0x00000fc0] */ 0x0c9d2e00, 0x100214a7, // add rb_lcount, rb_lcount, r0
++/* [0x00000fc8] */ 0x119d75c0, 0xd0020827, // shl r0, r2, i_shift23
++/* [0x00000fd0] */ 0x0c9dae00, 0x100216a7, // add rb_dma0, rb_dma0, r0
++/* [0x00000fd8] */ 0xfffffe00, 0xf0f809e7, // brr -, r:yloop
++/* [0x00000fe0] */ 0x409d000f, 0x100049e0, // nop                   ; mul24 r0, r1, rb_pitch
++/* [0x00000fe8] */ 0x0c9d7e00, 0x100215e7, // add rb_dest, rb_dest, r0
++/* [0x00000ff0] */ 0x159dcfc0, 0x10021c67, // mov vw_setup, rb_vpm_init
 +// ::mc_filter_b
-+/* [0x00001088] */ 0xfffffbf0, 0xf0f807a7, // brr ra_link, r:per_block_setup
-+/* [0x00001090] */ 0x959a0ff6, 0x10024023, // mov ra0, unif         ; mov r3, elem_num
-+/* [0x00001098] */ 0x0000ff00, 0xe20229e7, // mov.setf -, [0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1]
-+/* [0x000010a0] */ 0x8c001cff, 0x14024800, // add r0, ra0.16b, r3   ; mov rb_xshift2, rb_xshift2_next
++/* [0x00000ff8] */ 0xfffffbf8, 0xf0f807a7, // brr ra_link, r:per_block_setup
++/* [0x00001000] */ 0x959a0ff6, 0x10024023, // mov ra0, unif         ; mov r3, elem_num
++/* [0x00001008] */ 0x0000ff00, 0xe20229e7, // mov.setf -, [0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1]
++/* [0x00001010] */ 0x8c001cff, 0x14024800, // add r0, ra0.16b, r3   ; mov rb_xshift2, rb_xshift2_next
 +// :yloopb
-+/* [0x000010a8] */ 0xcd511bee, 0xba0269e5, // sub.setf -, r5, rb_i_tmu      ; v8adds r5rep, r5, ra_k1             ; ldtmu1
-+/* [0x000010b0] */ 0x8e4c09f6, 0xa0029851, // shr r1, r4, rb_xshift2        ; mov.ifz ra_y_y2, ra_y_y2_next      ; ldtmu0
-+/* [0x000010b8] */ 0x8e5509bf, 0x12024823, // shr r0, r4, ra_xshift         ; mov r3, rb_pitch
-+/* [0x000010c0] */ 0x13440dc0, 0xd40208a7, // max r2, ra_y, 0
-+/* [0x000010c8] */ 0x9269e5f6, 0x10029898, // min r2, r2, rb_max_y          ; mov.ifz ra_base, ra_base_next
-+/* [0x000010d0] */ 0x4c441dd3, 0xd4224462, // add ra_y, ra_y, 1             ; mul24 r2, r2, r3
-+/* [0x000010d8] */ 0x8c613cbf, 0x10029e19, // add t0s, ra_base, r2          ; mov.ifz ra_base2, rb_base2_next
-+/* [0x000010e0] */ 0x13440dc0, 0xd20208a7, // max r2, ra_y2, 0
-+/* [0x000010e8] */ 0x129de5c0, 0x100208a7, // min r2, r2, rb_max_y
-+/* [0x000010f0] */ 0x4c441dd3, 0xd2124462, // add ra_y2, ra_y2, 1           ; mul24 r2, r2, r3
-+/* [0x000010f8] */ 0x8c656c87, 0x10024f20, // add t1s, ra_base2, r2         ; v8min r0, r0, rb_k255
-+/* [0x00001100] */ 0x0000ff00, 0xe20229e7, // mov.setf -, [0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1]
-+/* [0x00001108] */ 0x540163f0, 0x18024863, // and r1, r1, rb_k255   ; mul24      r3, ra0.8a,      r0
-+/* [0x00001110] */ 0x4003f030, 0xda0049e2, // nop                   ; mul24      r2, ra0.8b << 1, r0 << 1    @ "mul_used", 0
-+/* [0x00001118] */ 0x40038031, 0xd800c9e3, // nop                   ; mul24.ifnz r3, ra0.8a << 8, r1 << 8    @ "mul_used", 0
-+/* [0x00001120] */ 0x40037031, 0xda00c9e2, // nop                   ; mul24.ifnz r2, ra0.8b << 9, r1 << 9    @ "mul_used", 0
-+/* [0x00001128] */ 0x4d03e4f0, 0xdc0248a3, // sub r2, r2, r3        ; mul24      r3, ra0.8c << 2, r0 << 2    @ "mul_used", 0
-+/* [0x00001130] */ 0x40036031, 0xdc00c9e3, // nop                   ; mul24.ifnz r3, ra0.8c << 10, r1 << 10  @ "mul_used", 0
-+/* [0x00001138] */ 0x4d03d4f0, 0xde0248a3, // sub r2, r2, r3        ; mul24      r3, ra0.8d << 3, r0 << 3    @ "mul_used", 0
-+/* [0x00001140] */ 0x40035031, 0xde00c9e3, // nop                   ; mul24.ifnz r3, ra0.8d << 11, r1 << 11  @ "mul_used", 0
-+/* [0x00001148] */ 0x4c07c4f0, 0xd80248a3, // add r2, r2, r3        ; mul24      r3, ra1.8a << 4, r0 << 4    @ "mul_used", 0
-+/* [0x00001150] */ 0x40074031, 0xd800c9e3, // nop                   ; mul24.ifnz r3, ra1.8a << 12, r1 << 12  @ "mul_used", 0
-+/* [0x00001158] */ 0x4c07b4f0, 0xda0248a3, // add r2, r2, r3        ; mul24      r3, ra1.8b << 5, r0 << 5    @ "mul_used", 0
-+/* [0x00001160] */ 0x40073031, 0xda00c9e3, // nop                   ; mul24.ifnz r3, ra1.8b << 13, r1 << 13  @ "mul_used", 0
-+/* [0x00001168] */ 0x4d07a4f0, 0xdc0248a3, // sub r2, r2, r3        ; mul24      r3, ra1.8c << 6, r0 << 6    @ "mul_used", 0
-+/* [0x00001170] */ 0x40072031, 0xdc00c9e3, // nop                   ; mul24.ifnz r3, ra1.8c << 14, r1 << 14  @ "mul_used", 0
-+/* [0x00001178] */ 0x4c0794f0, 0xde0248a3, // add r2, r2, r3        ; mul24      r3, ra1.8d << 7, r0 << 7    @ "mul_used", 0
-+/* [0x00001180] */ 0x40071031, 0xde00c9e3, // nop                   ; mul24.ifnz r3, ra1.8d << 15, r1 << 15  @ "mul_used", 0
-+/* [0x00001188] */ 0x0d9e74c0, 0x10020827, // sub r0, r2, r3
-+/* [0x00001190] */ 0x8d208bf6, 0xd00269e1, // sub.setf -, r5, 8     ; mov r1,   ra8
-+/* [0x00001198] */ 0x95249dbf, 0x10024208, // mov ra8,  ra9         ; mov rb8,  rb9
-+/* [0x000011a0] */ 0xfffffee8, 0xf06809e7, // brr.anyn -, r:yloopb
-+/* [0x000011a8] */ 0x9528adbf, 0x10024249, // mov ra9,  ra10        ; mov rb9,  rb10
-+/* [0x000011b0] */ 0x952cbdbf, 0x1002428a, // mov ra10, ra11        ; mov rb10, rb11
-+/* [0x000011b8] */ 0x959e7009, 0x100242cb, // mov ra11, r0          ; mov rb11, r1
-+/* [0x000011c0] */ 0x4008803e, 0x180049e0, // nop                   ; mul24 r0, rb8,  ra2.8a
-+/* [0x000011c8] */ 0x4008903e, 0x1a0049e1, // nop                   ; mul24 r1, rb9,  ra2.8b
-+/* [0x000011d0] */ 0x4d08a23e, 0x1c024860, // sub r1, r1, r0        ; mul24 r0, rb10, ra2.8c
-+/* [0x000011d8] */ 0x4d08b23e, 0x1e024860, // sub r1, r1, r0        ; mul24 r0, rb11, ra2.8d
-+/* [0x000011e0] */ 0x4c204237, 0x10024860, // add r1, r1, r0        ; mul24 r0, ra8,  rb4
-+/* [0x000011e8] */ 0x4c245237, 0x10024860, // add r1, r1, r0        ; mul24 r0, ra9,  rb5
-+/* [0x000011f0] */ 0x4d286237, 0x10024860, // sub r1, r1, r0        ; mul24 r0, ra10, rb6
-+/* [0x000011f8] */ 0x4c2c7237, 0x10024860, // add r1, r1, r0        ; mul24 r0, ra11, rb7
-+/* [0x00001200] */ 0x8d9cc23f, 0x10024862, // sub r1, r1, r0        ; mov r2, rb_wt_off
-+/* [0x00001208] */ 0x4d512bce, 0x120269e1, // sub.setf -, r5, rb_lcount ; mul24 r1, r1, ra_k256
-+/* [0x00001210] */ 0x0f9ce3c0, 0xd0020867, // asr r1, r1, 14
-+/* [0x00001218] */ 0x405a700e, 0x120049e0, // nop                   ; mul24 r0, r1, ra_wt_mul_l0
-+/* [0x00001220] */ 0x4c4b808e, 0xd2024821, // add r0, r0, r2        ; mul24 r1, r1 << 8, ra_wt_mul_l1 << 8    @ "mul_used", 0
-+/* [0x00001228] */ 0x8c9f223f, 0x10020867, // add r1, r1, r0        ; mov -, vw_wait
-+/* [0x00001230] */ 0x914083f6, 0xd2024860, // shl r1, r1, 8         ; mov r0, ra_height
-+/* [0x00001238] */ 0xfffffe50, 0xf06809e7, // brr.anyn -, r:yloopb
-+/* [0x00001240] */ 0x0f9cd3c0, 0x10c200e7, // asr ra3.8as, r1, rb_wt_den_p15
-+/* [0x00001248] */ 0x00000010, 0xe0020867, // mov r1, 16
-+/* [0x00001250] */ 0x8d0e7076, 0x18024830, // sub r0, r0, r1        ; mov vpm, ra3.8a
-+/* [0x00001258] */ 0x939c01c0, 0xd01279d0, // max.setf -, r0, 0     ; mov ra_height, r0
-+/* [0x00001260] */ 0x00000000, 0xf027c9e7, // bra.anyz -, ra_link
-+/* [0x00001268] */ 0x929da07f, 0x10024831, // min r0, r0, r1        ; mov vw_setup, rb_dma0
-+/* [0x00001270] */ 0x8d9dd07f, 0x100248b1, // sub r2, r0, r1        ; mov vw_setup, rb_dma1
-+/* [0x00001278] */ 0x809d703f, 0x100049f2, // nop                   ; mov vw_addr, rb_dest
-+/* [0x00001280] */ 0x0c9d2e00, 0x100214a7, // add rb_lcount, rb_lcount, r0
-+/* [0x00001288] */ 0x119d75c0, 0xd0020827, // shl r0, r2, i_shift23
-+/* [0x00001290] */ 0x0c9dae00, 0x100216a7, // add rb_dma0, rb_dma0, r0
-+/* [0x00001298] */ 0xfffffdf0, 0xf0f809e7, // brr -, r:yloopb
-+/* [0x000012a0] */ 0x409d000f, 0x100049e0, // nop                   ; mul24 r0, r1, rb_pitch
-+/* [0x000012a8] */ 0x0c9d7e00, 0x100215e7, // add rb_dest, rb_dest, r0
-+/* [0x000012b0] */ 0x159dcfc0, 0x10021c67, // mov vw_setup, rb_vpm_init
++/* [0x00001018] */ 0xcd511bee, 0xba0269e5, // sub.setf -, r5, rb_i_tmu      ; v8adds r5rep, r5, ra_k1             ; ldtmu1
++/* [0x00001020] */ 0x8e4c09f6, 0xa0029851, // shr r1, r4, rb_xshift2        ; mov.ifz ra_y_y2, ra_y_y2_next      ; ldtmu0
++/* [0x00001028] */ 0x8e5509bf, 0x12024823, // shr r0, r4, ra_xshift         ; mov r3, rb_pitch
++/* [0x00001030] */ 0x13440dc0, 0xd40208a7, // max r2, ra_y, 0
++/* [0x00001038] */ 0x9269e5f6, 0x10029898, // min r2, r2, rb_max_y          ; mov.ifz ra_base, ra_base_next
++/* [0x00001040] */ 0x4c441dd3, 0xd4224462, // add ra_y, ra_y, 1             ; mul24 r2, r2, r3
++/* [0x00001048] */ 0x8c613cbf, 0x10029e19, // add t0s, ra_base, r2          ; mov.ifz ra_base2, rb_base2_next
++/* [0x00001050] */ 0x13440dc0, 0xd20208a7, // max r2, ra_y2, 0
++/* [0x00001058] */ 0x129de5c0, 0x100208a7, // min r2, r2, rb_max_y
++/* [0x00001060] */ 0x4c441dd3, 0xd2124462, // add ra_y2, ra_y2, 1           ; mul24 r2, r2, r3
++/* [0x00001068] */ 0x8c656c87, 0x10024f20, // add t1s, ra_base2, r2         ; v8min r0, r0, rb_k255
++/* [0x00001070] */ 0x0000ff00, 0xe20229e7, // mov.setf -, [0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1]
++/* [0x00001078] */ 0x540163f0, 0x18024863, // and r1, r1, rb_k255   ; mul24      r3, ra0.8a,      r0
++/* [0x00001080] */ 0x4003f030, 0xda0049e2, // nop                   ; mul24      r2, ra0.8b << 1, r0 << 1    @ "mul_used", 0
++/* [0x00001088] */ 0x40038031, 0xd800c9e3, // nop                   ; mul24.ifnz r3, ra0.8a << 8, r1 << 8    @ "mul_used", 0
++/* [0x00001090] */ 0x40037031, 0xda00c9e2, // nop                   ; mul24.ifnz r2, ra0.8b << 9, r1 << 9    @ "mul_used", 0
++/* [0x00001098] */ 0x4d03e4f0, 0xdc0248a3, // sub r2, r2, r3        ; mul24      r3, ra0.8c << 2, r0 << 2    @ "mul_used", 0
++/* [0x000010a0] */ 0x40036031, 0xdc00c9e3, // nop                   ; mul24.ifnz r3, ra0.8c << 10, r1 << 10  @ "mul_used", 0
++/* [0x000010a8] */ 0x4d03d4f0, 0xde0248a3, // sub r2, r2, r3        ; mul24      r3, ra0.8d << 3, r0 << 3    @ "mul_used", 0
++/* [0x000010b0] */ 0x40035031, 0xde00c9e3, // nop                   ; mul24.ifnz r3, ra0.8d << 11, r1 << 11  @ "mul_used", 0
++/* [0x000010b8] */ 0x4c07c4f0, 0xd80248a3, // add r2, r2, r3        ; mul24      r3, ra1.8a << 4, r0 << 4    @ "mul_used", 0
++/* [0x000010c0] */ 0x40074031, 0xd800c9e3, // nop                   ; mul24.ifnz r3, ra1.8a << 12, r1 << 12  @ "mul_used", 0
++/* [0x000010c8] */ 0x4c07b4f0, 0xda0248a3, // add r2, r2, r3        ; mul24      r3, ra1.8b << 5, r0 << 5    @ "mul_used", 0
++/* [0x000010d0] */ 0x40073031, 0xda00c9e3, // nop                   ; mul24.ifnz r3, ra1.8b << 13, r1 << 13  @ "mul_used", 0
++/* [0x000010d8] */ 0x4d07a4f0, 0xdc0248a3, // sub r2, r2, r3        ; mul24      r3, ra1.8c << 6, r0 << 6    @ "mul_used", 0
++/* [0x000010e0] */ 0x40072031, 0xdc00c9e3, // nop                   ; mul24.ifnz r3, ra1.8c << 14, r1 << 14  @ "mul_used", 0
++/* [0x000010e8] */ 0x4c0794f0, 0xde0248a3, // add r2, r2, r3        ; mul24      r3, ra1.8d << 7, r0 << 7    @ "mul_used", 0
++/* [0x000010f0] */ 0x40071031, 0xde00c9e3, // nop                   ; mul24.ifnz r3, ra1.8d << 15, r1 << 15  @ "mul_used", 0
++/* [0x000010f8] */ 0x8d208bf6, 0xd00269e1, // sub.setf -, r5, 8     ; mov r1,   ra8
++/* [0x00001100] */ 0x95249dbf, 0x10024208, // mov ra8,  ra9         ; mov rb8,  rb9
++/* [0x00001108] */ 0xfffffef0, 0xf06809e7, // brr.anyn -, r:yloopb
++/* [0x00001110] */ 0x9528adbf, 0x10024249, // mov ra9,  ra10        ; mov rb9,  rb10
++/* [0x00001118] */ 0x952cbdbf, 0x1002428a, // mov ra10, ra11        ; mov rb10, rb11
++/* [0x00001120] */ 0x8d9e74c9, 0x100242cb, // sub ra11, r2, r3      ; mov rb11, r1
++/* [0x00001128] */ 0x4008803e, 0x180049e0, // nop                   ; mul24 r0, rb8,  ra2.8a
++/* [0x00001130] */ 0x4008903e, 0x1a0049e1, // nop                   ; mul24 r1, rb9,  ra2.8b
++/* [0x00001138] */ 0x4d08a23e, 0x1c024860, // sub r1, r1, r0        ; mul24 r0, rb10, ra2.8c
++/* [0x00001140] */ 0x4d08b23e, 0x1e024860, // sub r1, r1, r0        ; mul24 r0, rb11, ra2.8d
++/* [0x00001148] */ 0x4c204237, 0x10024860, // add r1, r1, r0        ; mul24 r0, ra8,  rb4
++/* [0x00001150] */ 0x4c245237, 0x10024860, // add r1, r1, r0        ; mul24 r0, ra9,  rb5
++/* [0x00001158] */ 0x4d286237, 0x10024860, // sub r1, r1, r0        ; mul24 r0, ra10, rb6
++/* [0x00001160] */ 0x4c2c7237, 0x10024860, // add r1, r1, r0        ; mul24 r0, ra11, rb7
++/* [0x00001168] */ 0x8d9cc23f, 0x10024862, // sub r1, r1, r0        ; mov r2, rb_wt_off
++/* [0x00001170] */ 0x4d512bce, 0x120269e1, // sub.setf -, r5, rb_lcount ; mul24 r1, r1, ra_k256
++/* [0x00001178] */ 0x0f9ce3c0, 0xd0020867, // asr r1, r1, 14
++/* [0x00001180] */ 0x405a700e, 0x120049e0, // nop                   ; mul24 r0, r1, ra_wt_mul_l0
++/* [0x00001188] */ 0x4c4b808e, 0xd2024821, // add r0, r0, r2        ; mul24 r1, r1 << 8, ra_wt_mul_l1 << 8    @ "mul_used", 0
++/* [0x00001190] */ 0x0c9e7200, 0x10020867, // add r1, r1, r0
++/* [0x00001198] */ 0x914083f6, 0xd2024860, // shl r1, r1, 8         ; mov r0, ra_height
++/* [0x000011a0] */ 0xfffffe58, 0xf06809e7, // brr.anyn -, r:yloopb
++/* [0x000011a8] */ 0x0f9cd3c0, 0x10c200e7, // asr ra3.8as, r1, rb_wt_den_p15
++/* [0x000011b0] */ 0x95532dbf, 0x1c020867, // mov r1, ra_k16        ; mov -, vw_wait
++/* [0x000011b8] */ 0x8d0e7076, 0x18024830, // sub r0, r0, r1        ; mov vpm, ra3.8a
++/* [0x000011c0] */ 0x939c01c0, 0xd01279d0, // max.setf -, r0, 0     ; mov ra_height, r0
++/* [0x000011c8] */ 0x00000000, 0xf027c9e7, // bra.anyz -, ra_link
++/* [0x000011d0] */ 0x929da07f, 0x10024831, // min r0, r0, r1        ; mov vw_setup, rb_dma0
++/* [0x000011d8] */ 0x8d9dd07f, 0x100248b1, // sub r2, r0, r1        ; mov vw_setup, rb_dma1
++/* [0x000011e0] */ 0x809d703f, 0x100049f2, // nop                   ; mov vw_addr, rb_dest
++/* [0x000011e8] */ 0x0c9d2e00, 0x100214a7, // add rb_lcount, rb_lcount, r0
++/* [0x000011f0] */ 0x119d75c0, 0xd0020827, // shl r0, r2, i_shift23
++/* [0x000011f8] */ 0x0c9dae00, 0x100216a7, // add rb_dma0, rb_dma0, r0
++/* [0x00001200] */ 0xfffffdf8, 0xf0f809e7, // brr -, r:yloopb
++/* [0x00001208] */ 0x409d000f, 0x100049e0, // nop                   ; mul24 r0, r1, rb_pitch
++/* [0x00001210] */ 0x0c9d7e00, 0x100215e7, // add rb_dest, rb_dest, r0
++/* [0x00001218] */ 0x159dcfc0, 0x10021c67, // mov vw_setup, rb_vpm_init
 +// ::mc_filter_y_p00
-+/* [0x000012b8] */ 0x959a0ff6, 0x10024023, // mov ra0, unif         ; mov r3, elem_num
-+/* [0x000012c0] */ 0x15567d80, 0x14120567, // mov ra_xshift, ra_xshift_next
-+/* [0x000012c8] */ 0x0c027cc0, 0x14020827, // add r0, ra0.16b, r3
-+/* [0x000012d0] */ 0x139c01c0, 0xd0020827, // max r0, r0, 0
-+/* [0x000012d8] */ 0x129d91c0, 0x10020827, // min r0, r0, rb_max_x
-+/* [0x000012e0] */ 0x119c31c0, 0xd0220567, // shl ra_xshift_next, r0, 3
-+/* [0x000012e8] */ 0xf49dc1d2, 0xd0024822, // and r0, r0, -4        ; v8subs r2, r2, r2
-+/* [0x000012f0] */ 0x8d8105f6, 0x1002589a, // sub r2, r2, rb_pitch  ; mov ra_base_next, unif
-+/* [0x000012f8] */ 0x940270b6, 0x12225853, // and r1, r0, r2        ; mov ra_y_next, ra0.16a
-+/* [0x00001300] */ 0x569d404f, 0x10024821, // xor r0, r0, r1        ; mul24 r1, r1, rb_xpitch
-+/* [0x00001308] */ 0x8c827076, 0x10025810, // add r0, r0, r1        ; mov ra_width_height, unif
-+/* [0x00001310] */ 0x8c69cc3f, 0x100246b1, // add ra_base_next, ra_base_next, r0 ; mov vw_setup, rb_vpm_init
-+/* [0x00001318] */ 0x0d418f80, 0x14021767, // sub rb_dma1, rb_dma1_base, ra_width
-+/* [0x00001320] */ 0x8d402df6, 0xd2025460, // sub rb_i_tmu, ra_height, PREREAD ; mov r0, ra_height
-+/* [0x00001328] */ 0x12527180, 0x1c020827, // min r0, r0, ra_k16
-+/* [0x00001330] */ 0x8c8001f6, 0xd0025496, // add rb_lcount, r0, 0  ; mov ra_wt_off_mul_l0, unif
-+/* [0x00001338] */ 0x918071f6, 0xd0024817, // shl r0,   r0, 7       ; mov rb_dest, unif
-+/* [0x00001340] */ 0x0c427180, 0x14020827, // add r0,   r0, ra_width
-+/* [0x00001348] */ 0x119d01c0, 0xd0020827, // shl r0,   r0, i_shift16
-+/* [0x00001350] */ 0x0c9db1c0, 0x100216a7, // add rb_dma0, r0, rb_dma0_base
-+/* [0x00001358] */ 0xf158dddb, 0x14024825, // shl r0, ra_wt_off_l0, rb_wt_den_p15 ; v8subs r5rep, r3, r3
-+/* [0x00001360] */ 0x8f8011f6, 0xd002531e, // asr rb_wt_off, r0, 1  ; mov ra_link, unif
++/* [0x00001220] */ 0x959a0ff6, 0x10024023, // mov ra0, unif         ; mov r3, elem_num
++/* [0x00001228] */ 0x15567d80, 0x14120567, // mov ra_xshift, ra_xshift_next
++/* [0x00001230] */ 0x0c027cc0, 0x14020827, // add r0, ra0.16b, r3
++/* [0x00001238] */ 0x139c01c0, 0xd0020827, // max r0, r0, 0
++/* [0x00001240] */ 0x129d91c0, 0x10020827, // min r0, r0, rb_max_x
++/* [0x00001248] */ 0x119c31c0, 0xd0220567, // shl ra_xshift_next, r0, 3
++/* [0x00001250] */ 0xf49dc1d2, 0xd0024822, // and r0, r0, -4        ; v8subs r2, r2, r2
++/* [0x00001258] */ 0x8d8105f6, 0x1002589a, // sub r2, r2, rb_pitch  ; mov ra_base_next, unif
++/* [0x00001260] */ 0x940270b6, 0x12225853, // and r1, r0, r2        ; mov ra_y_next, ra0.16a
++/* [0x00001268] */ 0x569d404f, 0x10024821, // xor r0, r0, r1        ; mul24 r1, r1, rb_xpitch
++/* [0x00001270] */ 0x8c827076, 0x10025810, // add r0, r0, r1        ; mov ra_width_height, unif
++/* [0x00001278] */ 0x8c69cc3f, 0x100246b1, // add ra_base_next, ra_base_next, r0 ; mov vw_setup, rb_vpm_init
++/* [0x00001280] */ 0x0d418f80, 0x14021767, // sub rb_dma1, rb_dma1_base, ra_width
++/* [0x00001288] */ 0x8d402df6, 0xd2025460, // sub rb_i_tmu, ra_height, PREREAD ; mov r0, ra_height
++/* [0x00001290] */ 0x12527180, 0x1c020827, // min r0, r0, ra_k16
++/* [0x00001298] */ 0x8c8001f6, 0xd0025496, // add rb_lcount, r0, 0  ; mov ra_wt_off_mul_l0, unif
++/* [0x000012a0] */ 0x918071f6, 0xd0024817, // shl r0,   r0, 7       ; mov rb_dest, unif
++/* [0x000012a8] */ 0x0c427180, 0x14020827, // add r0,   r0, ra_width
++/* [0x000012b0] */ 0x119d01c0, 0xd0020827, // shl r0,   r0, i_shift16
++/* [0x000012b8] */ 0x0c9db1c0, 0x100216a7, // add rb_dma0, r0, rb_dma0_base
++/* [0x000012c0] */ 0xf158dddb, 0x14024825, // shl r0, ra_wt_off_l0, rb_wt_den_p15 ; v8subs r5rep, r3, r3
++/* [0x000012c8] */ 0x8f8011f6, 0xd002531e, // asr rb_wt_off, r0, 1  ; mov ra_link, unif
 +// :yloop_p00
-+/* [0x00001368] */ 0xcd511bee, 0x1a0269e5, // sub.setf -, r5, rb_i_tmu  ; v8adds r5rep, r5, ra_k1
-+/* [0x00001370] */ 0x804e7036, 0xa42099d1, // nop                   ; mov.ifz ra_y, ra_y_next      ; ldtmu0
-+/* [0x00001378] */ 0x8e5509bf, 0x12024823, // shr r0, r4, ra_xshift ; mov r3, rb_pitch
-+/* [0x00001380] */ 0x13440dc0, 0xd40208a7, // max r2, ra_y, 0
-+/* [0x00001388] */ 0x9269e5f6, 0x10029898, // min r2, r2, rb_max_y  ; mov.ifz ra_base, ra_base_next
-+/* [0x00001390] */ 0x4c441dd3, 0xd4224462, // add ra_y, ra_y, 1     ; mul24 r2, r2, r3
-+/* [0x00001398] */ 0x8c616c87, 0x10024e20, // add t0s, ra_base, r2  ; v8min r0, r0, rb_k255
-+/* [0x000013a0] */ 0x4d592bc6, 0x120269e1, // sub.setf -, r5, rb_lcount ; mul24 r1, r0, ra_wt_mul_l0
-+/* [0x000013a8] */ 0x9140f3f6, 0xd2024860, // shl r1, r1, 15        ; mov r0, ra_height
-+/* [0x000013b0] */ 0x0c9cc3c0, 0x10020867, // add r1, r1, rb_wt_off
-+/* [0x000013b8] */ 0xffffff90, 0xf06809e7, // brr.anyn -, r:yloop_p00
-+/* [0x000013c0] */ 0x0f9cd3c0, 0x10c200e7, // asr ra3.8as, r1, rb_wt_den_p15
-+/* [0x000013c8] */ 0x95532dbf, 0x1c020867, // mov r1, ra_k16        ; mov -, vw_wait
-+/* [0x000013d0] */ 0x8d0e7076, 0x18024830, // sub r0, r0, r1        ; mov vpm, ra3.8a
-+/* [0x000013d8] */ 0x939c01c0, 0xd01279d0, // max.setf -, r0, 0     ; mov ra_height, r0
-+/* [0x000013e0] */ 0x00000000, 0xf027c9e7, // bra.anyz -, ra_link
-+/* [0x000013e8] */ 0x929da07f, 0x10024831, // min r0, r0, r1        ; mov vw_setup, rb_dma0
-+/* [0x000013f0] */ 0x8d9dd07f, 0x100248b1, // sub r2, r0, r1        ; mov vw_setup, rb_dma1
-+/* [0x000013f8] */ 0x809d703f, 0x100049f2, // nop                   ; mov vw_addr, rb_dest
-+/* [0x00001400] */ 0x0c9d2e00, 0x100214a7, // add rb_lcount, rb_lcount, r0
-+/* [0x00001408] */ 0x119d75c0, 0xd0020827, // shl r0, r2, i_shift23
-+/* [0x00001410] */ 0x0c9dae00, 0x100216a7, // add rb_dma0, rb_dma0, r0
-+/* [0x00001418] */ 0xffffff30, 0xf0f809e7, // brr -, r:yloop_p00
-+/* [0x00001420] */ 0x409d000f, 0x100049e0, // nop                   ; mul24 r0, r1, rb_pitch
-+/* [0x00001428] */ 0x0c9d7e00, 0x100215e7, // add rb_dest, rb_dest, r0
-+/* [0x00001430] */ 0x159dcfc0, 0x10021c67, // mov vw_setup, rb_vpm_init
++/* [0x000012d0] */ 0xcd511bee, 0x1a0269e5, // sub.setf -, r5, rb_i_tmu  ; v8adds r5rep, r5, ra_k1
++/* [0x000012d8] */ 0x804e7036, 0xa42099d1, // nop                   ; mov.ifz ra_y, ra_y_next      ; ldtmu0
++/* [0x000012e0] */ 0x8e5509bf, 0x12024823, // shr r0, r4, ra_xshift ; mov r3, rb_pitch
++/* [0x000012e8] */ 0x13440dc0, 0xd40208a7, // max r2, ra_y, 0
++/* [0x000012f0] */ 0x9269e5f6, 0x10029898, // min r2, r2, rb_max_y  ; mov.ifz ra_base, ra_base_next
++/* [0x000012f8] */ 0x4c441dd3, 0xd4224462, // add ra_y, ra_y, 1     ; mul24 r2, r2, r3
++/* [0x00001300] */ 0x8c616c87, 0x10024e20, // add t0s, ra_base, r2  ; v8min r0, r0, rb_k255
++/* [0x00001308] */ 0x4d592bc6, 0x120269e1, // sub.setf -, r5, rb_lcount ; mul24 r1, r0, ra_wt_mul_l0
++/* [0x00001310] */ 0x9140f3f6, 0xd2024860, // shl r1, r1, 15        ; mov r0, ra_height
++/* [0x00001318] */ 0x0c9cc3c0, 0x10020867, // add r1, r1, rb_wt_off
++/* [0x00001320] */ 0xffffff90, 0xf06809e7, // brr.anyn -, r:yloop_p00
++/* [0x00001328] */ 0x0f9cd3c0, 0x10c200e7, // asr ra3.8as, r1, rb_wt_den_p15
++/* [0x00001330] */ 0x95532dbf, 0x1c020867, // mov r1, ra_k16        ; mov -, vw_wait
++/* [0x00001338] */ 0x8d0e7076, 0x18024830, // sub r0, r0, r1        ; mov vpm, ra3.8a
++/* [0x00001340] */ 0x939c01c0, 0xd01279d0, // max.setf -, r0, 0     ; mov ra_height, r0
++/* [0x00001348] */ 0x00000000, 0xf027c9e7, // bra.anyz -, ra_link
++/* [0x00001350] */ 0x929da07f, 0x10024831, // min r0, r0, r1        ; mov vw_setup, rb_dma0
++/* [0x00001358] */ 0x8d9dd07f, 0x100248b1, // sub r2, r0, r1        ; mov vw_setup, rb_dma1
++/* [0x00001360] */ 0x809d703f, 0x100049f2, // nop                   ; mov vw_addr, rb_dest
++/* [0x00001368] */ 0x0c9d2e00, 0x100214a7, // add rb_lcount, rb_lcount, r0
++/* [0x00001370] */ 0x119d75c0, 0xd0020827, // shl r0, r2, i_shift23
++/* [0x00001378] */ 0x0c9dae00, 0x100216a7, // add rb_dma0, rb_dma0, r0
++/* [0x00001380] */ 0xffffff30, 0xf0f809e7, // brr -, r:yloop_p00
++/* [0x00001388] */ 0x409d000f, 0x100049e0, // nop                   ; mul24 r0, r1, rb_pitch
++/* [0x00001390] */ 0x0c9d7e00, 0x100215e7, // add rb_dest, rb_dest, r0
++/* [0x00001398] */ 0x159dcfc0, 0x10021c67, // mov vw_setup, rb_vpm_init
 +// ::mc_filter_y_b00
-+/* [0x00001438] */ 0xfffff840, 0xf0f807a7, // brr ra_link, r:per_block_setup
-+/* [0x00001440] */ 0x959a0ff6, 0x10024023, // mov ra0, unif         ; mov r3, elem_num
-+/* [0x00001448] */ 0x0000ff00, 0xe20229e7, // mov.setf -, [0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1]
-+/* [0x00001450] */ 0x8c001cff, 0x14024800, // add r0, ra0.16b, r3   ; mov rb_xshift2, rb_xshift2_next
-+/* [0x00001458] */ 0x00000007, 0xe0020827, // mov r0, 7
-+/* [0x00001460] */ 0x0d9d1e00, 0x10021467, // sub rb_i_tmu, rb_i_tmu, r0
-+/* [0x00001468] */ 0x0d9d2e00, 0x100214a7, // sub rb_lcount, rb_lcount, r0
-+/* [0x00001470] */ 0x95588ff6, 0xd0024821, // mov r0, 8             ; mov r1, ra_wt_off_mul_l0
-+/* [0x00001478] */ 0x119cce00, 0x10021327, // shl rb_wt_off, rb_wt_off, r0
-+/* [0x00001480] */ 0x809f8009, 0xd000d9d6, // nop                   ; mov.ifnz ra_wt_off_mul_l0, r1 << 8
++/* [0x000013a0] */ 0xfffff850, 0xf0f807a7, // brr ra_link, r:per_block_setup
++/* [0x000013a8] */ 0x959a0ff6, 0x10024023, // mov ra0, unif         ; mov r3, elem_num
++/* [0x000013b0] */ 0x0000ff00, 0xe20229e7, // mov.setf -, [0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1]
++/* [0x000013b8] */ 0x8c001cff, 0x14024800, // add r0, ra0.16b, r3   ; mov rb_xshift2, rb_xshift2_next
++/* [0x000013c0] */ 0x00000007, 0xe0020827, // mov r0, 7
++/* [0x000013c8] */ 0x0d9d1e00, 0x10021467, // sub rb_i_tmu, rb_i_tmu, r0
++/* [0x000013d0] */ 0x0d9d2e00, 0x100214a7, // sub rb_lcount, rb_lcount, r0
++/* [0x000013d8] */ 0x95588ff6, 0xd0024821, // mov r0, 8             ; mov r1, ra_wt_off_mul_l0
++/* [0x000013e0] */ 0x119cce00, 0x10021327, // shl rb_wt_off, rb_wt_off, r0
++/* [0x000013e8] */ 0x809f8009, 0xd000d9d6, // nop                   ; mov.ifnz ra_wt_off_mul_l0, r1 << 8
 +// :yloop_b00
-+/* [0x00001488] */ 0xcd511bee, 0xba0269e5, // sub.setf -, r5, rb_i_tmu      ; v8adds r5rep, r5, ra_k1             ; ldtmu1
-+/* [0x00001490] */ 0x8e4c09f6, 0xa0029851, // shr r1, r4, rb_xshift2 ; mov.ifz ra_y_y2, ra_y_y2_next      ; ldtmu0
-+/* [0x00001498] */ 0x8e5509bf, 0x12024823, // shr r0, r4, ra_xshift ; mov r3, rb_pitch
-+/* [0x000014a0] */ 0x13440dc0, 0xd40208a7, // max r2, ra_y, 0
-+/* [0x000014a8] */ 0x9269e5f6, 0x10029898, // min r2, r2, rb_max_y  ; mov.ifz ra_base, ra_base_next
-+/* [0x000014b0] */ 0x4c441dd3, 0xd4224462, // add ra_y, ra_y, 1     ; mul24 r2, r2, r3
-+/* [0x000014b8] */ 0x8c613cbf, 0x10029e19, // add t0s, ra_base, r2  ; mov.ifz ra_base2, rb_base2_next
-+/* [0x000014c0] */ 0x13440dc0, 0xd20208a7, // max r2, ra_y2, 0
-+/* [0x000014c8] */ 0x129de5c0, 0x100208a7, // min r2, r2, rb_max_y
-+/* [0x000014d0] */ 0x4c441dd3, 0xd2124462, // add ra_y2, ra_y2, 1   ; mul24 r2, r2, r3
-+/* [0x000014d8] */ 0x8c656c87, 0x10024f20, // add t1s, ra_base2, r2 ; v8min r0, r0, rb_k255
-+/* [0x000014e0] */ 0x545963c6, 0x12024860, // and r1, r1, rb_k255   ; mul24 r0, r0, ra_wt_mul_l0
-+/* [0x000014e8] */ 0x4d492bce, 0x120269e1, // sub.setf -, r5, rb_lcount ; mul24 r1, r1, ra_wt_mul_l1
-+/* [0x000014f0] */ 0x0c9e7040, 0x10020867, // add r1, r0, r1
-+/* [0x000014f8] */ 0x119ce3c0, 0xd0020867, // shl r1, r1, 14
-+/* [0x00001500] */ 0x8c40c3f6, 0x12024860, // add r1, r1, rb_wt_off ; mov r0, ra_height
-+/* [0x00001508] */ 0xffffff60, 0xf06809e7, // brr.anyn -, r:yloop_b00
-+/* [0x00001510] */ 0x0f9cd3c0, 0x10c200e7, // asr ra3.8as, r1, rb_wt_den_p15
-+/* [0x00001518] */ 0x95532dbf, 0x1c020867, // mov r1, ra_k16        ; mov -, vw_wait
-+/* [0x00001520] */ 0x8d0e7076, 0x18024830, // sub r0, r0, r1        ; mov vpm, ra3.8a
-+/* [0x00001528] */ 0x939c01c0, 0xd01279d0, // max.setf -, r0, 0     ; mov ra_height, r0
-+/* [0x00001530] */ 0x00000000, 0xf027c9e7, // bra.anyz -, ra_link
-+/* [0x00001538] */ 0x929da07f, 0x10024831, // min r0, r0, r1        ; mov vw_setup, rb_dma0
-+/* [0x00001540] */ 0x8d9dd07f, 0x100248b1, // sub r2, r0, r1        ; mov vw_setup, rb_dma1
-+/* [0x00001548] */ 0x809d703f, 0x100049f2, // nop                   ; mov vw_addr, rb_dest
-+/* [0x00001550] */ 0x0c9d2e00, 0x100214a7, // add rb_lcount, rb_lcount, r0
-+/* [0x00001558] */ 0x119d75c0, 0xd0020827, // shl r0, r2, i_shift23
-+/* [0x00001560] */ 0x0c9dae00, 0x100216a7, // add rb_dma0, rb_dma0, r0
-+/* [0x00001568] */ 0xffffff00, 0xf0f809e7, // brr -, r:yloop_b00
-+/* [0x00001570] */ 0x409d000f, 0x100049e0, // nop                   ; mul24 r0, r1, rb_pitch
-+/* [0x00001578] */ 0x0c9d7e00, 0x100215e7, // add rb_dest, rb_dest, r0
-+/* [0x00001580] */ 0x159dcfc0, 0x10021c67, // mov vw_setup, rb_vpm_init
++/* [0x000013f0] */ 0xcd511bee, 0xba0269e5, // sub.setf -, r5, rb_i_tmu ; v8adds r5rep, r5, ra_k1            ; ldtmu1
++/* [0x000013f8] */ 0x8e4c09f6, 0xa0029851, // shr r1, r4, rb_xshift2 ; mov.ifz ra_y_y2, ra_y_y2_next        ; ldtmu0
++/* [0x00001400] */ 0x8e5509bf, 0x12024823, // shr r0, r4, ra_xshift ; mov r3, rb_pitch
++/* [0x00001408] */ 0x13440dc0, 0xd40208a7, // max r2, ra_y, 0
++/* [0x00001410] */ 0x9269e5f6, 0x10029898, // min r2, r2, rb_max_y  ; mov.ifz ra_base, ra_base_next
++/* [0x00001418] */ 0x4c441dd3, 0xd4224462, // add ra_y, ra_y, 1     ; mul24 r2, r2, r3
++/* [0x00001420] */ 0x8c613cbf, 0x10029e19, // add t0s, ra_base, r2  ; mov.ifz ra_base2, rb_base2_next
++/* [0x00001428] */ 0x13440dc0, 0xd20208a7, // max r2, ra_y2, 0
++/* [0x00001430] */ 0x129de5c0, 0x100208a7, // min r2, r2, rb_max_y
++/* [0x00001438] */ 0x4c441dd3, 0xd2124462, // add ra_y2, ra_y2, 1   ; mul24 r2, r2, r3
++/* [0x00001440] */ 0x8c656c87, 0x10024f20, // add t1s, ra_base2, r2 ; v8min r0, r0, rb_k255
++/* [0x00001448] */ 0x545963c6, 0x12024860, // and r1, r1, rb_k255   ; mul24 r0, r0, ra_wt_mul_l0
++/* [0x00001450] */ 0x4d492bce, 0x120269e1, // sub.setf -, r5, rb_lcount ; mul24 r1, r1, ra_wt_mul_l1
++/* [0x00001458] */ 0x0c9e7040, 0x10020867, // add r1, r0, r1
++/* [0x00001460] */ 0x119ce3c0, 0xd0020867, // shl r1, r1, 14
++/* [0x00001468] */ 0x8c40c3f6, 0x12024860, // add r1, r1, rb_wt_off ; mov r0, ra_height
++/* [0x00001470] */ 0xffffff60, 0xf06809e7, // brr.anyn -, r:yloop_b00
++/* [0x00001478] */ 0x0f9cd3c0, 0x10c200e7, // asr ra3.8as, r1, rb_wt_den_p15
++/* [0x00001480] */ 0x95532dbf, 0x1c020867, // mov r1, ra_k16        ; mov -, vw_wait
++/* [0x00001488] */ 0x8d0e7076, 0x18024830, // sub r0, r0, r1        ; mov vpm, ra3.8a
++/* [0x00001490] */ 0x939c01c0, 0xd01279d0, // max.setf -, r0, 0     ; mov ra_height, r0
++/* [0x00001498] */ 0x00000000, 0xf027c9e7, // bra.anyz -, ra_link
++/* [0x000014a0] */ 0x929da07f, 0x10024831, // min r0, r0, r1        ; mov vw_setup, rb_dma0
++/* [0x000014a8] */ 0x8d9dd07f, 0x100248b1, // sub r2, r0, r1        ; mov vw_setup, rb_dma1
++/* [0x000014b0] */ 0x809d703f, 0x100049f2, // nop                   ; mov vw_addr, rb_dest
++/* [0x000014b8] */ 0x0c9d2e00, 0x100214a7, // add rb_lcount, rb_lcount, r0
++/* [0x000014c0] */ 0x119d75c0, 0xd0020827, // shl r0, r2, i_shift23
++/* [0x000014c8] */ 0x0c9dae00, 0x100216a7, // add rb_dma0, rb_dma0, r0
++/* [0x000014d0] */ 0xffffff00, 0xf0f809e7, // brr -, r:yloop_b00
++/* [0x000014d8] */ 0x409d000f, 0x100049e0, // nop                   ; mul24 r0, r1, rb_pitch
++/* [0x000014e0] */ 0x0c9d7e00, 0x100215e7, // add rb_dest, rb_dest, r0
++/* [0x000014e8] */ 0x159dcfc0, 0x10021c67, // mov vw_setup, rb_vpm_init
 +// ::mc_end
 +};
 +#ifdef __HIGHC__
@@ -16772,7 +16871,7 @@ index 0000000..18827f7
 +#endif
 diff --git a/libavcodec/rpi_shader.h b/libavcodec/rpi_shader.h
 new file mode 100644
-index 0000000..14b6728
+index 0000000..a44bce9
 --- /dev/null
 +++ b/libavcodec/rpi_shader.h
 @@ -0,0 +1,35 @@
@@ -16784,39 +16883,39 @@ index 0000000..14b6728
 +#define mc_setup_c_q0 (rpi_shader + 0)
 +#define mc_start (rpi_shader + 0)
 +#define mc_setup_c_qn (rpi_shader + 2)
-+#define mc_filter_uv (rpi_shader + 144)
-+#define mc_filter_uv_b0 (rpi_shader + 280)
-+#define mc_sync_q0 (rpi_shader + 482)
-+#define mc_sync_q1 (rpi_shader + 500)
-+#define mc_sync_q2 (rpi_shader + 512)
-+#define mc_sync_q3 (rpi_shader + 524)
-+#define mc_sync_q4 (rpi_shader + 536)
-+#define mc_sync_q5 (rpi_shader + 554)
-+#define mc_sync_q6 (rpi_shader + 566)
-+#define mc_sync_q7 (rpi_shader + 578)
-+#define mc_sync_q8 (rpi_shader + 590)
-+#define mc_sync_q9 (rpi_shader + 608)
-+#define mc_sync_q10 (rpi_shader + 620)
-+#define mc_sync_q11 (rpi_shader + 632)
-+#define mc_exit (rpi_shader + 644)
-+#define mc_exit_c (rpi_shader + 644)
-+#define mc_interrupt_exit12 (rpi_shader + 658)
-+#define mc_interrupt_exit12c (rpi_shader + 658)
-+#define mc_setup_y_q0 (rpi_shader + 674)
-+#define mc_setup_y_qn (rpi_shader + 676)
-+#define mc_filter (rpi_shader + 918)
-+#define mc_filter_b (rpi_shader + 1058)
-+#define mc_filter_y_p00 (rpi_shader + 1198)
-+#define mc_filter_y_b00 (rpi_shader + 1294)
-+#define mc_end (rpi_shader + 1378)
++#define mc_filter_uv (rpi_shader + 138)
++#define mc_filter_uv_b0 (rpi_shader + 264)
++#define mc_sync_q0 (rpi_shader + 454)
++#define mc_sync_q1 (rpi_shader + 472)
++#define mc_sync_q2 (rpi_shader + 484)
++#define mc_sync_q3 (rpi_shader + 496)
++#define mc_sync_q4 (rpi_shader + 508)
++#define mc_sync_q5 (rpi_shader + 526)
++#define mc_sync_q6 (rpi_shader + 538)
++#define mc_sync_q7 (rpi_shader + 550)
++#define mc_sync_q8 (rpi_shader + 562)
++#define mc_sync_q9 (rpi_shader + 580)
++#define mc_sync_q10 (rpi_shader + 592)
++#define mc_sync_q11 (rpi_shader + 604)
++#define mc_exit (rpi_shader + 616)
++#define mc_exit_c (rpi_shader + 616)
++#define mc_interrupt_exit12 (rpi_shader + 630)
++#define mc_interrupt_exit12c (rpi_shader + 630)
++#define mc_setup_y_q0 (rpi_shader + 646)
++#define mc_setup_y_qn (rpi_shader + 648)
++#define mc_filter (rpi_shader + 884)
++#define mc_filter_b (rpi_shader + 1022)
++#define mc_filter_y_p00 (rpi_shader + 1160)
++#define mc_filter_y_b00 (rpi_shader + 1256)
++#define mc_end (rpi_shader + 1340)
 +
 +#endif
 diff --git a/libavcodec/rpi_shader.qasm b/libavcodec/rpi_shader.qasm
 new file mode 100644
-index 0000000..7e6af68
+index 0000000..58fd911
 --- /dev/null
 +++ b/libavcodec/rpi_shader.qasm
-@@ -0,0 +1,1367 @@
+@@ -0,0 +1,1349 @@
 +
 +# The @ "mul_used", 0 annotations that occur by various mul blocks suppress
 +# the warning that we are using rotation & ra/rb registers. r0..3 can be
@@ -16922,7 +17021,9 @@ index 0000000..7e6af68
 +# C:  (elem & 1) == 0 ? elem * 2 : (elem + 4) * 2
 +.set rb_elem_x,                    rb2
 +
-+# -- free --                       rb3
++# rb3
++# C: Temp (U/V flag)
++# Y: free
 +
 +# rb4-7
 +# C-B: L1 H filter out FIFO
@@ -17047,16 +17148,10 @@ index 0000000..7e6af68
 +  mov ra_kff100100, 0xff100100
 +  mov rb_k255, 255
 +
-+# touch registers to keep simulator happy
-+
-+  # ra/b4..7: B0 -> B stash registers
-+  mov ra4, 0 ; mov rb4, 0
-+  mov ra5, 0 ; mov rb5, 0
-+  mov ra6, 0 ; mov rb6, 0
-+  mov ra7, 0 ; mov rb7, 0
 +
 +  mov r1, vdw_setup_1(0)  # Merged with dst_stride shortly, delay slot for ra_base
 +
++# touch registers to keep simulator happy
 +# ; ra12..15: vertical scroll registers
 +# get source pitch
 +  mov rb_xpitch, unif   ; mov ra12, 0           # stride2
@@ -17066,7 +17161,7 @@ index 0000000..7e6af68
 +  add rb_dma1_base, r1, rb_pitch ; mov ra15, ra_k0 # vdw_setup_1
 +
 +  and r0, 1, elem_num
-+  nop                   ; mul24 r0, r0, 7
++  nop                   ; mul24 r0, r0, 5
 +  add rb_elem_x, r0, elem_num
 +
 +# Compute base address for first and second access
@@ -17095,9 +17190,7 @@ index 0000000..7e6af68
 +# Compute part of VPM to use for DMA output
 +  m_calc_dma_regs rb_vpm_init, rb_dma0_base
 +
-+# -----------------
 +# And again for L1, but only worrying about frame2 stuff
-+
 +
 +# Load first request location
 +  mov ra0, unif                                 # next_x_y
@@ -17128,33 +17221,30 @@ index 0000000..7e6af68
 +# Do preloads
 +# r0 = ra_y, r2 = ra_y2
 +  mov r3, PREREAD       ; mov r0, ra_y
-+  mov ra_link, unif                             # link
 +
 +:c_preload
 +  sub.setf r3, r3, 1
 +  max r1, r0, 0
 +  min r1, r1, rb_max_y
 +  add r0, r0, ra_k1     ; mul24 r1, r1, rb_pitch
-+  add t0s, ra_base, r1
++  add t0s, ra_base, r1  ; mov ra_y, r0
 +
 +  max r1, r2, 0
 +  brr.anynz -, r:c_preload
 +  min r1, r1, rb_max_y
 +  add r2, r2, ra_k1     ; mul24 r1, r1, rb_pitch
-+  add t1s, ra_base2, r1
-+# >>>
++  add t1s, ra_base2, r1 ; mov ra_y2, r2
++# >>> .anynz c_preload
 +
++  mov ra_link, unif                             # link
++# touch registers to keep simulator happy
++  # ra/b4..7: B0 -> B stash registers
++  mov ra4, 0 ; mov rb4, 0
 +  bra -, ra_link
-+  mov ra_y, r0
-+  mov ra_y2, r2
-+  nop
++  mov ra5, 0 ; mov rb5, 0
++  mov ra6, 0 ; mov rb6, 0
++  mov ra7, 0 ; mov rb7, 0
 +# >>> ra_link
-+
-+
-+.macro setf_nz_if_v
-+  mov.setf -, [0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1]
-+.endm
-+
 +
 +################################################################################
 +
@@ -17163,19 +17253,17 @@ index 0000000..7e6af68
 +# At this point we have already issued two pairs of texture requests for the current block
 +# ra_x, ra_x16_base point to the current coordinates for this block
 +::mc_filter_uv
-+  mov vw_setup, rb_vpm_init
-+
 +# per-channel shifts were calculated on the *previous* invocation
 +
 +# get base addresses and per-channel shifts for *next* invocation
-+  mov ra2, unif                                 # x_y
++  mov vw_setup, rb_vpm_init ; mov ra2, unif     # ; x_y
 +
-+  and.setf -, elem_num, 1                       # Also acts as delay slot for ra2
++  and.setf -, elem_num, 1                       # [ra2 delay]
 +
-+  add r0, ra2.16b, ra2.16b ; v8subs r1, r1, r1     # x ; r1=0
++  add r0, ra2.16b, ra2.16b ; v8subs r1, r1, r1  # x ; r1=0
 +  add r0, r0, rb_elem_x
 +  sub r1, r1, rb_pitch  ; mov r3, unif          # r1=pitch2 mask ; r3=base
-+  max r0, r0, 0         ; mov ra_xshift, ra_xshift_next
++  max r0, r0, 0         ; mov rb_xshift2, ra_xshift_next
 +  min r0, r0, rb_max_x  ; mov ra1, unif         # ; width_height
 +
 +  shl ra_xshift_next, r0, 3
@@ -17196,14 +17284,14 @@ index 0000000..7e6af68
 +
 +# ; unpack filter coefficients
 +
-+  add r0, r0, r2      ; mov rb8,  ra3.8a      # Combine width and height of destination area (r0=h<<8, r2=w*2)
++  add r0, r0, r2        ; mov rb8,  ra3.8a      # Combine width and height of destination area (r0=h<<8, r2=w*2)
 +  shl r0, r0, i_shift16 ; mov rb9,  ra3.8b      # Shift into bits 16 upwards of the vdw_setup0 register
 +  add rb_dma0, r0, rb_dma0_base ; mov r1, ra_wt_off_l0       # ; r1=weight
 +
 +  mov rb_dest, unif     ; mov ra9, rb_max_y     # dst_addr ; alias rb_max_y
 +
 +  shl r1, r1, rb_wt_den_p15 ; mov rb10, ra3.8c
-+  mov r5quad, 0             ; mov rb11, ra3.8d      # Loop count (r5rep is B, r5quad is A)
++  mov r5quad, 0         ; mov rb11, ra3.8d      # Loop count (r5rep is B, r5quad is A)
 +
 +  asr rb_wt_off, r1, 1  ; mov ra_link, unif     # Link
 +  shl ra_wt_mul_l0, ra_wt_mul_l0, 1             # weight*2
@@ -17216,11 +17304,12 @@ index 0000000..7e6af68
 +# retrieve texture results and pick out bytes
 +# then submit two more texture requests
 +
++# We want (r0r1)
++# U0U3 : V0V3 : U1U4 : V1V4 : U2U5 : V2U5 : ...
++# We fetch (after shift)
++#  C0  :  C3  :  C1  :  C4  :  C2  :  C5  : ...
 +
-+# we want (r4a r4b)
-+# C0C1 : C4Ca : C0C1 : C4Ca : C2C3 : CaCb : C2C3...
-+# goes to (r0r1)
-+# U0U4 : V0V4 : U1U5 : V1V5 : U2U6 : V2U6 : ...
++  mov rb3, [0,0,0,0,0,0,0,0,1,1,1,1,1,1,1,1]
 +
 +# r5 = 0 (loop counter)
 +:uvloop
@@ -17228,8 +17317,7 @@ index 0000000..7e6af68
 +# then submit two more texture requests
 +
 +  sub.setf -, r5, rb_i_tmu ; v8adds r5rep, r5, ra_k1 ; ldtmu0     # loop counter increment
-+  shr r2, r4, ra_xshift
-+  nop                   ; mov.ifz r3, ra_y_next
++  shr r2, r4, rb_xshift2 ; mov.ifz r3, ra_y_next
 +  shr r1, r2, 8         ; mov.ifnz r3, ra_y
 +  add r0, r3, 1         ; mov.ifz ra_base, ra_base_next
 +
@@ -17240,34 +17328,30 @@ index 0000000..7e6af68
 +  mov.ifz r0, r2        ; mul24 r2, r3, rb_pitch
 +  add t0s, ra_base, r2  ; v8min r0, r0, rb_k255  # v8subs masks out all but bottom byte
 +
-+# generate seven shifted versions
-+# interleave with scroll of vertical context
-+
-+  setf_nz_if_v
++# ra4 not really needed; this could be a mul24 rather than a mov but current
++# register usage means this wouldn't help
++  mov.setf -, rb3       ; mov ra4, ra5
 +
 +# apply horizontal filter
 +# The filter coeffs for the two halves of this are the same (unlike in the
 +# Y case) so it doesn't matter which ra0 we get them from
++# Also as the two halves are locked together we don't need to separate the 1st
++# r0 mul or the last r1 mul as they are vaild for all QPUs
 +
 +  and r1, r1, rb_k255   ; mul24      r3, ra0.8a,       r0
 +  nop                   ; mul24      r2, ra0.8b << 2,  r0 << 2  @ "mul_used", 0
-+  nop                   ; mul24.ifnz r3, ra0.8a << 8,  r1 << 8  @ "mul_used", 0
-+  nop                   ; mul24.ifnz r2, ra0.8b << 10, r1 << 10 @ "mul_used", 0
++  nop                   ; mul24.ifnz r2, ra0.8b << 12, r1 << 12 @ "mul_used", 0
 +  sub r2, r2, r3        ; mul24      r3, ra0.8c << 4,  r0 << 4  @ "mul_used", 0
-+  nop                   ; mul24.ifnz r3, ra0.8c << 12, r1 << 12 @ "mul_used", 0
-+  add r2, r2, r3        ; mul24      r3, ra0.8d << 6,  r0 << 6  @ "mul_used", 0
-+  nop                   ; mul24.ifnz r3, ra0.8d << 14, r1 << 14 @ "mul_used", 0
-+  sub r0, r2, r3
-+  sub.setf -, r5, 4     ; mov ra4, ra5
++  nop                   ; mul24.ifnz r3, ra0.8c << 14, r1 << 14 @ "mul_used", 0
++  sub.setf -, r5, 4     ; mul24      r0, ra0.8d      , r1
 +  brr.anyn -, r:uvloop
-+  mov ra5, ra6          ; mul24 r1, ra6, rb9
-+  mov ra6, ra7
-+  mov ra7, r0           ; mul24 r0, ra4, rb8
++  add r2, r2, r3        ; mov ra5, ra6
++# V filter =- ra4 * rb8-+ ra5 * rb9 + ra6 * rb10 - ra7 * rb11 (post FIFO shift)
++  mov ra6, ra7          ; mul24 r1, ra7, rb10
++  sub ra7, r2, r0       ; mul24 r0, ra4, rb8
 +# >>> .anyn uvloop
 +
-+# apply vertical filter and write to VPM
-+
-+  sub r1, r1, r0        ; mul24 r0, ra6, rb10
++  sub r1, r1, r0        ; mul24 r0, ra5, rb9    # [ra7 delay]
 +  add r1, r1, r0        ; mul24 r0, ra7, rb11
 +  sub r1, r1, r0
 +  sub.setf -, r5, rb_lcount ; mul24 r1, r1, ra_k256
@@ -17280,30 +17364,14 @@ index 0000000..7e6af68
 +  asr ra1.8as, r1, rb_wt_den_p15
 +  mov -, vw_wait
 +  mov vpm, ra1.8a
-+
-+# >>>
++# >>> .anyn uvloop
 +
 +# DMA out for U & stash for V
 +  bra -, ra_link
 +  mov vw_setup, rb_dma0
 +  mov vw_setup, rb_dma1
 +  mov vw_addr, rb_dest     # u_dst_addr
-+# >>>
-+
-+# we want
-+# C0C1 : C4Ca : C0C1 : C4Ca : C2C3 : CaCb : C2C3...
-+# U0U4 : V0V4 : U1U5 : V1V5 : U2U6 : V2U6 : ...
-+
-+# mov.setf -, [0,1,0,...]
-+# shr r2, r4, ra_xshift  # if elem & 2 == 1 then r0 = r0 >> 16
-+# shr r1, r2, 8
-+# mov r0, r2
-+# mov.ifnz r0, r1 << 1
-+# mov.ifz  r1, r2 << 15
-+#
-+#
-+#
-+
++# >>> ra_link
 +
 +################################################################################
 +
@@ -17370,9 +17438,6 @@ index 0000000..7e6af68
 +  shl r1, ra_wt_off_l1, rb_wt_den_p15
 +  asr rb_wt_off, r1, 9  ; mov ra_link, unif     # link
 +
-+# retrieve texture results and pick out bytes
-+# then submit two more texture requests
-+
 +# r5        loop counter
 +# ra0       H coeffs L0
 +# ra1       H coeffs L1
@@ -17383,10 +17448,11 @@ index 0000000..7e6af68
 +# rb8-rb11  V coeffs L1
 +# ra9       rb_max_y alias
 +
++  mov rb3, [0,0,0,0,0,0,0,0,1,1,1,1,1,1,1,1]
++
 +:uvloop_b
 +# retrieve texture results and pick out bytes
 +# then submit two more texture requests
-+
 +  sub.setf -, r5, rb_i_tmu ; v8adds r5rep, r5, ra_k1 ; ldtmu0     # loop counter increment
 +  shr r2, r4, ra_xshift ; mov.ifz ra_base2, rb_base2_next
 +  shr r1, r2, 8         ; mov.ifz ra_y_y2, ra_y_y2_next
@@ -17400,22 +17466,19 @@ index 0000000..7e6af68
 +  mov.ifz r0, r2        ; mul24 r3, r3, rb_pitch
 +  add t0s, ra_base, r3  ; v8min r0, r0, rb_k255  # v8subs masks out all but bottom byte
 +
-+# generate seven shifted versions
-+# interleave with scroll of vertical context
-+
-+  mov.setf -, [0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1]
++# L0 H-filter
++# H FIFO scrolls are spread all over this loop
++  mov.setf -, rb3       ; mov ra4, ra5
 +
 +  and r1, r1, rb_k255   ; mul24      r3, ra0.8a,       r0
 +  nop                   ; mul24      r2, ra0.8b << 2,  r0 << 2  @ "mul_used", 0
-+  nop                   ; mul24.ifnz r3, ra0.8a << 8,  r1 << 8  @ "mul_used", 0
-+  nop                   ; mul24.ifnz r2, ra0.8b << 10, r1 << 10 @ "mul_used", 0
++  nop                   ; mul24.ifnz r2, ra0.8b << 12, r1 << 12 @ "mul_used", 0
 +  sub r2, r2, r3        ; mul24      r3, ra0.8c << 4,  r0 << 4  @ "mul_used", 0
-+  nop                   ; mul24.ifnz r3, ra0.8c << 12, r1 << 12 @ "mul_used", 0
-+  add r2, r2, r3        ; mul24      r3, ra0.8d << 6,  r0 << 6  @ "mul_used", 0
-+  nop                   ; mul24.ifnz r3, ra0.8d << 14, r1 << 14 @ "mul_used", 0
++  nop                   ; mul24.ifnz r3, ra0.8c << 14, r1 << 14 @ "mul_used", 0
++  add r2, r2, r3        ; mul24      r3, ra0.8d,       r1
 +  sub ra3, r2, r3       ; mov rb5, rb6          ; ldtmu1
 +
-+  shr r2, r4, rb_xshift2 ; mov ra4, ra5
++  shr r2, r4, rb_xshift2 ; mov ra5, ra6
 +  shr r1, r2, 8         ; mov r3, ra_y2
 +  add ra_y2, r3, ra_k1  ; mov rb6, rb7
 +
@@ -17426,57 +17489,49 @@ index 0000000..7e6af68
 +  mov.ifz r0, r2        ; mul24 r3, r3, rb_pitch
 +  add t1s, ra_base2, r3 ; v8min r0, r0, rb_k255  # v8subs masks out all but bottom byte
 +
-+# generate seven shifted versions
-+# interleave with scroll of vertical context
-+
-+  mov.setf -, [0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1]
++# L1 H-filter
++  mov.setf -, rb3       ; mov rb7, ra3
 +
 +  and r1, r1, rb_k255   ; mul24      r3, ra1.8a,       r0
 +  nop                   ; mul24      r2, ra1.8b << 2,  r0 << 2  @ "mul_used", 0
-+  nop                   ; mul24.ifnz r3, ra1.8a << 8,  r1 << 8  @ "mul_used", 0
-+  nop                   ; mul24.ifnz r2, ra1.8b << 10, r1 << 10 @ "mul_used", 0
++  nop                   ; mul24.ifnz r2, ra1.8b << 12, r1 << 12 @ "mul_used", 0
 +  sub r2, r2, r3        ; mul24      r3, ra1.8c << 4,  r0 << 4  @ "mul_used", 0
-+  nop                   ; mul24.ifnz r3, ra1.8c << 12, r1 << 12 @ "mul_used", 0
-+  add r2, r2, r3        ; mul24      r3, ra1.8d << 6,  r0 << 6  @ "mul_used", 0
-+  nop                   ; mul24.ifnz r3, ra1.8d << 14, r1 << 14 @ "mul_used", 0
-+  sub.setf -, r5, 4     ; mov ra5, ra6
++  nop                   ; mul24.ifnz r3, ra1.8c << 14, r1 << 14 @ "mul_used", 0
++  sub.setf -, r5, 4     ; mul24      r0, ra1.8d,       r1
 +  brr.anyn -, r:uvloop_b
-+  sub r0, r2, r3        ; mov ra6, ra7
-+  mov ra7, r0           ; mov rb7, ra3
-+  nop                   ; mul24 r0, rb4, ra2.8a # Start V filter
-+
++# V filters - start in branch delay slots of H
++  add r2, r2, r3        ; mul24 r1, rb5, ra2.8b
++  mov ra6, ra7          ; mul24 r3, ra7, rb10
++  sub ra7, r2, r0       ; mul24 r0, rb4, ra2.8a
 +# >>> .anyn uvloop_b0
-+# apply vertical filters
 +
-+  nop                   ; mul24 r1, rb5, ra2.8b
 +  sub r1, r1, r0        ; mul24 r0, rb6, ra2.8c
 +  add r1, r1, r0        ; mul24 r0, rb7, ra2.8d
 +  sub r2, r1, r0        ; mul24 r0, ra4, rb8
-+  nop                   ; mul24 r1, ra5, rb9
-+  sub r1, r1, r0        ; mul24 r0, ra6, rb10
++  sub r1, r3, r0        ; mul24 r0, ra5, rb9
 +  add r1, r1, r0        ; mul24 r0, ra7, rb11
 +  sub r1, r1, r0        ; mul24 r2, r2, ra_k256
 +
 +  asr r2, r2, 14        ; mul24 r1, r1, ra_k256
 +  asr r1, r1, 14        ; mul24 r2, r2, ra_wt_mul_l0
 +
-+  add r2, r2, rb_wt_off ; mul24 r1, r1, ra_wt_mul_l1   # rb_wt_off = (offsetL0 + offsetL1 + 1) << (rb_wt_den_p15 - 9)
++  add r2, r2, rb_wt_off ; mul24 r1, r1, ra_wt_mul_l1    # rb_wt_off = (offsetL0 + offsetL1 + 1) << (rb_wt_den_p15 - 9)
 +  add r1, r1, r2
 +
-+  sub.setf -, r5, rb_lcount ; mul24 r1, r1, ra_k256 # Lose bad top 8 bits & sign extend
++  sub.setf -, r5, rb_lcount ; mul24 r1, r1, ra_k256     # Lose bad top 8 bits & sign extend
 +
 +  brr.anyn -, r:uvloop_b
 +  asr ra3.8as, r1, rb_wt_den_p15
 +  mov -, vw_wait
 +  mov vpm, ra3.8a
-+# >>>
++# >>> .anyn uvloop_b
 +
 +# DMA out
-+
 +  bra -, ra_link
 +  mov vw_setup, rb_dma0
 +  mov vw_setup, rb_dma1
-+  mov vw_addr, rb_dest                          # c_dst_addr
++  mov vw_addr, rb_dest
++# >>> ra_link
 +
 +################################################################################
 +# Exit code used by both Luma & Chroma so place between them to avoid I-cache
@@ -17501,7 +17556,20 @@ index 0000000..7e6af68
 +.endif
 +.endm
 +
-+
++# This sync layout groups QPUs 0-3, 4-7, 8-11 (i.e. 1 group per TMU pair)
++# All qpus start at the beginning and after that (group - 1) must have finished
++# before (group) can start
++#
++# Requires setup code for QPU 0 to srel sem 12 (m_setup_q0) to start the chain
++# Exit code will sacq sem 12 so everything is @ 0 on exit (this is important -
++# lockup otherwise)
++#
++# There is some, currently ill defined, potential lockup if we have the VDM active
++# whilst doing sem stuff so we wait first. ?? QPU stall from sem stalls VDM pipe too ??
++#
++# The code stalled when I had many waiters on a single sem so we have a
++# "ripple" of srels to restart.  Unsure why, may have been bug, but this works
++# and we currently have both the memory & sems to support it.
 +.macro m_sync_q, n_qpu
 +  mov ra_link, unif
 +  mov -, vw_wait
@@ -17586,15 +17654,27 @@ index 0000000..7e6af68
 +
 +
 +################################################################################
-+# mc_setup(y_x, ref_y_base, y2_x2, ref_y2_base, frame_width_height, pitch, dst_pitch, offset_shift, tbd, next_kernel)
++# mc_setup
++#
++# typedef struct qpu_mc_pred_y_s_s {
++#    qpu_mc_src_t next_src1;
++#    qpu_mc_src_t next_src2;
++#    uint16_t pic_h;
++#    uint16_t pic_w;
++#    uint32_t stride2;
++#    uint32_t stride1;
++#    uint32_t wdenom;
++#    uint32_t next_fn;
++# } qpu_mc_pred_y_s_t;
++
 +::mc_setup_y_q0
 +  m_setup_q0
 +::mc_setup_y_qn
 +  # Need to save these because we need to know the frame dimensions before computing texture coordinates
 +  mov tmurs, 1          ; mov ra0, unif         # No TMU swap ; x_y
-+  mov ra9, unif         # ref_y_base
++  mov ra9, unif                                 # ref_y_base
 +  mov ra1, unif                                 # x2_y2
-+  mov ra11, unif        # ref_y2_base
++  mov ra11, unif                                # ref_y2_base
 +
 +# load constants
 +
@@ -17644,29 +17724,24 @@ index 0000000..7e6af68
 +  add ra_base2, ra11, r0
 +
 +# Do preloads
-+# r0 = ra_y, r2 = ra_y2
-+  mov r0, ra0.16a       # Load y
-+  mov r2, ra1.16a       # Load y2
-+  mov r3, PREREAD
++  nop                   ; mov r0, ra0.16a       # ; r0 = y
++  mov r3, PREREAD       ; mov r2, ra1.16a       # ; r2 = y2
 +
 +:y_preload
 +  sub.setf r3, r3, 1
 +  max r1, r0, 0
 +  min r1, r1, rb_max_y
 +  add r0, r0, ra_k1     ; mul24 r1, r1, rb_pitch
-+  add t0s, ra_base, r1
++  add t0s, ra_base, r1  ; mov ra_y, r0
 +
 +  max r1, r2, 0
 +  brr.anynz -, r:y_preload
 +  min r1, r1, rb_max_y
 +  add r2, r2, ra_k1     ; mul24 r1, r1, rb_pitch
-+  add t1s, ra_base2, r1
-+# >>>
-+  mov ra_y, r0
-+  mov ra_y2, r2
++  add t1s, ra_base2, r1 ; mov ra_y2, r2
++# >>> .anynz y_preload
 +
-+# Weighted prediction denom
-+  add rb_wt_den_p15, unif, 9     # unif = weight denom + 6
++  add rb_wt_den_p15, unif, 9                    # weight denom + 6
 +
 +  m_calc_dma_regs rb_vpm_init, rb_dma0_base
 +
@@ -17680,7 +17755,31 @@ index 0000000..7e6af68
 +  mov ra11, 0           ; mov rb11, 0
 +# >>> ra_link
 +
++################################################################################
++#
++# Start of per-block setup code
++# P and B blocks share the same setup code to save on Icache space
++
++# luma_setup_delay3 done in delay slots of branch that got us here
++
++# get base addresses and per-channel shifts for *next* invocation
++# per-channel shifts were calculated on the *previous* invocation
++
 +# 1st 3 instructions of per_block-setup in branch delay
++#
++# typedef struct qpu_mc_pred_y_p_s {
++#    qpu_mc_src_t next_src1;
++#    qpu_mc_src_t next_src2;
++#    uint16_t h;
++#    uint16_t w;
++#    uint32_t mymx21;
++#    uint32_t wo1;
++#    uint32_t wo2;
++#    uint32_t dst_addr;
++#    uint32_t next_fn;
++# } qpu_mc_pred_y_p_t;
++#
++
 +.macro luma_setup
 +  brr ra_link, r:per_block_setup
 +  mov ra0, unif         ; mov r3, elem_num  # y_x ; elem_num has implicit unpack??
@@ -17688,20 +17787,7 @@ index 0000000..7e6af68
 +  add r0, ra0.16b, r3   ; mov rb_xshift2, rb_xshift2_next
 +.endm
 +
-+################################################################################
-+#
-+# Start of per-block setup code
-+# P and B blocks share the same setup code to save on Icache space
 +:per_block_setup
-+
-+# luma_setup_delay3 done in delay slots of branch that got us here
-+
-+# get base addresses and per-channel shifts for *next* invocation
-+# per-channel shifts were calculated on the *previous* invocation
-+
-+# ra0: x_y     (loaded in luma_setup macro)
-+# ra1: x2_y2   (from uniform)
-+
 +  max r0, r0, 0         ; mov ra_xshift, ra_xshift_next
 +  min r0, r0, rb_max_x
 +
@@ -17806,9 +17892,6 @@ index 0000000..7e6af68
 +# retrieve texture results and pick out bytes
 +# then submit two more texture requests
 +
-+# If we knew there was no clipping then this code would get simpler.
-+# Perhaps we could add on the pitch and clip using larger values?
-+
 +# N.B. Whilst y == y2 as far as this loop is concerned we will start
 +# the grab for the next block before we finish with this block and that
 +# might be B where y != y2 so we must do full processing on both y and y2
@@ -17849,14 +17932,13 @@ index 0000000..7e6af68
 +  nop                   ; mul24.ifnz r3, ra1.8c << 14, r1 << 14  @ "mul_used", 0
 +  add r2, r2, r3        ; mul24      r3, ra1.8d << 7, r0 << 7    @ "mul_used", 0
 +  nop                   ; mul24.ifnz r3, ra1.8d << 15, r1 << 15  @ "mul_used", 0
-+  sub r0, r2, r3
 +
 +  sub.setf -, r5, 8     ; mov r1,   ra8
 +  mov ra8,  ra9         ; mov rb8,  rb9
 +  brr.anyn -, r:yloop
 +  mov ra9,  ra10        ; mov rb9,  rb10
 +  mov ra10, ra11        ; mov rb10, rb11
-+  mov ra11, r0          ; mov rb11, r1
++  sub ra11, r2, r3      ; mov rb11, r1
 +  # >>> .anyn yloop
 +
 +  # apply vertical filter and write to VPM
@@ -17869,7 +17951,7 @@ index 0000000..7e6af68
 +  add r1, r1, r0        ; mul24 r0, ra9,  rb5
 +  sub r1, r1, r0        ; mul24 r0, ra10, rb6
 +  add r1, r1, r0        ; mul24 r0, ra11, rb7
-+  sub r1, r1, r0        ; mov -, vw_wait
++  sub r1, r1, r0
 +# At this point r1 is a 22-bit signed quantity: 8 (original sample),
 +#  +6, +6 (each pass), +1 (the passes can overflow slightly), +1 (sign)
 +# The top 8 bits have rubbish in them as mul24 is unsigned
@@ -17882,7 +17964,7 @@ index 0000000..7e6af68
 +  shl r1, r1, 8         ; mov r0, ra_height
 +  brr.anyn -, r:yloop
 +  asr ra3.8as, r1, rb_wt_den_p15
-+  mov r1, 16
++  mov r1, ra_k16        ; mov -, vw_wait
 +  sub r0, r0, r1        ; mov vpm, ra3.8a
 +# >>> branch.anyn yloop
 +
@@ -17969,14 +18051,13 @@ index 0000000..7e6af68
 +  nop                   ; mul24.ifnz r3, ra1.8c << 14, r1 << 14  @ "mul_used", 0
 +  add r2, r2, r3        ; mul24      r3, ra1.8d << 7, r0 << 7    @ "mul_used", 0
 +  nop                   ; mul24.ifnz r3, ra1.8d << 15, r1 << 15  @ "mul_used", 0
-+  sub r0, r2, r3
 +
 +  sub.setf -, r5, 8     ; mov r1,   ra8
 +  mov ra8,  ra9         ; mov rb8,  rb9
 +  brr.anyn -, r:yloopb
 +  mov ra9,  ra10        ; mov rb9,  rb10
 +  mov ra10, ra11        ; mov rb10, rb11
-+  mov ra11, r0          ; mov rb11, r1
++  sub ra11, r2, r3      ; mov rb11, r1
 +  # >>> .anyn yloopb
 +
 +  # apply vertical filter and write to VPM
@@ -17997,11 +18078,11 @@ index 0000000..7e6af68
 +  nop                   ; mul24 r0, r1, ra_wt_mul_l0
 +  add r0, r0, r2        ; mul24 r1, r1 << 8, ra_wt_mul_l1 << 8    @ "mul_used", 0
 +
-+  add r1, r1, r0        ; mov -, vw_wait
++  add r1, r1, r0
 +  shl r1, r1, 8         ; mov r0, ra_height
 +  brr.anyn -, r:yloopb
 +  asr ra3.8as, r1, rb_wt_den_p15
-+  mov r1, 16
++  mov r1, ra_k16        ; mov -, vw_wait
 +  sub r0, r0, r1        ; mov vpm, ra3.8a
 +# >>> branch.anyn yloop
 +
@@ -18117,7 +18198,7 @@ index 0000000..7e6af68
 +################################################################################
 +
 +::mc_filter_y_b00
-+# luma setup does a fair bit more than we need calculating fileter coeffs
++# luma setup does a fair bit more than we need calculating filter coeffs
 +# that we will never use but it saves I-cache to use it (also simple!)
 +  luma_setup
 +
@@ -18130,8 +18211,8 @@ index 0000000..7e6af68
 +  nop                   ; mov.ifnz ra_wt_off_mul_l0, r1 << 8
 +
 +:yloop_b00
-+  sub.setf -, r5, rb_i_tmu      ; v8adds r5rep, r5, ra_k1             ; ldtmu1
-+  shr r1, r4, rb_xshift2 ; mov.ifz ra_y_y2, ra_y_y2_next      ; ldtmu0
++  sub.setf -, r5, rb_i_tmu ; v8adds r5rep, r5, ra_k1            ; ldtmu1
++  shr r1, r4, rb_xshift2 ; mov.ifz ra_y_y2, ra_y_y2_next        ; ldtmu0
 +  shr r0, r4, ra_xshift ; mov r3, rb_pitch
 +
 +  max r2, ra_y, 0  # y
@@ -19201,6 +19282,38 @@ index 73b6bd0..d907de3 100644
  /**
   * @}
   */
+diff --git a/libavutil/frame.h b/libavutil/frame.h
+index 7cb78a1..b94a635 100644
+--- a/libavutil/frame.h
++++ b/libavutil/frame.h
+@@ -127,6 +127,13 @@ enum AVFrameSideDataType {
+      * libavutil/spherical.h.
+      */
+     AV_FRAME_DATA_SPHERICAL,
++
++    /**
++     * Extra data required to deal with a cropped Sand frame
++     * AVFrame holds the cropped size, but we cannot simply offset the start
++     * address to get the picture as we can for planar formats
++     */
++    AV_FRAME_DATA_SAND_INFO,
+ };
+ 
+ enum AVActiveFormatDescription {
+@@ -139,6 +146,13 @@ enum AVActiveFormatDescription {
+     AV_AFD_SP_4_3       = 15,
+ };
+ 
++typedef struct AVFrameDataSandInfo
++{
++    unsigned int left_offset;
++    unsigned int top_offset;
++    unsigned int pic_width;
++    unsigned int pic_height;
++} AVFrameDataSandInfo;
+ 
+ /**
+  * Structure to hold side data for an AVFrame.
 diff --git a/libavutil/pixdesc.c b/libavutil/pixdesc.c
 index d4a7a8b..92a01a4 100644
 --- a/libavutil/pixdesc.c
@@ -19310,6 +19423,159 @@ index 0000000..2d45679
 +H265 QPU acceleration is broken on Pi1 and so it is disabled.
 +
 +
+diff --git a/pi-util/conf_h265.2016_HEVC_v1.csv b/pi-util/conf_h265.2016_HEVC_v1.csv
+new file mode 100644
+index 0000000..6082641
+--- /dev/null
++++ b/pi-util/conf_h265.2016_HEVC_v1.csv
+@@ -0,0 +1,147 @@
++1,AMP_A_Samsung_7,AMP_A_Samsung_7.bin,AMP_A_Samsung_7.md5
++1,AMP_B_Samsung_7,AMP_B_Samsung_7.bin,AMP_B_Samsung_7.md5
++1,AMP_D_Hisilicon_3,AMP_D_Hisilicon.bit,AMP_D_Hisilicon_3.yuv.md5
++1,AMP_E_Hisilicon_3,AMP_E_Hisilicon.bit,AMP_E_Hisilicon_3.yuv.md5
++1,AMP_F_Hisilicon_3,AMP_F_Hisilicon_3.bit,AMP_F_Hisilicon_3.yuv.md5
++1,AMVP_A_MTK_4,AMVP_A_MTK_4.bit,AMVP_A_MTK_4.md5
++1,AMVP_B_MTK_4,AMVP_B_MTK_4.bit,AMVP_B_MTK_4.md5
++1,AMVP_C_Samsung_7,AMVP_C_Samsung_7.bin,AMVP_C_Samsung_7.md5
++1,BUMPING_A_ericsson_1,BUMPING_A_ericsson_1.bit,BUMPING_A_ericsson_1.md5
++1,CAINIT_A_SHARP_4,CAINIT_A_SHARP_4.bit,CAINIT_A_SHARP_4.md5
++1,CAINIT_B_SHARP_4,CAINIT_B_SHARP_4.bit,CAINIT_B_SHARP_4.md5
++1,CAINIT_C_SHARP_3,CAINIT_C_SHARP_3.bit,CAINIT_C_SHARP_3.md5
++1,CAINIT_D_SHARP_3,CAINIT_D_SHARP_3.bit,CAINIT_D_SHARP_3.md5
++1,CAINIT_E_SHARP_3,CAINIT_E_SHARP_3.bit,CAINIT_E_SHARP_3.md5
++1,CAINIT_F_SHARP_3,CAINIT_F_SHARP_3.bit,CAINIT_F_SHARP_3.md5
++1,CAINIT_G_SHARP_3,CAINIT_G_SHARP_3.bit,CAINIT_G_SHARP_3.md5
++1,CAINIT_H_SHARP_3,CAINIT_H_SHARP_3.bit,CAINIT_H_SHARP_3.md5
++1,CIP_A_Panasonic_3,CIP_A_Panasonic_3.bit,CIP_A_Panasonic_3_yuv.md5
++1,cip_B_NEC_3,cip_B_NEC_3.bit,cip_B_NEC_3.md5
++1,CIP_C_Panasonic_2,CIP_C_Panasonic_2.bit,CIP_C_Panasonic_2_yuv.md5
++1,CONFWIN_A_Sony_1,CONFWIN_A_Sony_1.bit,CONFWIN_A_Sony_1.md5
++1,DBLK_A_MAIN10_VIXS_4,DBLK_A_MAIN10_VIXS_4.bit,DBLK_A_MAIN10_VIXS_4.md5
++1,DBLK_A_SONY_3,DBLK_A_SONY_3.bit,DBLK_A_SONY_3.bit.yuv.md5
++1,DBLK_B_SONY_3,DBLK_B_SONY_3.bit,DBLK_B_SONY_3.bit.yuv.md5
++1,DBLK_C_SONY_3,DBLK_C_SONY_3.bit,DBLK_C_SONY_3.bit.yuv.md5
++1,DBLK_D_VIXS_2,DBLK_D_VIXS_2.bit,DBLK_D_VIXS_2_yuv.md5
++1,DBLK_E_VIXS_2,DBLK_E_VIXS_2.bit,DBLK_E_VIXS_2_yuv.md5
++1,DBLK_F_VIXS_2,DBLK_F_VIXS_2.bit,DBLK_F_VIXS_2_yuv.md5
++1,DBLK_G_VIXS_2,DBLK_G_VIXS_2.bit,DBLK_G_VIXS_2_yuv.md5
++1,DELTAQP_A_BRCM_4,DELTAQP_A_BRCM_4.bit,DELTAQP_A_BRCM_4_yuv.md5
++1,DELTAQP_B_SONY_3,DELTAQP_B_SONY_3.bit,DELTAQP_B_SONY_3.bit.yuv.md5
++1,DELTAQP_C_SONY_3,DELTAQP_C_SONY_3.bit,DELTAQP_C_SONY_3.bit.yuv.md5
++1,DSLICE_A_HHI_5,DSLICE_A_HHI_5.bin,DSLICE_A_HHI_5.md5
++1,DSLICE_B_HHI_5,DSLICE_B_HHI_5.bin,DSLICE_B_HHI_5.md5
++1,DSLICE_C_HHI_5,DSLICE_C_HHI_5.bin,DSLICE_C_HHI_5.md5
++1,ENTP_A_QUALCOMM_1,ENTP_A_Qualcomm_1.bit,ENTP_A_Qualcomm_1.md5
++1,ENTP_B_Qualcomm_1,ENTP_B_Qualcomm_1.bit,ENTP_B_Qualcomm_1.md5
++1,ENTP_C_Qualcomm_1,ENTP_C_Qualcomm_1.bit,ENTP_C_Qualcomm_1.md5
++1,EXT_A_ericsson_4,EXT_A_ericsson_4.bit,EXT_A_ericsson_4.md5
++1,FILLER_A_Sony_1,FILLER_A_Sony_1.bit,FILLER_A_Sony_1.md5
++1,HRD_A_Fujitsu_3,HRD_A_Fujitsu_3.bin,HRD_A_Fujitsu_3.md5
++1,INITQP_A_Sony_1,INITQP_A_Sony_1.bit,INITQP_A_Sony_1.md5
++1,INITQP_B_Main10_Sony_1,INITQP_B_Main10_Sony_1.bit,INITQP_B_Main10_Sony_1.md5
++1,ipcm_A_NEC_3,ipcm_A_NEC_3.bit,ipcm_A_NEC_3.md5
++1,ipcm_B_NEC_3,ipcm_B_NEC_3.bit,ipcm_B_NEC_3.md5
++1,ipcm_C_NEC_3,ipcm_C_NEC_3.bit,ipcm_C_NEC_3.md5
++1,ipcm_D_NEC_3,ipcm_D_NEC_3.bit,ipcm_D_NEC_3.md5
++1,ipcm_E_NEC_2,ipcm_E_NEC_2.bit,ipcm_E_NEC_2.md5
++1,IPRED_A_docomo_2,IPRED_A_docomo_2.bit,IPRED_A_docomo_2.md5
++1,IPRED_B_Nokia_3,IPRED_B_Nokia_3.bit,IPRED_B_Nokia_3_yuv.md5
++1,IPRED_C_Mitsubishi_3,IPRED_C_Mitsubishi_3.bit,IPRED_C_Mitsubishi_3_yuv.md5
++1,LS_A_Orange_2,LS_A_Orange_2.bit,LS_A_Orange_2_yuv.md5
++1,LS_B_Orange_4,LS_B_Orange_4.bit,LS_B_Orange_4_yuv.md5
++1,LTRPSPS_A_Qualcomm_1,LTRPSPS_A_Qualcomm_1.bit,LTRPSPS_A_Qualcomm_1.md5
++1,MAXBINS_A_TI_5,MAXBINS_A_TI_5.bit,MAXBINS_A_TI_5_yuv.md5
++1,MAXBINS_B_TI_5,MAXBINS_B_TI_5.bit,MAXBINS_B_TI_5_yuv.md5
++1,MAXBINS_C_TI_5,MAXBINS_C_TI_5.bit,MAXBINS_C_TI_5_yuv.md5
++1,MERGE_A_TI_3,MERGE_A_TI_3.bit,MERGE_A_TI_3.md5
++1,MERGE_B_TI_3,MERGE_B_TI_3.bit,MERGE_B_TI_3.md5
++1,MERGE_C_TI_3,MERGE_C_TI_3.bit,MERGE_C_TI_3.md5
++1,MERGE_D_TI_3,MERGE_D_TI_3.bit,MERGE_D_TI_3.md5
++1,MERGE_E_TI_3,MERGE_E_TI_3.bit,MERGE_E_TI_3.md5
++1,MERGE_F_MTK_4,MERGE_F_MTK_4.bit,MERGE_F_MTK_4.md5
++1,MERGE_G_HHI_4,MERGE_G_HHI_4.bit,MERGE_G_HHI_4.md5
++1,MVCLIP_A_qualcomm_3,MVCLIP_A_qualcomm_3.bit,MVCLIP_A_qualcomm_3.yuv.md5
++1,MVDL1ZERO_A_docomo_4,MVDL1ZERO_A_docomo_4.bit,MVDL1ZERO_A_docomo_4.md5
++1,MVEDGE_A_qualcomm_3,MVEDGE_A_qualcomm_3.bit,MVEDGE_A_qualcomm_3.yuv.md5
++1,NoOutPrior_A_Qualcomm_1,NoOutPrior_A_Qualcomm_1.bit,NoOutPrior_A_Qualcomm_1.md5
++1,NoOutPrior_B_Qualcomm_1,NoOutPrior_B_Qualcomm_1.bit,NoOutPrior_B_Qualcomm_1.md5
++1,NUT_A_ericsson_5,NUT_A_ericsson_5.bit,NUT_A_ericsson_5.md5
++1,OPFLAG_A_Qualcomm_1,OPFLAG_A_Qualcomm_1.bit,OPFLAG_A_Qualcomm_1.md5
++1,OPFLAG_B_Qualcomm_1,OPFLAG_B_Qualcomm_1.bit,OPFLAG_B_Qualcomm_1.md5
++1,OPFLAG_C_Qualcomm_1,OPFLAG_C_Qualcomm_1.bit,OPFLAG_C_Qualcomm_1.md5
++1,PICSIZE_A_Bossen_1,PICSIZE_A_Bossen_1.bin,PICSIZE_A_Bossen_1.md5
++1,PICSIZE_B_Bossen_1,PICSIZE_B_Bossen_1.bin,PICSIZE_B_Bossen_1.md5
++1,PICSIZE_C_Bossen_1,PICSIZE_C_Bossen_1.bin,PICSIZE_C_Bossen_1.md5
++1,PICSIZE_D_Bossen_1,PICSIZE_D_Bossen_1.bin,PICSIZE_D_Bossen_1.md5
++1,PMERGE_A_TI_3,PMERGE_A_TI_3.bit,PMERGE_A_TI_3.md5
++1,PMERGE_B_TI_3,PMERGE_B_TI_3.bit,PMERGE_B_TI_3.md5
++1,PMERGE_C_TI_3,PMERGE_C_TI_3.bit,PMERGE_C_TI_3.md5
++1,PMERGE_D_TI_3,PMERGE_D_TI_3.bit,PMERGE_D_TI_3.md5
++1,PMERGE_E_TI_3,PMERGE_E_TI_3.bit,PMERGE_E_TI_3.md5
++1,POC_A_Bossen_3,POC_A_Bossen_3.bin,POC_A_Bossen_3.md5
++1,PPS_A_qualcomm_7,PPS_A_qualcomm_7.bit,PPS_A_qualcomm_7.yuv.md5
++1,PS_B_VIDYO_3,PS_B_VIDYO_3.bit,PS_B_VIDYO_3_yuv.md5
++1,RAP_A_docomo_6,RAP_A_docomo_6.bit,RAP_A_docomo_6.md5
++1,RAP_B_Bossen_2,RAP_B_Bossen_2.bit,RAP_B_Bossen_2.md5
++1,RPLM_A_qualcomm_4,RPLM_A_qualcomm_4.bit,RPLM_A_qualcomm_4.yuv.md5
++1,RPLM_B_qualcomm_4,RPLM_B_qualcomm_4.bit,RPLM_B_qualcomm_4.yuv.md5
++1,RPS_A_docomo_5,RPS_A_docomo_5.bit,RPS_A_docomo_5.md5
++1,RPS_B_qualcomm_5,RPS_B_qualcomm_5.bit,RPS_B_qualcomm_5.yuv.md5
++1,RPS_C_ericsson_5,RPS_C_ericsson_5.bit,RPS_C_ericsson_5.md5
++1,RPS_D_ericsson_6,RPS_D_ericsson_6.bit,RPS_D_ericsson_6.md5
++1,RPS_E_qualcomm_5,RPS_E_qualcomm_5.bit,RPS_E_qualcomm_5.yuv.md5
++1,RPS_F_docomo_2,RPS_F_docomo_2.bit,RPS_F_docomo_2.md5
++1,RQT_A_HHI_4,RQT_A_HHI_4.bit,RQT_A_HHI_4.md5
++1,RQT_B_HHI_4,RQT_B_HHI_4.bit,RQT_B_HHI_4.md5
++1,RQT_C_HHI_4,RQT_C_HHI_4.bit,RQT_C_HHI_4.md5
++1,RQT_D_HHI_4,RQT_D_HHI_4.bit,RQT_D_HHI_4.md5
++1,RQT_E_HHI_4,RQT_E_HHI_4.bit,RQT_E_HHI_4.md5
++1,RQT_F_HHI_4,RQT_F_HHI_4.bit,RQT_F_HHI_4.md5
++1,RQT_G_HHI_4,RQT_G_HHI_4.bit,RQT_G_HHI_4.md5
++1,SAO_A_MediaTek_4,SAO_A_MediaTek_4.bit,SAO_A_MediaTek_4.md5
++1,SAO_B_MediaTek_5,SAO_B_MediaTek_5.bit,SAO_B_MediaTek_5.md5
++1,SAO_C_Samsung_5,SAO_C_Samsung_5.bin,SAO_C_Samsung_5.md5
++1,SAO_D_Samsung_5,SAO_D_Samsung_5.bin,SAO_D_Samsung_5.md5
++1,SAO_E_Canon_4,SAO_E_Canon_4.bit,SAO_E_Canon_4.md5
++1,SAO_F_Canon_3,SAO_F_Canon_3.bit,SAO_F_Canon_3.md5
++1,SAO_G_Canon_3,SAO_G_Canon_3.bit,SAO_G_Canon_3.md5
++1,SAO_H_Parabola_1,SAO_H_Parabola_1.bit,SAO_H_Parabola_1.md5
++2,SAODBLK_A_MainConcept_4,SAODBLK_A_MainConcept_4.bin,SAODBLK_A_MainConcept_4_md5.txt
++2,SAODBLK_B_MainConcept_4,SAODBLK_B_MainConcept_4.bin,SAODBLK_B_MainConcept_4_md5.txt
++1,SDH_A_Orange_4,SDH_A_Orange_4.bit,SDH_A_Orange_4_yuv.md5
++1,SLICES_A_Rovi_3,SLICES_A_Rovi_3.bin,SLICES_A_Rovi_3.md5
++1,SLIST_A_Sony_5,SLIST_A_Sony_5.bin,SLIST_A_Sony_5_yuv.md5
++1,SLIST_B_Sony_9,SLIST_B_Sony_9.bin,SLIST_B_Sony_9_yuv.md5
++1,SLIST_C_Sony_4,SLIST_C_Sony_4.bin,SLIST_C_Sony_4_yuv.md5
++1,SLIST_D_Sony_9,str.bin,SLIST_D_Sony_9_yuv.md5
++1,SLPPLP_A_VIDYO_2,SLPPLP_A_VIDYO_2.bit,SLPPLP_A_VIDYO_2_yuv.md5
++1,STRUCT_A_Samsung_7,STRUCT_A_Samsung_7.bin,STRUCT_A_Samsung_7.md5
++1,STRUCT_B_Samsung_7,STRUCT_B_Samsung_7.bin,STRUCT_B_Samsung_7.md5
++1,TILES_A_Cisco_2,TILES_A_Cisco_2.bin,TILES_A_Cisco_2_yuv.md5
++1,TILES_B_Cisco_1,TILES_B_Cisco_1.bin,TILES_B_Cisco_1_yuv.md5
++1,TMVP_A_MS_3,TMVP_A_MS_3.bit,TMVP_A_MS_3.yuv.md5
++1,TSCL_A_VIDYO_5,TSCL_A_VIDYO_5.bit,TSCL_A_VIDYO_5_yuv.md5
++1,TSCL_B_VIDYO_4,TSCL_B_VIDYO_4.bit,TSCL_B_VIDYO_4_yuv.md5
++1,TSKIP_A_MS_3,TSKIP_A_MS_3.bit,TSKIP_A_MS_3.yuv.md5
++3,TSUNEQBD_A_MAIN10_Technicolor_2,TSUNEQBD_A_MAIN10_Technicolor_2.bit,TSUNEQBD_A_MAIN10_Technicolor_2_yuv.md5, # unequal bit depth
++1,TUSIZE_A_Samsung_1,TUSIZE_A_Samsung_1.bin,TUSIZE_A_Samsung_1.md5
++1,VPSID_A_VIDYO_2,VPSID_A_VIDYO_2.bit,VPSID_A_VIDYO_2_yuv.md5
++3,VPSSPSPPS_A_MainConcept_1,VPSSPSPPS_A_MainConcept_1.bin,VPSSPSPPS_A_MainConcept_1_md5.txt, # ???
++1,WP_A_MAIN10_Toshiba_3,WP_A_MAIN10_Toshiba_3.bit,WP_A_MAIN10_Toshiba_3_yuv.md5
++1,WP_A_Toshiba_3,WP_A_Toshiba_3.bit,WP_A_Toshiba_3_yuv.md5
++1,WP_B_Toshiba_3,WP_B_Toshiba_3.bit,WP_B_Toshiba_3_yuv.md5
++1,WP_MAIN10_B_Toshiba_3,WP_MAIN10_B_Toshiba_3.bit,WP_MAIN10_B_Toshiba_3_yuv.md5
++1,WPP_A_ericsson_MAIN10_2,WPP_A_ericsson_MAIN10_2.bit,WPP_A_ericsson_MAIN10_yuv.md5
++1,WPP_A_ericsson_MAIN_2,WPP_A_ericsson_MAIN_2.bit,WPP_A_ericsson_MAIN_2_yuv.md5
++1,WPP_B_ericsson_MAIN10_2,WPP_B_ericsson_MAIN10_2.bit,WPP_B_ericsson_MAIN10_yuv.md5
++1,WPP_B_ericsson_MAIN_2,WPP_B_ericsson_MAIN_2.bit,WPP_B_ericsson_MAIN_2_yuv.md5
++1,WPP_C_ericsson_MAIN10_2,WPP_C_ericsson_MAIN10_2.bit,WPP_C_ericsson_MAIN10_yuv.md5
++1,WPP_C_ericsson_MAIN_2,WPP_C_ericsson_MAIN_2.bit,WPP_C_ericsson_MAIN_2_yuv.md5
++1,WPP_D_ericsson_MAIN10_2,WPP_D_ericsson_MAIN10_2.bit,WPP_D_ericsson_MAIN10_yuv.md5
++1,WPP_D_ericsson_MAIN_2,WPP_D_ericsson_MAIN_2.bit,WPP_D_ericsson_MAIN_2_yuv.md5
++1,WPP_E_ericsson_MAIN10_2,WPP_E_ericsson_MAIN10_2.bit,WPP_E_ericsson_MAIN10_yuv.md5
++1,WPP_E_ericsson_MAIN_2,WPP_E_ericsson_MAIN_2.bit,WPP_E_ericsson_MAIN_2_yuv.md5
++1,WPP_F_ericsson_MAIN10_2,WPP_F_ericsson_MAIN10_2.bit,WPP_F_ericsson_MAIN10_yuv.md5
++1,WPP_F_ericsson_MAIN_2,WPP_F_ericsson_MAIN_2.bit,WPP_F_ericsson_MAIN_2_yuv.md5
 diff --git a/pi-util/conf_h265.csv b/pi-util/conf_h265.csv
 new file mode 100644
 index 0000000..fc14f2a
@@ -19535,10 +19801,10 @@ index 0000000..f8e5e75
 +# -Wa,-ahls
 diff --git a/pi-util/ffconf.py b/pi-util/ffconf.py
 new file mode 100755
-index 0000000..c896bc6
+index 0000000..e96bad2
 --- /dev/null
 +++ b/pi-util/ffconf.py
-@@ -0,0 +1,154 @@
+@@ -0,0 +1,164 @@
 +#!/usr/bin/env python
 +
 +import os
@@ -19549,7 +19815,6 @@ index 0000000..c896bc6
 +import csv
 +from stat import *
 +
-+conf_root = "/opt/conform/h265"
 +ffmpeg_exec = "./ffmpeg"
 +
 +def testone(fileroot, name, es_file, md5_file):
@@ -19599,10 +19864,10 @@ index 0000000..c896bc6
 +
 +def scandir(root):
 +    aconf = []
-+    ents = os.listdir(conf_root)
++    ents = os.listdir(root)
 +    ents.sort(key=str.lower)
 +    for name in ents:
-+        test_path = os.path.join(conf_root, name)
++        test_path = os.path.join(root, name)
 +        if S_ISDIR(os.stat(test_path).st_mode):
 +            files = os.listdir(test_path)
 +            es_file = "?"
@@ -19613,7 +19878,7 @@ index 0000000..c896bc6
 +                    pass
 +                elif ext == ".bit" or ext == ".bin":
 +                    es_file = f
-+                elif ext == ".md5":
++                elif ext == ".md5" or (ext == ".txt" and base[-4:] == "_md5"):
 +                    if md5_file == "?":
 +                        md5_file = f
 +                    elif base[-3:] == "yuv":
@@ -19629,9 +19894,11 @@ index 0000000..c896bc6
 +            return True
 +        return False
 +
-+def doconf(csva, tests):
-+    failures = []
++def doconf(csva, tests, test_root):
++    unx_failures = []
 +    unx_success = []
++    failures = 0
++    successes = 0
 +    for a in csva:
 +        exp_test = int(a[0])
 +        if (exp_test and runtest(a[1], tests)):
@@ -19639,17 +19906,25 @@ index 0000000..c896bc6
 +            print "==== ", name,
 +            sys.stdout.flush()
 +
-+            rv = testone(os.path.join(conf_root, name), name, a[2], a[3])
++            rv = testone(os.path.join(test_root, name), name, a[2], a[3])
++            if (rv == 0):
++                successes += 1
++            else:
++                failures += 1
++
 +            if (rv == 0):
 +                if exp_test == 2:
 +                    print ": * OK *"
 +                    unx_success.append(name)
 +                else:
 +                    print ": ok"
-+            elif exp_test > 1 and rv == 1:
++            elif exp_test == 2 and rv == 1:
 +                print ": fail"
++            elif exp_test == 3 and rv == 2:
++                # Call an expected "crash" an abort
++                print ": abort"
 +            else:
-+                failures.append(name)
++                unx_failures.append(name)
 +                if rv == 1:
 +                    print ": * FAIL *"
 +                elif (rv == 2) :
@@ -19659,11 +19934,11 @@ index 0000000..c896bc6
 +                else :
 +                    print ": * BANG *"
 +
-+    if failures or unx_success:
-+        print "Unexpected Failures:", failures
++    if unx_failures or unx_success:
++        print "Unexpected Failures:", unx_failures
 +        print "Unexpected Success: ", unx_success
 +    else:
-+        print "All tests normal"
++        print "All tests normal:", successes, "ok,", failures, "failed"
 +
 +
 +class ConfCSVDialect(csv.Dialect):
@@ -19679,19 +19954,20 @@ index 0000000..c896bc6
 +
 +    argp = argparse.ArgumentParser(description="FFmpeg h265 conformance tester")
 +    argp.add_argument("tests", nargs='*')
++    argp.add_argument("--test_root", default="/opt/conform/h265", help="Root dir for test")
 +    argp.add_argument("--csvgen", action='store_true', help="Generate CSV file for dir")
 +    argp.add_argument("--csv", default="pi-util/conf_h265.csv", help="CSV filename")
 +    args = argp.parse_args()
 +
 +    if args.csvgen:
-+        csv.writer(sys.stdout).writerows(scandir(conf_root))
++        csv.writer(sys.stdout).writerows(scandir(args.test_root))
 +        exit(0)
 +
 +    with open(args.csv, 'rt') as csvfile:
 +        csva = [a for a in csv.reader(csvfile, ConfCSVDialect())]
 +
 +
-+    doconf(csva, args.tests)
++    doconf(csva, args.tests, args.test_root)
 +
 diff --git a/pi-util/qem.sh b/pi-util/qem.sh
 new file mode 100755
