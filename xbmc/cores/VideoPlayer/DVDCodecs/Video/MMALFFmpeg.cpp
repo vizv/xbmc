@@ -96,6 +96,8 @@ void CMMALYUVBuffer::GetStrides(int(&strides)[YuvImage::MAX_PLANES])
   strides[0] = geo.stride_y;
   strides[1] = geo.stride_c;
   strides[2] = geo.stride_c;
+  if (geo.stripes > 1)
+    strides[3] = geo.height_y + geo.height_c;      // abuse: strides[3] = stripe stride
 }
 
 void CMMALYUVBuffer::SetDimensions(int width, int height, const int (&strides)[YuvImage::MAX_PLANES])
@@ -273,7 +275,7 @@ CDVDVideoCodec::VCReturn CDecoder::Decode(AVCodecContext* avctx, AVFrame* frame)
 
   if (frame)
   {
-    if ((frame->format != AV_PIX_FMT_YUV420P && frame->format != AV_PIX_FMT_BGR0 && frame->format != AV_PIX_FMT_RGB565LE) ||
+    if ((frame->format != AV_PIX_FMT_YUV420P && frame->format != AV_PIX_FMT_SAND128 && frame->format != AV_PIX_FMT_BGR0 && frame->format != AV_PIX_FMT_RGB565LE) ||
         frame->buf[1] != nullptr || frame->buf[0] == nullptr)
     {
       CLog::Log(LOGERROR, "%s::%s frame format invalid format:%d buf:%p,%p", CLASSNAME, __func__, frame->format, frame->buf[0], frame->buf[1]);
