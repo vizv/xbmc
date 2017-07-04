@@ -160,7 +160,7 @@ void CPixelConverterRBP::GetPicture(VideoPicture& picture)
   picture.iFlags         = 0;
   picture.color_matrix   = 4; // CONF_FLAGS_YUVCOEF_BT601
   picture.color_range    = 0; // *not* CONF_FLAGS_YUV_FULLRANGE
-  picture.iWidth         = m_height;
+  picture.iWidth         = m_width;
   picture.iHeight        = m_height;
   picture.iDisplayWidth  = m_width; //! @todo: Update if aspect ratio changes
   picture.iDisplayHeight = m_height;
