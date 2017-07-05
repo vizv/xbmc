@@ -227,7 +227,7 @@ uint32_t CMMALPool::TranslateFormat(AVPixelFormat pixfmt)
 void CMMALPool::Configure(AVPixelFormat format, int width, int height, int alignedWidth, int alignedHeight, int size)
 {
   CSingleLock lock(m_critSection);
-  if (m_mmal_format == MMAL_ENCODING_UNKNOWN)
+  if (format != AV_PIX_FMT_NONE)
     m_mmal_format = TranslateFormat(format);
   m_width = width;
   m_height = height;
@@ -242,13 +242,13 @@ void CMMALPool::Configure(AVPixelFormat format, int width, int height, int align
     {
       if (alignedWidth)
       {
-        m_geo.stride_y = alignedWidth;
-        m_geo.stride_c = alignedWidth>>1;
+        m_geo.stride_y = alignedWidth * m_geo.bytes_per_pixel;
+        m_geo.stride_c = alignedWidth * m_geo.bytes_per_pixel >> 1;
       }
       if (alignedHeight)
       {
-        m_geo.height_y = alignedHeight;
-        m_geo.height_c = alignedHeight>>1;
+        m_geo.height_y = alignedHeight * m_geo.bytes_per_pixel;
+        m_geo.height_c = alignedHeight * m_geo.bytes_per_pixel >> 1;
       }
     }
   }
@@ -258,7 +258,7 @@ void CMMALPool::Configure(AVPixelFormat format, int width, int height, int align
     const unsigned int size_c = m_geo.stride_c * m_geo.height_c;
     m_size = (size_y + size_c * m_geo.planes_c) * m_geo.stripes;
   }
-  CLog::Log(LOGDEBUG, "%s::%s pool:%p %dx%d (%dx%d) pix:%d size:%d fmt:%.4s", CLASSNAME, __func__, m_mmal_pool, width, height, alignedWidth, alignedHeight, format, size, (char *)&m_mmal_format);
+  CLog::Log(LOGDEBUG, "%s::%s pool:%p %dx%d (%dx%d) pix:%d size:%d(%d) fmt:%.4s", CLASSNAME, __func__, m_mmal_pool, width, height, alignedWidth, alignedHeight, format, m_size, m_size, (char *)&m_mmal_format);
 }
 
 void CMMALPool::Configure(AVPixelFormat format, int size)
