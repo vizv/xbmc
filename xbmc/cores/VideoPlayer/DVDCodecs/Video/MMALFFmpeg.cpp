@@ -107,6 +107,11 @@ void CMMALYUVBuffer::SetDimensions(int width, int height, const int (&strides)[Y
   pool->SetDimensions(width, height, strides[0], height);
 }
 
+void CMMALYUVBuffer::SetDimensions(int width, int height, const int (&strides)[YuvImage::MAX_PLANES], const int (&planeOffsets)[YuvImage::MAX_PLANES])
+{
+  return SetDimensions(width, height, strides);
+}
+
 //-----------------------------------------------------------------------------
 // MMAL Decoder
 //-----------------------------------------------------------------------------
