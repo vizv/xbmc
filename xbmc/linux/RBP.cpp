@@ -406,7 +406,7 @@ static int get_image_params(int file_desc, VC_IMAGE_T * img)
 CGPUMEM::CGPUMEM(unsigned int numbytes, bool cached)
 {
   m_numbytes = numbytes;
-  m_vcsm_handle = vcsm_malloc_cache(numbytes, cached ? VCSM_CACHE_TYPE_HOST : VCSM_CACHE_TYPE_NONE, (char *)"CGPUMEM");
+  m_vcsm_handle = vcsm_malloc_cache(numbytes, (VCSM_CACHE_TYPE_T)(0x80 | (unsigned)(cached ? VCSM_CACHE_TYPE_HOST : VCSM_CACHE_TYPE_NONE)), (char *)"CGPUMEM");
   assert(m_vcsm_handle);
   m_vc_handle = vcsm_vc_hdl_from_hdl(m_vcsm_handle);
   assert(m_vc_handle);
