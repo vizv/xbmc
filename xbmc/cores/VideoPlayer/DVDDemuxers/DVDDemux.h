@@ -148,6 +148,7 @@ public:
   std::shared_ptr<AVContentLightMetadata> contentLightMetaData;
 
   std::string stereo_mode; // expected stereo mode
+  int workaround_bugs = 0; // info for decoder
 };
 
 class CDemuxStreamAudio : public CDemuxStream
