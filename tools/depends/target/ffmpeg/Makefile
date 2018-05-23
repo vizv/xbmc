@@ -28,8 +28,13 @@ ffmpg_config += --enable-encoder=png --enable-encoder=mjpeg
 ffmpg_config += --enable-libdav1d
 ffmpg_config += $(FFMPEG_CONFIGURE_OPTIONS)
 
+ARCH = $(CPU)
+ifeq ($(CPU), cortex-a7)
+  ARCH = arm
+endif
+
 ifeq ($(CROSS_COMPILING), yes)
-  ffmpg_config += --arch=$(CPU) --enable-cross-compile
+  ffmpg_config += --arch=$(ARCH) --enable-cross-compile
 endif
 ifeq ($(OS), linux)
   ffmpg_config += --target-os=$(OS)
@@ -73,7 +78,7 @@ ifeq ($(Configuration), Release)
   ffmpg_config += --disable-debug
 endif
 
-ffmpg_config += --enable-rpi
+ffmpg_config += --enable-rpi --extra-cflags=-mfpu=neon
 
 all: .installed-$(PLATFORM)
 
