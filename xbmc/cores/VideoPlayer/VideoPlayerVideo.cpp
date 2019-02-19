@@ -14,6 +14,7 @@
 #include "ServiceBroker.h"
 #include "cores/VideoPlayer/Interface/Addon/DemuxPacket.h"
 #include "cores/VideoPlayer/Interface/Addon/TimingConstants.h"
+#include "cores/VideoPlayer/VideoRenderers/RenderFlags.h"
 #include "settings/AdvancedSettings.h"
 #include "settings/SettingsComponent.h"
 #include "utils/MathUtils.h"
@@ -700,6 +701,8 @@ bool CVideoPlayerVideo::ProcessDecoderOutput(double &frametime, double &pts)
           break;
         default:
           stereoMode = m_hints.stereo_mode;
+          if (m_processInfo.GetVideoSettings().m_StereoInvert)
+            stereoMode = InvertStereoMode(stereoMode);
           break;
       }
       if (!stereoMode.empty())
