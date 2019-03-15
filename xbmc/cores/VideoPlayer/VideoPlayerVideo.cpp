@@ -17,7 +17,6 @@
 #include "DVDCodecs/Video/DVDVideoCodecFFmpeg.h"
 #include "cores/VideoPlayer/Interface/Addon/DemuxPacket.h"
 #include "cores/VideoPlayer/Interface/Addon/TimingConstants.h"
-#include "cores/VideoPlayer/VideoRenderers/RenderFlags.h"
 #include "windowing/GraphicContext.h"
 #include <sstream>
 #include <iomanip>
@@ -700,8 +699,6 @@ bool CVideoPlayerVideo::ProcessDecoderOutput(double &frametime, double &pts)
           break;
         default:
           stereoMode = m_hints.stereo_mode;
-          if (m_processInfo.GetVideoSettings().m_StereoInvert)
-            stereoMode = InvertStereoMode(stereoMode);
           break;
       }
       if (!stereoMode.empty())
