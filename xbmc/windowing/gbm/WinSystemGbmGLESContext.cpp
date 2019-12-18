@@ -21,6 +21,7 @@
 #include "cores/VideoPlayer/VideoRenderers/RenderFactory.h"
 #include "rendering/gles/ScreenshotSurfaceGLES.h"
 #include "utils/log.h"
+#include "VideoSyncPi.h"
 
 #include "platform/posix/XTimeUtils.h"
 
@@ -146,4 +147,18 @@ bool CWinSystemGbmGLESContext::CreateContext()
     return false;
   }
   return true;
+}
+
+std::unique_ptr<CVideoSync> CWinSystemGbmGLESContext::GetVideoSync(void *clock)
+{
+  std::unique_ptr<CVideoSync> pVSync(new CVideoSyncPi(clock));
+  return pVSync;
+}
+
+void CWinSystemGbmGLESContext::SetVSyncImpl(bool enable)
+{
+  if (!m_eglContext.SetVSync(enable))
+  {
+    CLog::Log(LOGERROR, "%s,Could not set egl vsync", __FUNCTION__);
+  }
 }
