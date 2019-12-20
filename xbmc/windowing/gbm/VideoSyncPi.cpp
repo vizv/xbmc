@@ -66,6 +66,14 @@ bool CVideoSyncPi::Setup(PUPDATECLOCK func)
   m_abort = false;
   CServiceBroker::GetWinSystem()->Register(this);
   CLog::Log(LOGDEBUG, "CVideoReferenceClock: setting up RPi");
+
+  // hack - get this from somewhere!
+  m_fd = open("/dev/dri/card1", O_RDWR | O_CLOEXEC);
+  if (m_fd < 0)
+    CLog::Log(LOGWARNING, "CVideoReferenceClock: failed to open device (%d)", m_fd);
+  else
+    CLog::Log(LOGWARNING, "CVideoReferenceClock: opened (%d)", m_fd);
+
   return true;
 }
 
@@ -74,13 +82,12 @@ void CVideoSyncPi::Run(CEvent& stopEvent)
   /* This shouldn't be very busy and timing is important so increase priority */
   CThread::GetCurrentThread()->SetPriority(CThread::GetCurrentThread()->GetPriority()+1);
 
-  // hack - get this from somewhere!
-  int fd = open("/dev/dri/card1", O_RDWR | O_CLOEXEC);
-  if (fd < 0)
+  if (m_fd < 0)
   {
-    CLog::Log(LOGWARNING, "CVideoReferenceClock: failed to open device (%d)", fd);
+    CLog::Log(LOGWARNING, "CVideoReferenceClock: failed to open device (%d)", m_fd);
     return;
   }
+  CLog::Log(LOGWARNING, "CVideoReferenceClock: started (%d)", m_fd);
 
   drmVBlank vbl;
   drmEventContext evctx;
@@ -88,7 +95,7 @@ void CVideoSyncPi::Run(CEvent& stopEvent)
   /* Get current count first */
   vbl.request.type = DRM_VBLANK_RELATIVE;
   vbl.request.sequence = 0;
-  int ret = drmWaitVBlank(fd, &vbl);
+  int ret = drmWaitVBlank(m_fd, &vbl);
   if (ret != 0)
   {
     CLog::Log(LOGWARNING, "drmWaitVBlank (relative) failed ret: %i\n", ret);
@@ -99,7 +106,7 @@ void CVideoSyncPi::Run(CEvent& stopEvent)
   vbl.request.type = (drmVBlankSeqType)(DRM_VBLANK_RELATIVE | DRM_VBLANK_EVENT);
   vbl.request.sequence = 1;
   vbl.request.signal = reinterpret_cast<std::uintptr_t>(this);
-  ret = drmWaitVBlank(fd, &vbl);
+  ret = drmWaitVBlank(m_fd, &vbl);
   if (ret != 0)
   {
     CLog::Log(LOGWARNING, "drmWaitVBlank (relative, event) failed ret: %i\n", ret);
@@ -117,19 +124,16 @@ void CVideoSyncPi::Run(CEvent& stopEvent)
 
   while (!stopEvent.Signaled() && !m_abort)
   {
-    struct timeval timeout = { .tv_sec = 3, .tv_usec = 0 };
+    struct timeval timeout = { .tv_sec = 1, .tv_usec = 0 };
     fd_set fds;
-    int ret;
     FD_ZERO(&fds);
-    FD_SET(fd, &fds);
-    ret = select(fd + 1, &fds, NULL, NULL, &timeout);
+    FD_SET(m_fd, &fds);
+    ret = select(m_fd + 1, &fds, NULL, NULL, &timeout);
     if (ret <= 0) {
       CLog::Log(LOGWARNING, "select timed out or error (ret %d)\n", ret);
       break;
-    } else if (FD_ISSET(0, &fds)) {
-      CLog::Log(LOGDEBUG, "got event (ret %d)\n", ret);
     }
-    ret = drmHandleEvent(fd, &evctx);
+    ret = drmHandleEvent(m_fd, &evctx);
     if (ret != 0) {
       CLog::Log(LOGWARNING, "drmHandleEvent failed: %i\n", ret);
       return;
@@ -141,6 +145,9 @@ void CVideoSyncPi::Cleanup()
 {
   CLog::Log(LOGDEBUG, "CVideoReferenceClock: cleaning up RPi");
   CServiceBroker::GetWinSystem()->Unregister(this);
+  CLog::Log(LOGWARNING, "CVideoReferenceClock: closing (%d)", m_fd);
+  close(m_fd);
+  m_fd = -1;
 }
 
 float CVideoSyncPi::GetFps()

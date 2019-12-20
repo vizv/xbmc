@@ -26,5 +26,6 @@ public:
 private:
   unsigned int m_vbl_count;
   struct timeval m_start;
+  int m_fd;
   volatile bool m_abort;
 };
