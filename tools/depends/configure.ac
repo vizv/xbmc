@@ -481,6 +481,8 @@ if test "$target_platform" = "raspberry-pi" ; then
    -lvchiq_arm"
 fi
 
+platform_ldflags+=" -L${use_firmware}/opt/vc/lib -lvcsm"
+
 XBMC_SETUP_ARCH_DEFINES()
 
 
