@@ -90,7 +90,7 @@ void PAPlayer::SoftStart(bool wait/* = false */)
   {
     /* wait for them to fade in */
     lock.Leave();
-    Sleep(FAST_XFADE_TIME);
+    CThread::Sleep(FAST_XFADE_TIME);
     lock.Enter();
 
     /* be sure they have faded in */
@@ -104,7 +104,7 @@ void PAPlayer::SoftStart(bool wait/* = false */)
         {
           lock.Leave();
           wait = true;
-          Sleep(1);
+          CThread::Sleep(1);
           lock.Enter();
           break;
         }
@@ -139,7 +139,7 @@ void PAPlayer::SoftStop(bool wait/* = false */, bool close/* = true */)
 
     /* wait for them to fade out */
     lock.Leave();
-    Sleep(FAST_XFADE_TIME);
+    CThread::Sleep(FAST_XFADE_TIME);
     lock.Enter();
 
     /* be sure they have faded out */
@@ -153,7 +153,7 @@ void PAPlayer::SoftStop(bool wait/* = false */, bool close/* = true */)
         {
           lock.Leave();
           wait = true;
-          Sleep(1);
+          CThread::Sleep(1);
           lock.Enter();
           break;
         }
