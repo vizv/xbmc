@@ -64,11 +64,11 @@ bool CWinSystemRpiGLESContext::InitWindowSystem()
   RETRO::CRPProcessInfoPi::Register();
   RETRO::CRPProcessInfoPi::RegisterRendererFactory(new RETRO::CRendererFactoryOpenGLES);
   CDVDFactoryCodec::ClearHWAccels();
-  MMAL::CDecoder::Register();
+  // MMAL::CDecoder::Register();
   CDVDFactoryCodec::ClearHWVideoCodecs();
-  MMAL::CMMALVideo::Register();
+  // MMAL::CMMALVideo::Register();
   VIDEOPLAYER::CRendererFactory::ClearRenderer();
-  MMAL::CMMALRenderer::Register();
+  // MMAL::CMMALRenderer::Register();
 
   return true;
 }

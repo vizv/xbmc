@@ -54,9 +54,9 @@ bool CWinSystemGbmGLESContext::InitWindowSystem()
     return false;
   }
 
-  MMAL::CDecoder::Register();
-  MMAL::CMMALRenderer::Register();
-  MMAL::CMMALVideo::Register();
+  // MMAL::CDecoder::Register();
+  // MMAL::CMMALRenderer::Register();
+  // MMAL::CMMALVideo::Register();
 
   return true;
 }
